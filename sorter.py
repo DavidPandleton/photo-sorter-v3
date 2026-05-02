@@ -3,15 +3,20 @@ import sys
 import shutil
 import logging
 import json
+import datetime
 from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, 
                              QHBoxLayout, QWidget, QFileDialog, QFrame, 
                              QPushButton, QGraphicsOpacityEffect, QMessageBox,
                              QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
-                             QGraphicsRectItem)
+                             QGraphicsRectItem, QStackedWidget)
 from PyQt6.QtGui import (QPixmap, QImage, QColor, QPalette, QKeyEvent, 
-                         QPainter, QImageReader, QFont, QIcon, QBrush, QPen, QTransform)
+                         QPainter, QImageReader, QFont, QIcon, QBrush, QPen, QTransform, QGuiApplication)
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QPropertyAnimation, QRect, QRectF, QVariantAnimation
+
+QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+)
 
 import rawpy
 import numpy as np
@@ -100,21 +105,17 @@ class PhotoViewer(QGraphicsView):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
         super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event):
-        # Zoom factor
         zoom_in_factor = 1.15
         zoom_out_factor = 1 / zoom_in_factor
-
-        # Zoom
-        if event.angleDelta().y() > 0:
-            self.zoom(zoom_in_factor)
-        else:
-            self.zoom(zoom_out_factor)
+        if event.angleDelta().y() > 0: self.zoom(zoom_in_factor)
+        else: self.zoom(zoom_out_factor)
 
     def zoom(self, factor):
         self.scale(factor, factor)
@@ -142,12 +143,17 @@ class PhotoSorter(QMainWindow):
         self.cache = {}
         self.active_loaders = []
         self.root_folder = ""
-        self.side_layout = None  # Pre-initialize to avoid AttributeErrors
+        self.is_processing = False
+        self.side_layout = None
+
+        self.stack = QStackedWidget()
+        self.setCentralWidget(self.stack)
         
         self.setup_styles()
-        self.build_ui()
+        self.build_menu_ui()
+        self.build_main_ui()
         
-        QTimer.singleShot(100, self.select_folder)
+        self.stack.setCurrentIndex(0)
 
     def setup_styles(self):
         self.setStyleSheet("""
@@ -156,50 +162,74 @@ class PhotoSorter(QMainWindow):
             #SidePanel { background-color: #1a1a1a; border-left: 1px solid #333; }
             #TopBar { background-color: #1a1a1a; border-bottom: 1px solid #333; min-height: 60px; }
             #Title { font-size: 20px; font-weight: bold; color: #42a5f5; padding-left: 20px; }
-            QPushButton { background-color: #333; border: none; padding: 8px 15px; border-radius: 4px; font-weight: 600; }
+            QPushButton { background-color: #333; border: none; padding: 8px 15px; border-radius: 4px; font-weight: 600; min-height: 35px; }
             QPushButton:hover { background-color: #444; }
             QPushButton#ActionBtn { background-color: #42a5f5; color: white; }
             #HotkeyLabel { font-size: 13px; padding: 10px; border-radius: 4px; margin-bottom: 5px; background-color: #252525; border: 1px solid #333; }
             #StatCard { background-color: #222; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #333; }
             #StatValue { font-size: 24px; font-weight: bold; }
             #StatTitle { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+            #MenuTitle { font-size: 48px; font-weight: bold; color: #42a5f5; margin-bottom: 30px; }
         """)
 
-    def build_ui(self):
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        main_layout = QVBoxLayout(main_widget)
+    def build_menu_ui(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(20)
+        
+        title = QLabel("PHOTO SORTER V1")
+        title.setObjectName("MenuTitle")
+        layout.addWidget(title, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        btn_start = QPushButton("Start Sorting")
+        btn_start.setFixedSize(300, 60)
+        btn_start.clicked.connect(self.select_folder)
+        layout.addWidget(btn_start, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        btn_restore = QPushButton("Restore Checkpoint")
+        btn_restore.setFixedSize(300, 60)
+        btn_restore.clicked.connect(self.restore_from_menu)
+        layout.addWidget(btn_restore, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        btn_exit = QPushButton("Exit")
+        btn_exit.setFixedSize(300, 60)
+        btn_exit.clicked.connect(self.close)
+        layout.addWidget(btn_exit, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        self.stack.addWidget(page)
+
+    def build_main_ui(self):
+        page = QWidget()
+        main_layout = QVBoxLayout(page)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Top Bar
         top_bar = QWidget(); top_bar.setObjectName("TopBar")
         top_layout = QHBoxLayout(top_bar)
         title = QLabel("PHOTO SORTER V1"); title.setObjectName("Title")
         top_layout.addWidget(title)
         top_layout.addStretch()
-        btn_open = QPushButton("Open Folder"); btn_open.clicked.connect(self.select_folder)
-        top_layout.addWidget(btn_open)
+        
+        btn_back = QPushButton("Back to Menu"); btn_back.clicked.connect(self.confirm_return_to_menu)
+        top_layout.addWidget(btn_back)
+        
         btn_restore = QPushButton("Restore Checkpoint"); btn_restore.clicked.connect(self.restore_checkpoint)
         top_layout.addWidget(btn_restore)
+        
         btn_export = QPushButton("Finish Export"); btn_export.setObjectName("ActionBtn"); btn_export.clicked.connect(self.finish_sorting)
         top_layout.addWidget(btn_export)
         main_layout.addWidget(top_bar)
 
-        # Content
         content = QWidget()
         content_layout = QHBoxLayout(content); content_layout.setContentsMargins(0, 0, 0, 0); content_layout.setSpacing(0)
         
-        # Left Viewer
         self.viewer = PhotoViewer()
         content_layout.addWidget(self.viewer, 1)
         
-        # Right Panel
-        side_panel = QFrame()
-        side_panel.setObjectName("SidePanel")
+        side_panel = QFrame(); side_panel.setObjectName("SidePanel")
         side_panel.setFixedWidth(300)
-        self.side_layout = QVBoxLayout(side_panel)
-        self.side_layout.setContentsMargins(20, 20, 20, 20)
+        self.side_layout = QVBoxLayout(side_panel); self.side_layout.setContentsMargins(20, 20, 20, 20)
         
         self.create_hotkey_panel()
         self.side_layout.addSpacing(20)
@@ -209,9 +239,9 @@ class PhotoSorter(QMainWindow):
         
         content_layout.addWidget(side_panel)
         main_layout.addWidget(content)
+        self.stack.addWidget(page)
 
     def create_hotkey_panel(self):
-        if not self.side_layout: return
         self.side_layout.addWidget(QLabel("CONTROLS"))
         hk = [
             ("<span style='color:#ef5350'>[1]</span> BAD", "BadLabel"),
@@ -226,7 +256,6 @@ class PhotoSorter(QMainWindow):
             self.side_layout.addWidget(l)
 
     def create_stats_panel(self):
-        if not self.side_layout: return
         self.stat_widgets = {}
         for cat in ["BAD", "OK", "GOOD"]:
             card = QFrame(); card.setObjectName("StatCard")
@@ -238,7 +267,6 @@ class PhotoSorter(QMainWindow):
             self.stat_widgets[cat] = v
 
     def create_info_panel(self):
-        if not self.side_layout: return
         self.info_progress = QLabel("0 / 0"); self.info_progress.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.info_filename = QLabel("-"); self.info_filename.setWordWrap(True); self.info_filename.setStyleSheet("color: #aaa;")
         self.info_type = QLabel("-"); self.info_type.setStyleSheet("color: #42a5f5; font-weight: bold;")
@@ -250,12 +278,17 @@ class PhotoSorter(QMainWindow):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
         if folder: self.load_images(folder)
 
+    def restore_from_menu(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select folder that contains the checkpoint")
+        if folder:
+            self.root_folder = os.path.abspath(folder)
+            self.restore_checkpoint()
+
     def load_images(self, folder):
         self.root_folder = os.path.abspath(folder)
         exts = {'.jpg', '.jpeg', '.png', '.cr2', '.arw', '.nef'}
         self.image_paths = []
         for r, _, fs in os.walk(self.root_folder):
-            # Skip subfolders we created
             if any(x in r for x in ['/BAD', '/OK', '/GOOD', '\\BAD', '\\OK', '\\GOOD']): continue
             for f in fs:
                 if Path(f).suffix.lower() in exts: 
@@ -265,20 +298,69 @@ class PhotoSorter(QMainWindow):
             QMessageBox.warning(self, "No Images", "Folder is empty or formats not supported.")
             return
 
-        self.create_checkpoint()
+        cp_path = os.path.join(self.root_folder, ".photosorter_checkpoint.json")
+        overwrite = True
+        if os.path.exists(cp_path):
+            ans = QMessageBox.question(self, "Checkpoint Exists", 
+                "A previous checkpoint was found. Do you want to replace it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if ans == QMessageBox.StandardButton.No: overwrite = False
+
+        if overwrite: self.create_checkpoint()
+        
         self.current_index = 0
         self.results = {}
         self.update_stats()
+        self.stack.setCurrentIndex(1)
         self.display_current()
 
-    def create_checkpoint(self):
+    def reset_to_menu(self):
+        for loader in self.active_loaders:
+            loader.terminate()
+            loader.wait()
+        self.active_loaders = []
+        self.image_paths = []
+        self.results = {}
+        self.cache = {}
+        self.current_index = -1
+        self.root_folder = ""
+        self.stack.setCurrentIndex(0)
+
+    def confirm_return_to_menu(self):
+        if len(self.results) > 0:
+            ans = QMessageBox.question(self, "Confirm Exit", 
+                "You have started sorting images. Are you sure you want to return to the main menu?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if ans != QMessageBox.StandardButton.Yes: return
+        self.reset_to_menu()
+
+    def create_checkpoint(self, created_folders=None):
         cp_path = os.path.join(self.root_folder, ".photosorter_checkpoint.json")
-        if not os.path.exists(cp_path):
-            data = {"root": self.root_folder, "files": self.image_paths}
+        data = {}
+        if os.path.exists(cp_path):
             try:
-                with open(cp_path, 'w') as f: json.dump(data, f, indent=2)
-                logging.info(f"Checkpoint created: {cp_path}")
-            except Exception as e: logging.error(f"Checkpoint failed: {e}")
+                with open(cp_path, 'r') as f: data = json.load(f)
+            except: pass
+        
+        if not data or "files" not in data:
+            data = {
+                "root": self.root_folder,
+                "created_by": "PhotoSorterV1",
+                "created_at": datetime.datetime.now().isoformat(),
+                "files": self.image_paths,
+                "created_folders": []
+            }
+        
+        if created_folders:
+            existing = data.get("created_folders", [])
+            for f in created_folders:
+                if f not in existing: existing.append(f)
+            data["created_folders"] = existing
+
+        try:
+            with open(cp_path, 'w') as f: json.dump(data, f, indent=2)
+            logging.info(f"Checkpoint updated: {cp_path}")
+        except Exception as e: logging.error(f"Checkpoint failed: {e}")
 
     def display_current(self):
         if 0 <= self.current_index < len(self.image_paths):
@@ -322,7 +404,7 @@ class PhotoSorter(QMainWindow):
 
     def on_image_loaded(self, path, qimage):
         self.cache[path] = qimage
-        if 0 <= self.current_index < len(self.image_paths):
+        if self.stack.currentIndex() == 1 and 0 <= self.current_index < len(self.image_paths):
             if path == self.image_paths[self.current_index]:
                 self.viewer.set_image(qimage)
 
@@ -336,9 +418,18 @@ class PhotoSorter(QMainWindow):
         if loader in self.active_loaders: self.active_loaders.remove(loader)
 
     def keyPressEvent(self, event: QKeyEvent):
+        if self.stack.currentIndex() != 1 or event.isAutoRepeat(): return
+        if self.is_processing: return
+        
         key = event.key()
         mod = event.modifiers()
-        if key == Qt.Key.Key_Escape: self.close()
+        
+        if key == Qt.Key.Key_Escape:
+            self.confirm_return_to_menu()
+            return
+        elif key in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
+            self.finish_sorting()
+            return
         elif key == Qt.Key.Key_F:
             if self.isFullScreen(): self.showNormal()
             else: self.showFullScreen()
@@ -358,50 +449,52 @@ class PhotoSorter(QMainWindow):
         elif key == Qt.Key.Key_2: category, color = "OK", QColor(255, 202, 40)
         elif key == Qt.Key.Key_3: category, color = "GOOD", QColor(102, 187, 106)
         if category:
+            self.is_processing = True
             self.results[self.image_paths[self.current_index]] = category
             self.viewer.flash(color)
             self.update_stats()
-            QTimer.singleShot(250, lambda: self.navigate_auto_advance())
+            QTimer.singleShot(250, self.after_rating)
 
-    def navigate_auto_advance(self):
+    def after_rating(self):
         if self.current_index < len(self.image_paths) - 1:
             self.current_index += 1
             self.display_current()
+        self.is_processing = False
 
     def finish_sorting(self):
-        if not self.results:
-            QMessageBox.information(self, "Export", "No images rated yet.")
-            return
-        
+        if not self.results: return
         moved_count = 0
-        errors = []
+        newly_created = []
         for path, category in self.results.items():
             try:
                 target_dir = os.path.join(self.root_folder, category)
-                os.makedirs(target_dir, exist_ok=True)
+                if not os.path.exists(target_dir):
+                    os.makedirs(target_dir, exist_ok=True)
+                    newly_created.append(category)
                 target_path = os.path.join(target_dir, os.path.basename(path))
                 if os.path.exists(path):
                     shutil.move(path, target_path)
                     moved_count += 1
-            except Exception as e:
-                errors.append(f"{os.path.basename(path)}: {str(e)}")
+            except Exception as e: logging.error(f"Move failed: {e}")
+        
+        if newly_created: self.create_checkpoint(created_folders=newly_created)
         
         summary = {"BAD": 0, "OK": 0, "GOOD": 0}
         for cat in self.results.values(): summary[cat] += 1
-        
         msg = f"Export Finished!\nMoved: {moved_count} files.\n"
         msg += f"BAD: {summary['BAD']} | OK: {summary['OK']} | GOOD: {summary['GOOD']}"
         QMessageBox.information(self, "Export Complete", msg)
-        
-        self.results = {}
-        self.load_images(self.root_folder)
+        self.reset_to_menu()
 
     def restore_checkpoint(self):
         cp_path = os.path.join(self.root_folder, ".photosorter_checkpoint.json")
         if not os.path.exists(cp_path):
-            QMessageBox.warning(self, "Restore", "No checkpoint found.")
+            QMessageBox.warning(self, "Restore", "No checkpoint file found in this folder.\n(Make sure you select the root folder of your project)")
             return
             
+        ans = QMessageBox.question(self, "Restore Checkpoint", "Restore all files and clean generated folders?")
+        if ans != QMessageBox.StandardButton.Yes: return
+        
         try:
             with open(cp_path, 'r') as f: data = json.load(f)
             restored = 0
@@ -415,10 +508,30 @@ class PhotoSorter(QMainWindow):
                         shutil.move(search_path, original_path)
                         restored += 1
                         break
-            QMessageBox.information(self, "Restore", f"Restored {restored} files.")
-            self.load_images(self.root_folder)
-        except Exception as e:
-            QMessageBox.critical(self, "Restore Error", f"Failed: {e}")
+            
+            removed_folders = 0
+            for folder in data.get("created_folders", []):
+                fpath = os.path.join(self.root_folder, folder)
+                if os.path.exists(fpath) and not os.listdir(fpath):
+                    try:
+                        os.rmdir(fpath)
+                        removed_folders += 1
+                    except: pass
+
+            QMessageBox.information(self, "Restore", 
+                f"Restored {restored} files.\nRemoved {removed_folders} empty generated folders.")
+            if self.stack.currentIndex() == 1: self.load_images(self.root_folder)
+        except Exception as e: logging.error(f"Restore failed: {e}")
+
+    def closeEvent(self, event):
+        if self.stack.currentIndex() == 1 and len(self.results) > 0:
+            ans = QMessageBox.question(self, "Confirm Exit", 
+                "You have started sorting images. Are you sure you want to exit?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if ans == QMessageBox.StandardButton.Yes: event.accept()
+            else: event.ignore()
+        else:
+            event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
