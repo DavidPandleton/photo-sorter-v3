@@ -1,81 +1,106 @@
 # Photo Sorter V1
 
-A professional-grade, keyboard-driven photo culling and organization tool built with PyQt6. Designed for photographers who need to sort through large batches of images (JPG, PNG) and RAW files (CR2, ARW, NEF) quickly and reliably.
+A simple, keyboard-driven tool to help you cull and organize large batches of photos quickly. It’s designed to be fast, reliable, and stay out of your way.
 
 ---
 
-## 🚀 Features
+## Features
 
-- **Fast RAW Previews**: Optimized loading for high-resolution RAW formats.
-- **High DPI Support**: Fully compatible with Windows display scaling (125%, 150%, 200%).
-- **Stable Navigation**: Input locks and auto-repeat prevention ensure no images are skipped during rapid culling.
-- **Smart Checkpoints**: A non-destructive "Time Machine" system that tracks your project's original state.
+- **Sort by Rating**: Quickly categorize photos into **BAD**, **OK**, or **GOOD**.
+- **Wide Format Support**: Works with standard images (JPG, PNG) and RAW files (CR2, ARW, NEF) if `rawpy` is installed.
+- **Fast Workflow**: Optimized for keyboard use (1, 2, 3, N, P, Enter).
+- **Interactive Viewer**: Simple zoom and pan support to check details.
+- **Visual Feedback**: Subtle color overlays when you rate an image so you know it registered.
+- **Safety First**: Includes a checkpoint system to restore files if you change your mind.
+- **Cross-Platform**: Runs on Windows, Linux, and macOS.
 
 ---
 
-## ⌨️ Controls
+## Controls
 
 ### Rating & Export
-- **[1]**: Rate **BAD** (Red Flash)
-- **[2]**: Rate **OK** (Yellow Flash)
-- **[3]**: Rate **GOOD** (Green Flash)
-- **[ENTER]**: Finish & Export (Moves rated files to subfolders)
+- **1** → Rate **BAD** (Red flash)
+- **2** → Rate **OK** (Yellow flash)
+- **3** → Rate **GOOD** (Green flash)
+- **Enter** → **Finish Export** (Moves rated files to their folders)
 
 ### Navigation
-- **[N]**: Next Image
-- **[P]**: Previous Image
-- **[ESC]**: Return to Main Menu (Shows confirmation if progress exists)
-- **[F]**: Toggle Fullscreen
-- **[Window X]**: Close App (Shows confirmation if progress exists)
+- **N** → Next image
+- **P** → Previous image
+- **ESC** → Back to menu (it will ask for confirmation if you have progress)
+- **F** → Toggle Fullscreen
+- **Ctrl + Plus/Minus** (or **Cmd** on Mac) → Zoom In/Out
 
-### Viewer
-- **[CTRL + Plus/Minus]**: Zoom In / Out
-- **[Mouse Scroll]**: Zoom at cursor position
-- **[Left Mouse Drag]**: Pan while zoomed
+*Note: I've disabled key auto-repeat, so holding down a key won't accidentally skip five images.*
 
 ---
 
-## 📂 Export System
+## How it works
 
-When you click **Finish Export** or press **ENTER**:
-1. The app identifies all images you have rated.
-2. It physically **MOVES** those files into organized subfolders: `/BAD`, `/OK`, and `/GOOD`.
-3. Files you haven't rated are left untouched in their original location.
-4. The application state is then safely reset.
-
----
-
-## 💾 Checkpoint & Restore System
-
-### Automatic Checkpoints
-Every time you start sorting a new folder, the app creates a hidden `.photosorter_checkpoint.json` file. 
-- If a checkpoint already exists, the app will ask if you want to **replace** it or keep the original baseline.
-
-### Smart Restoration
-If you need to undo your organization:
-1. Select **Restore Checkpoint** from the menu.
-2. Select the **Root Folder** of your project.
-3. The app will move files from `/BAD`, `/OK`, and `/GOOD` back to their **original relative paths**.
-4. **Smart Cleanup**: The app will only delete the folders it created (`/BAD`, `/OK`, `/GOOD`) and only if they are **completely empty** after restoration. Your own folders and files are never touched.
+1. **Select a folder**: The app scans for all supported images inside.
+2. **Rate your photos**: Use the 1, 2, and 3 keys as you browse.
+3. **Finish Export**: When you're done, press Enter. The app will physically move the rated files into three new subfolders: `/BAD`, `/OK`, and `/GOOD`.
+4. Files you didn't rate are left exactly where they were.
 
 ---
 
-## 🛠️ Installation
+## Checkpoint System
 
-1. Ensure you have **Python 3.10+** installed.
-2. Install the required dependencies:
+To keep things safe, the app creates a small file called `.photosorter_checkpoint.json` in your folder.
+
+- **What it does**: It remembers where every file was originally and which folders the app created.
+- **If you return**: If you open the same folder again, the app will ask if you want to keep the old checkpoint or start fresh.
+- **Restore feature**: If you want to "undo" everything, use the **Restore** button. It will move files back to their original spots and delete the `/BAD`, `/OK`, and `/GOOD` folders—but only if they are empty. It won't touch your own folders.
+
+---
+
+## Platform Notes
+
+- **Windows**: Should work fine out of the box.
+- **Linux**: You might need `libraw` installed for `rawpy` to work. If RAW support fails, the app will just skip those files and let you keep working with JPGs.
+- **macOS**: Uses the **Command (⌘)** key instead of Ctrl for shortcuts. Fullscreen follows the standard macOS "Spaces" style.
+
+---
+
+## DPI & Scaling
+
+If your Windows display scaling is set to something like 150%, the layout might look a bit different. I've added some code to handle this automatically, but keeping your display at 100% is always the most predictable.
+
+---
+
+## Installation
+
+1. Make sure you have Python installed.
+2. Install the few libraries needed:
    ```bash
    pip install -r requirements.txt
+   ```
+3. Run the app:
+   ```bash
+   python sorter.py
    ```
 
 ---
 
-## 📋 Requirements
+## Requirements
 
-- **PyQt6**: Core UI Framework
-- **rawpy**: RAW image decoding
-- **numpy**: Image data processing
+- **Python 3.9+**
+- **PyQt6** (The interface)
+- **rawpy** (Optional, only needed if you want to sort RAW files)
+- **numpy** (For image processing)
 
 ---
 
-*Made for efficiency. Sorting photos shouldn't be a chore.*
+## Known Limitations
+
+- RAW support depends on the `rawpy` library; some newer cameras might not be supported yet.
+- If you have thousands of photos in one folder, it might take a second or two to scan them all.
+- Multi-monitor behavior can vary a bit depending on your operating system's settings.
+
+---
+
+## A Final Note
+
+This is a simple tool I made to help sort photos faster. It’s not perfect, but it works well for my workflow and helps me get through big shoots without getting a headache.
+
+Feel free to use it, share it, or modify it to fit your own needs. Hope it helps!

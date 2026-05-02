@@ -18,13 +18,29 @@ QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
 )
 
-import rawpy
+try:
+    import rawpy
+    RAW_SUPPORTED = True
+except ImportError:
+    RAW_SUPPORTED = False
+
 import numpy as np
 
 # DEPENDENCIES:
 # pip install PyQt6 rawpy numpy
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+IS_MAC = sys.platform == "darwin"
+MOD_MASK = Qt.KeyboardModifier.MetaModifier if IS_MAC else Qt.KeyboardModifier.ControlModifier
+
+def safe_move(src, dst):
+    """Robust move that handles cross-filesystem transfers on Linux/Unix."""
+    try:
+        shutil.move(src, dst)
+    except Exception:
+        shutil.copy2(src, dst)
+        os.remove(src)
 
 class ImageLoader(QThread):
     loaded = pyqtSignal(str, QImage)
@@ -33,13 +49,19 @@ class ImageLoader(QThread):
     def __init__(self, path):
         super().__init__()
         self.path = path
+        self._running = True
+
+    def stop(self):
+        self._running = False
 
     def run(self):
+        if not self._running: return
         try:
             ext = Path(self.path).suffix.lower()
-            if ext in ['.cr2', '.arw', '.nef']:
+            if RAW_SUPPORTED and ext in ['.cr2', '.arw', '.nef']:
                 with rawpy.imread(self.path) as raw:
                     rgb = raw.postprocess(use_camera_wb=True, no_auto_bright=False, bright=1.0)
+                    if not self._running: return
                     h, w, c = rgb.shape
                     bytes_per_line = c * w
                     qimage = QImage(rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
@@ -131,6 +153,10 @@ class PhotoViewer(QGraphicsView):
         p = self.pixmap_item.pixmap().size()
         return min(s.width() / p.width(), s.height() / p.height())
 
+    def force_fit(self):
+        if not self.pixmap_item.pixmap().isNull():
+            self.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+
 class PhotoSorter(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -150,15 +176,35 @@ class PhotoSorter(QMainWindow):
         self.setCentralWidget(self.stack)
         
         self.setup_styles()
+        self.setup_menu_bar()
         self.build_menu_ui()
         self.build_main_ui()
         
         self.stack.setCurrentIndex(0)
 
+    def setup_menu_bar(self):
+        menubar = self.menuBar()
+        if IS_MAC: menubar.setNativeMenuBar(True)
+        
+        file_menu = menubar.addMenu("File")
+        
+        act_open = file_menu.addAction("Open Folder")
+        act_open.triggered.connect(self.select_folder)
+        act_open.setShortcut("Ctrl+O") # Qt maps Ctrl to Cmd on Mac for shortcuts
+        
+        act_restore = file_menu.addAction("Restore Checkpoint")
+        act_restore.triggered.connect(self.restore_checkpoint)
+        
+        file_menu.addSeparator()
+        
+        act_exit = file_menu.addAction("Exit")
+        act_exit.triggered.connect(self.close)
+        act_exit.setShortcut("Ctrl+Q")
+
     def setup_styles(self):
         self.setStyleSheet("""
             QMainWindow { background-color: #121212; }
-            QWidget { color: #e0e0e0; font-family: 'Segoe UI', 'Roboto', sans-serif; }
+            QWidget { color: #e0e0e0; font-family: 'Segoe UI', 'Roboto', 'Ubuntu', 'San Francisco', 'Helvetica Neue', 'Arial', sans-serif; }
             #SidePanel { background-color: #1a1a1a; border-left: 1px solid #333; }
             #TopBar { background-color: #1a1a1a; border-bottom: 1px solid #333; min-height: 60px; }
             #Title { font-size: 20px; font-weight: bold; color: #42a5f5; padding-left: 20px; }
@@ -227,9 +273,9 @@ class PhotoSorter(QMainWindow):
         self.viewer = PhotoViewer()
         content_layout.addWidget(self.viewer, 1)
         
-        side_panel = QFrame(); side_panel.setObjectName("SidePanel")
-        side_panel.setFixedWidth(300)
-        self.side_layout = QVBoxLayout(side_panel); self.side_layout.setContentsMargins(20, 20, 20, 20)
+        self.side_panel = QFrame(); self.side_panel.setObjectName("SidePanel")
+        self.side_panel.setFixedWidth(300)
+        self.side_layout = QVBoxLayout(self.side_panel); self.side_layout.setContentsMargins(20, 20, 20, 20)
         
         self.create_hotkey_panel()
         self.side_layout.addSpacing(20)
@@ -237,9 +283,10 @@ class PhotoSorter(QMainWindow):
         self.side_layout.addStretch()
         self.create_info_panel()
         
-        content_layout.addWidget(side_panel)
+        content_layout.addWidget(self.side_panel)
         main_layout.addWidget(content)
         self.stack.addWidget(page)
+        self.adjust_layout_to_screen()
 
     def create_hotkey_panel(self):
         self.side_layout.addWidget(QLabel("CONTROLS"))
@@ -288,8 +335,10 @@ class PhotoSorter(QMainWindow):
         self.root_folder = os.path.abspath(folder)
         exts = {'.jpg', '.jpeg', '.png', '.cr2', '.arw', '.nef'}
         self.image_paths = []
+        managed = {"BAD", "OK", "GOOD"}
         for r, _, fs in os.walk(self.root_folder):
-            if any(x in r for x in ['/BAD', '/OK', '/GOOD', '\\BAD', '\\OK', '\\GOOD']): continue
+            rel_path = Path(r).relative_to(self.root_folder)
+            if any(part.upper() in managed for part in rel_path.parts): continue
             for f in fs:
                 if Path(f).suffix.lower() in exts: 
                     self.image_paths.append(os.path.abspath(os.path.join(r, f)))
@@ -316,7 +365,7 @@ class PhotoSorter(QMainWindow):
 
     def reset_to_menu(self):
         for loader in self.active_loaders:
-            loader.terminate()
+            loader.stop()
             loader.wait()
         self.active_loaders = []
         self.image_paths = []
@@ -325,6 +374,30 @@ class PhotoSorter(QMainWindow):
         self.current_index = -1
         self.root_folder = ""
         self.stack.setCurrentIndex(0)
+        self.adjust_layout_to_screen()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.adjust_layout_to_screen()
+
+    def adjust_layout_to_screen(self):
+        if not hasattr(self, 'side_panel') or not self.side_panel: return
+        
+        # Detect active screen and orientation
+        screen = self.screen()
+        if not screen: return
+        
+        # We check the window geometry relative to the screen
+        win_geom = self.geometry()
+        is_portrait = win_geom.height() > win_geom.width()
+        
+        # Adjust Side Panel width based on orientation
+        target_width = 220 if is_portrait else 300
+        if self.side_panel.width() != target_width:
+            self.side_panel.setFixedWidth(target_width)
+        
+        # Force re-fit of image
+        QTimer.singleShot(50, self.viewer.force_fit)
 
     def confirm_return_to_menu(self):
         if len(self.results) > 0:
@@ -431,9 +504,12 @@ class PhotoSorter(QMainWindow):
             self.finish_sorting()
             return
         elif key == Qt.Key.Key_F:
-            if self.isFullScreen(): self.showNormal()
-            else: self.showFullScreen()
-        if mod & Qt.KeyboardModifier.ControlModifier:
+            if self.windowState() & Qt.WindowState.WindowFullScreen:
+                self.setWindowState(Qt.WindowState.WindowNoState)
+            else:
+                self.setWindowState(Qt.WindowState.WindowFullScreen)
+            QTimer.singleShot(100, self.adjust_layout_to_screen)
+        if mod & MOD_MASK:
             if key in [Qt.Key.Key_Plus, Qt.Key.Key_Equal]: self.viewer.zoom(1.2)
             elif key == Qt.Key.Key_Minus: self.viewer.zoom(0.8)
             return
@@ -473,7 +549,7 @@ class PhotoSorter(QMainWindow):
                     newly_created.append(category)
                 target_path = os.path.join(target_dir, os.path.basename(path))
                 if os.path.exists(path):
-                    shutil.move(path, target_path)
+                    safe_move(path, target_path)
                     moved_count += 1
             except Exception as e: logging.error(f"Move failed: {e}")
         
@@ -505,7 +581,7 @@ class PhotoSorter(QMainWindow):
                     search_path = os.path.join(self.root_folder, cat, filename)
                     if os.path.exists(search_path):
                         os.makedirs(os.path.dirname(original_path), exist_ok=True)
-                        shutil.move(search_path, original_path)
+                        safe_move(search_path, original_path)
                         restored += 1
                         break
             
