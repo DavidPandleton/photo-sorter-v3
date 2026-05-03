@@ -1,7 +1,7 @@
 # Photo Sorter V1
 
 <p align="center">
-  <img src="../../ss/main menu.png" alt="Photo Sorter V1 Main Menu" width="600">
+  <img src="../../assets/screenshots/main menu.png" alt="Photo Sorter V1 Main Menu" width="600">
 </p>
 
 <p align="center">
@@ -29,9 +29,9 @@ Kalau kamu pernah ngerasa pegel harus ngeklik ratusan foto hasil pemotretan dan 
 Konsep utamanya adalah tangan tetep di keyboard dan mata fokus ke foto. Kamu tinggal pilih folder, terus mulai sortir foto ke tiga kategori:
 
 <p align="center">
-  <img src="../../ss/bad yellow.png" width="250" alt="Rating: BAD">
-  <img src="../../ss/ok yellow.png" width="250" alt="Rating: OK">
-  <img src="../../ss/good green.png" width="250" alt="Rating: GOOD">
+  <img src="../../assets/screenshots/bad yellow.png" width="250" alt="Rating: BAD">
+  <img src="../../assets/screenshots/ok yellow.png" width="250" alt="Rating: OK">
+  <img src="../../assets/screenshots/good green.png" width="250" alt="Rating: GOOD">
 </p>
 
 1. **Pilih folder** yang isinya foto-foto kamu.

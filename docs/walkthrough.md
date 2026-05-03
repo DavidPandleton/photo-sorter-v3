@@ -8,15 +8,15 @@ I wanted to make a tool that felt simple and fast. This document walks you throu
 
 I tried to keep the interface as quiet as possible. When you open the app, you're greeted with just a few options. I didn't want you to have to dig through menus just to get started.
 
-![Main Menu](../ss/main%20menu.png)
+![Main Menu](../assets/screenshots/main%20menu.png)
 
 ### Picking your best shots
 Once you're in, the image is the only thing that matters. To keep you moving fast, I mapped the rating keys to `1`, `2`, and `3`. 
 
 <p align="center">
-  <img src="../ss/bad yellow.png" width="200" alt="Rating: BAD">
-  <img src="../ss/ok yellow.png" width="200" alt="Rating: OK">
-  <img src="../ss/good green.png" width="200" alt="Rating: GOOD">
+  <img src="../assets/screenshots/bad yellow.png" width="200" alt="Rating: BAD">
+  <img src="../assets/screenshots/ok yellow.png" width="200" alt="Rating: OK">
+  <img src="../assets/screenshots/good green.png" width="200" alt="Rating: GOOD">
 </p>
 
 I added the color flashes (Red for BAD, Yellow for OK, Green for GOOD) so you can be 100% sure you hit the right key without having to look away from the screen.

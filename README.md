@@ -1,7 +1,7 @@
 # Photo Sorter V1
 
 <p align="center">
-  <img src="ss/main menu.png" alt="Photo Sorter V1 Main Menu" width="600">
+  <img src="assets/screenshots/main menu.png" alt="Photo Sorter V1 Main Menu" width="600">
 </p>
 
 <p align="center">
@@ -29,9 +29,9 @@ If you've ever had to click through hundreds of images from a shoot and wished y
 The whole idea is to keep your hands on the keyboard and your eyes on the images. You just pick a folder and start sorting into three simple buckets:
 
 <p align="center">
-  <img src="ss/bad yellow.png" width="250" alt="Rating: BAD">
-  <img src="ss/ok yellow.png" width="250" alt="Rating: OK">
-  <img src="ss/good green.png" width="250" alt="Rating: GOOD">
+  <img src="assets/screenshots/bad yellow.png" width="250" alt="Rating: BAD">
+  <img src="assets/screenshots/ok yellow.png" width="250" alt="Rating: OK">
+  <img src="assets/screenshots/good green.png" width="250" alt="Rating: GOOD">
 </p>
 
 1. **Pick your folder** containing the photos.

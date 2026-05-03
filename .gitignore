@@ -75,3 +75,4 @@ venv.bak/
 *.tmp
 pyright_output.txt
 logs/
+private/
