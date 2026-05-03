@@ -1,130 +1,131 @@
 # Photo Sorter V1
 
-A simple, keyboard-driven tool to help you cull and organize large batches of photos quickly. It’s designed to be fast, reliable, and stay out of your way.
+A professional-grade, high-performance desktop utility for rapid photo culling and organization. Designed for photographers who need to move through large shoots with speed and precision.
 
 ---
 
-## Features
+## Overview
 
-- **Sort by Rating**: Quickly categorize photos into **BAD**, **OK**, or **GOOD**.
-- **Wide Format Support**: Works with standard images (JPG, PNG) and RAW files (CR2, ARW, NEF) if `rawpy` is installed.
-- **Fast Workflow**: Optimized for keyboard use (1, 2, 3, N, P, Enter).
-- **Interactive Viewer**: Simple zoom and pan support to check details.
-- **Visual Feedback**: Subtle color overlays when you rate an image so you know it registered.
-- **Safety First**: Includes a checkpoint system to restore files if you change your mind.
-- **Cross-Platform**: Runs on Windows, Linux, and macOS.
+Photo Sorter V1 is a lightweight yet robust tool that prioritizes workflow efficiency. It allows you to quickly categorize images into three simple buckets (**BAD**, **OK**, and **GOOD**) using a keyboard-first interface. Built with Python and PyQt6, it handles both standard web formats and professional RAW files with ease.
+
+## Why Photo Sorter?
+
+Most photo managers are bloated and slow. Photo Sorter is built for a single purpose: **Fast Culling**. It stays out of your way and focuses on making your selection process as frictionless as possible.
 
 ---
 
-## Controls
+## Key Features
 
-### Rating & Export
-- **1** → Rate **BAD** (Red flash)
-- **2** → Rate **OK** (Yellow flash)
-- **3** → Rate **GOOD** (Green flash)
-- **Enter** → **Finish Export** (Moves rated files to their folders)
-
-### Navigation
-- **N** → Next image
-- **P** → Previous image
-- **ESC** → Back to menu (it will ask for confirmation if you have progress)
-- **F** → Toggle Fullscreen
-- **Ctrl + Plus/Minus** (or **Cmd** on Mac) → Zoom In/Out
-
-*Note: I've disabled key auto-repeat, so holding down a key won't accidentally skip five images.*
+- **High-Performance Architecture**: Uses a multi-threaded `QThreadPool` loader with bounded concurrency to keep the UI responsive, even with large RAW files.
+- **Intelligent Caching**: Implements a memory-bounded LRU (Least Recently Used) cache to keep your experience smooth without exhausting system RAM.
+- **Standardized Zoom**: Unified zoom mechanics across Windows, macOS, and Linux, supporting mouse wheels, precision touchpads, and native pinch gestures.
+- **Smart RAW Pipeline**: Optimized for speed using a fallback chain (Embedded Thumbnail → Half-size Demosaic → Full Demosaic).
+- **Safety First**: Features an atomic checkpoint system (v2.0) with SHA1 validation to ensure your files are always recoverable.
+- **Preserved Hierarchy**: Maintains your original subfolder structure during export (Option A).
+- **Cross-Platform**: Tailored experience for Windows, macOS (Retina/Silicon support), and Linux.
 
 ---
 
-## How it works
+## Keyboard Shortcuts
 
-1. **Select a folder**: The app scans for all supported images inside.
-2. **Rate your photos**: Use the 1, 2, and 3 keys as you browse.
-3. **Finish Export**: When you're done, press Enter. The app will physically move the rated files into three new subfolders: `/BAD`, `/OK`, and `/GOOD`.
-4. Files you didn't rate are left exactly where they were.
+### Sorting & Workflow
+| Key | Action |
+| :--- | :--- |
+| **1** | Rate as **BAD** (Red Flash) |
+| **2** | Rate as **OK** (Yellow Flash) |
+| **3** | Rate as **GOOD** (Green Flash) |
+| **Enter** | **Finalize Export** (Moves rated files to category folders) |
+| **ESC** | Return to Menu (with confirmation if progress exists) |
 
----
-
-## Checkpoint System
-
-To keep things safe, the app creates a small file called `.photosorter_checkpoint.json` in your folder.
-
-- **What it does**: It remembers where every file was originally and which folders the app created.
-- **If you return**: If you open the same folder again, the app will ask if you want to keep the old checkpoint or start fresh.
-- **Restore feature**: If you want to "undo" everything, use the **Restore** button. It will move files back to their original spots and delete the `/BAD`, `/OK`, and `/GOOD` folders—but only if they are empty. It won't touch your own folders.
-
----
-
-## Platform Notes
-
-- **Windows**: Should work fine out of the box.
-- **Linux**: You might need `libraw` installed for `rawpy` to work. If RAW support fails, the app will just skip those files and let you keep working with JPGs.
-- **macOS**: Uses the **Command (⌘)** key instead of Ctrl for shortcuts. Fullscreen follows the standard macOS "Spaces" style.
-
-### Linux Notes
-
-On some distributions (especially Arch-based), you may need:
-
-- `libraw` (for RAW support via rawpy)
-- `qt6-base` (for PyQt6 GUI)
-
-Using a virtual environment is recommended:
-```bash
-python -m venv venv
-source venv/bin/activate
-```
-
-### macOS Notes
-
-You may need to install `libraw` manually:
-```bash
-brew install libraw
-```
-
-Also recommended:
-- Use Python 3.9 or newer
-- Use a virtual environment
+### Navigation & View
+| Key | Action |
+| :--- | :--- |
+| **N** | Next Image |
+| **P** | Previous Image |
+| **F** | Toggle Fullscreen |
+| **Ctrl + Scroll** | Smooth Zoom (Cmd on macOS) |
+| **Pinch** | Native Pinch-to-Zoom (if supported by hardware) |
+| **Ctrl + 0** | Reset Zoom to Fit (Cmd on macOS) |
+| **Double-Click** | Reset Zoom to Fit |
 
 ---
 
-## DPI & Scaling
+## Supported Formats
 
-If your Windows display scaling is set to something like 150%, the layout might look a bit different. I've added some code to handle this automatically, but keeping your display at 100% is always the most predictable.
+- **Standard**: `.jpg`, `.jpeg`, `.png`, `.webp`
+- **RAW**: `.cr2` (Canon), `.arw` (Sony), `.nef` (Nikon)
+  - *Requires `rawpy` for RAW support.*
 
 ---
 
 ## Installation
 
-1. Make sure you have Python installed.
-2. Install the few libraries needed:
+### Prerequisites
+- **Python 3.9+**
+- **pip** (Python package manager)
+
+### Setup
+1. Clone or download the repository.
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-3. Run the app:
+3. Run the application:
    ```bash
    python sorter.py
    ```
 
----
+### Platform-Specific Notes
 
-## Requirements
+#### macOS
+- Installs via virtual environment are highly recommended.
+- You may need to install `libraw` via Homebrew for RAW support:
+  ```bash
+  brew install libraw
+  ```
 
-- **Python 3.9+**
-- **PyQt6** (The interface)
-- **rawpy** (Optional, only needed if you want to sort RAW files)
-- **numpy** (For image processing)
-
----
-
-## Known Limitations
-
-- RAW support depends on the `rawpy` library; some newer cameras might not be supported yet.
-- If you have thousands of photos in one folder, it might take a second or two to scan them all.
-- Multi-monitor behavior can vary a bit depending on your operating system's settings.
+#### Linux
+- Ensure `qt6-base` is installed for your distribution.
+- For RAW support, ensure `libraw` is available (e.g., `sudo pacman -S libraw` or `sudo apt install libraw-dev`).
 
 ---
 
-## A Final Note
+## How Export Works
 
-This is a simple tool I made to help sort photos faster. It’s not perfect, but it works well for my workflow and helps me get through big shoots without getting a headache.
+When you finalize an export:
+1. The app calculates the relative path of your rated images.
+2. It creates `/BAD`, `/OK`, and `/GOOD` folders in your root directory.
+3. It moves your files into these folders, **preserving the original subfolder hierarchy**.
+4. Files you did not rate remain untouched in their original locations.
 
-Feel free to use it, share it, or modify it to fit your own needs. Hope it helps!
+---
+
+## Checkpoint & Restore
+
+Photo Sorter maintains a `.photosorter_checkpoint.json` file in your project folder.
+- **Atomic Writes**: Uses temporary file replacement to prevent data loss during crashes.
+- **Validation**: Tracks file sizes and SHA1 hashes to ensure integrity.
+- **Restore**: The "Restore" feature will reverse all moves and clean up empty generated folders, returning your directory to its exact original state.
+
+---
+
+## Troubleshooting
+
+- **Sluggish RAW loading**: This is usually due to missing embedded thumbnails in old or obscure RAW formats. The app will fallback to a half-size render.
+- **UI Scaling Issues**: On High-DPI displays (Windows/Retina), the app automatically applies a `PassThrough` policy. If things look small, check your OS scaling settings.
+- **Missing Shortcuts**: Some Linux desktop environments intercept standard keys. Check your global shortcut settings if `N` or `P` are not registering.
+
+---
+
+## Roadmap
+
+- [ ] Native support for DNG and HEIC formats.
+- [ ] Side-by-side comparison mode.
+- [ ] Non-destructive rating (XMP metadata writing).
+- [ ] Integrated histogram display.
+
+---
+
+## License
+
+*This project is provided as-is for personal use. [LICENSE placeholder]*
