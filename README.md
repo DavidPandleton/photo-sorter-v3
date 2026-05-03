@@ -1,92 +1,82 @@
 # Photo Sorter V1
 
 <p align="center">
-  <img src="assets/screenshots/ui_preview.png" alt="Photo Sorter V1 UI Preview" width="800">
+  <img src="ss/main menu.png" alt="Photo Sorter V1 Main Menu" width="600">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platforms">
   <img src="https://img.shields.io/badge/Python-3.9%2B-blueviolet" alt="Python Version">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/Status-Stable-success" alt="Status">
 </p>
 
 ---
 
-**Photo Sorter V1** is a professional, high-performance desktop utility designed for rapid photo culling and organization. Built for photographers who need to move through thousands of images with zero lag and total precision.
+## 📸 Overview
+
+Photo Sorter V1 is a simple, straightforward utility designed to help you cull large batches of photos quickly. It doesn't try to be a full photo editor or a complex management system—it just focuses on making the initial selection process fast and uncomplicated.
+
+It was built to solve a specific workflow problem: moving through hundreds of images from a shoot and deciding what to keep and what to toss, without the lag or distraction of heavier software.
 
 ---
 
-## ⬇️ Downloads
+## ✨ How it Works
 
-| Platform | Download | Format |
-| :--- | :--- | :--- |
-| **🪟 Windows** | [**Download Installer**](#) | `.exe` |
-| **🍎 macOS** | [**Download App**](#) | `.app` (Universal) |
-| **🐧 Linux** | [**Download Bundle**](#) | `.AppImage` |
+The workflow is centered around your keyboard, allowing you to stay focused on the images.
 
----
+<p align="center">
+  <img src="ss/good green.png" alt="Sorting Interface" width="600">
+</p>
 
-## 🚀 One-Click Quick Start (For Developers)
-
-If you have **Python 3.9+** installed, you can start sorting immediately without manual configuration:
-
-### 🪟 Windows
-1. Double-click **`install.bat`** (Run once to set up).
-2. Double-click **`run.bat`** to start the application.
-
-### 🍎 macOS
-1. Right-click **`install.command`** and select *Open*.
-2. Run **`run.command`** to launch.
-
-### 🐧 Linux
-1. Run **`./install.sh`** to set up dependencies.
-2. Run **`./run.sh`** to launch.
+1. **Select a folder** containing your photos.
+2. **Rate images** using the `1`, `2`, and `3` keys.
+3. **Navigate** with `N` (Next) and `P` (Previous).
+4. **Finalize** by pressing `Enter`. The app moves your rated files into `/BAD`, `/OK`, and `/GOOD` folders.
 
 ---
 
-## ✨ Features
+## 🛠️ Key Design Choices
 
-- **Photo-Hero UI**: A minimal, distraction-free interface that keeps your work centered.
-- **Zero-Lag Performance**: Offloads image decoding to a background thread pool for instant navigation.
-- **Smart RAW Pipeline**: Native support for professional formats (CR2, ARW, NEF) with optimized preview caching.
-- **Unified Zoom**: Standardized zoom mechanics across precision touchpads, trackpads, and mouse wheels.
-- **Safe & Atomic**: Non-destructive sorting with a robust checkpoint system—never lose your work or risk your originals.
+- **Keyboard-First**: Designed so you don't have to reach for your mouse while culling.
+- **Visual Feedback**: Simple color overlays provide immediate confirmation of your rating.
+- **Safe Operations**: A checkpoint system tracks every move. If you change your mind or make a mistake, you can restore everything to its original state.
+- **Hierarchy Preservation**: If your photos are in subfolders, the app maintains that structure within the category folders.
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## ⌨️ Shortcuts
 
 | Key | Action |
 | :--- | :--- |
 | **1 / 2 / 3** | Rate **BAD** / **OK** / **GOOD** |
 | **N / P** | Next / Previous Image |
 | **F** | Toggle Fullscreen |
-| **Ctrl + Scroll** | Smooth Zoom (Cmd on Mac) |
-| **Ctrl + 0** | Reset Zoom to Fit |
-| **Enter** | **Finalize Export** (Preserves Folder Hierarchy) |
-| **ESC** | Back to Menu |
+| **Ctrl + Scroll** | Zoom In/Out |
+| **Enter** | **Finalize Export** |
 
 ---
 
-## 📂 Supported Formats
+## 📖 Important Notes
 
-- **Standard**: `.jpg`, `.jpeg`, `.png`, `.webp`
-- **Professional RAW**: `.cr2`, `.arw`, `.nef` (Requires `rawpy`)
-
----
-
-## 📖 Documentation
-
-- **[Installation Guide](docs/installation.md)**: Detailed manual setup for all platforms.
-- **[Architecture & Design](docs/architecture.md)**: Deep dive into the threading and memory models.
-- **[Checkpoint & Safety](docs/checkpoint.md)**: Technical breakdown of the restoration logic.
-- **[Full Walkthrough](docs/walkthrough.md)**: Guided tour of features and UI.
+### ⚠️ Current Limitations
+- **RAW Support**: Depends on `rawpy`. If the library isn't available on your system, the app will fall back to standard images (JPG/PNG).
+- **Performance**: While we use background loading to keep things smooth, very large RAW files or slow drives may still show brief loading states.
+- **Experimental**: This tool is still evolving. While we focus on stability and safety, we always recommend having a backup of your photos before running major operations.
 
 ---
 
-## 🤝 Contributing & Support
+## 🚀 Quick Start
 
-We welcome contributions! Please see our [Developer Docs](docs/architecture.md) for architecture details. For issues or feature requests, please open an issue in the repository.
+1. **Install Python 3.9+**.
+2. Run **`install.bat`** (Windows) or **`install.sh`** (Linux/macOS).
+3. Run **`run.bat`** or **`run.sh`** to start sorting.
+
+For detailed setup instructions, see the **[Installation Guide](docs/installation.md)**.
+
+---
+
+## 💬 Feedback
+
+This project was made to be a useful tool for a specific task. If you find bugs or have ideas for improvements that keep the tool fast and simple, feedback is always welcome.
 
 Licensed under the [MIT License](LICENSE).

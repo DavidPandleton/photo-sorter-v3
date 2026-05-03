@@ -1,50 +1,59 @@
-# Photo Sorter V1: Feature Tour
+# Photo Sorter V1: Workflow Walkthrough
 
-Welcome to the guided walkthrough of Photo Sorter V1. This document highlights the core features and design philosophy that make this the fastest culling tool for photographers.
-
----
-
-## 🖥️ Application Interface
-
-Photo Sorter V1 is designed with a "Photo-Hero" philosophy. The UI is minimal to keep your focus entirely on the image quality and composition.
-
-![Application Preview](../assets/screenshots/ui_preview.png)
-
-### Key UI Elements
-- **Stage**: The central viewing area with high-performance rendering.
-- **Rating Overlay**: A subtle, semi-transparent color flash (Red, Yellow, Green) appears when you rate an image, providing instant visual feedback.
-- **Stats Bar**: A quiet indicator at the bottom showing your progress (e.g., "12/500 | 5 GOOD, 2 OK, 1 BAD").
+This document explains the features and design of Photo Sorter V1. The tool is designed to be a simple companion for the first stage of your photo editing workflow.
 
 ---
 
-## 🎨 Professional Branding
+## 🖥️ The Interface
 
-The application features a premium, custom-designed identity.
+The interface is intentionally minimal. When you start sorting, the image takes center stage.
 
-<p align="center">
-  <img src="../assets/icon.png" alt="App Icon" width="200">
-</p>
+![Main Menu](../ss/main%20menu.png)
 
----
+### Sorting & Rating
+The main goal is to get through your images quickly. When you press a rating key (`1`, `2`, or `3`), a subtle color flash confirms your choice.
 
-## 🚀 Performance Engineering
+![Rating Feedback](../ss/good%20green.png)
 
-- **Background Decoding**: While you look at the current photo, the next 3 images are already being decoded in the background.
-- **Memory-Bounded LRU Cache**: The app intelligently caches high-resolution pixmaps but respects a strict 1GB memory budget to ensure your OS stays responsive.
-- **RAW Pipeline**: Optimized fallback logic (Embedded Thumbnail -> Half-size -> Full) ensures you can cull professional RAW files at the same speed as JPEGs.
-
----
-
-## 🛡️ The Checkpoint System
-
-Safety is built-in. Every time you finalize an export, the app creates a `.photosorter_checkpoint.json` file.
-- **Reversible Actions**: If you accidentally export to the wrong folder, the "Restore" button will atomically move every file back to its exact original location.
-- **Hierarchy Preservation**: The app respects your directory structure. If you sort a file from `Trip/Day1/img.jpg`, it will move to `GOOD/Trip/Day1/img.jpg`.
+- **Red**: Rate as BAD (to be discarded).
+- **Yellow**: Rate as OK (middle ground).
+- **Green**: Rate as GOOD (your best shots).
 
 ---
 
-## ⌨️ Unified Controls
+## 🛠️ Performance & Caching
 
-Whether you are using a precision trackpad on Windows or a Magic Trackpad on macOS, the zoom and pan experience is normalized.
-- **Exponential Zoom**: Predictable, smooth scaling that centers on your cursor.
-- **Pinch-to-Zoom**: Native gesture support for a modern, fluid feel.
+To keep the experience fluid, the app does a few things in the background:
+- **Background Loading**: The app tries to decode the next few images while you are looking at the current one.
+- **Memory Management**: We track how much RAM the image previews are using and clear out older ones when a 1GB limit is reached. This helps keep your system responsive.
+
+---
+
+## 🛡️ Data Safety
+
+We know how important your photos are. Photo Sorter is designed to be non-destructive and reversible.
+
+### The Checkpoint System
+Every time you finalize a session, a `.photosorter_checkpoint.json` file is created. This file stores exactly where every photo was moved.
+- If you need to undo your work, the **Restore** feature uses this file to move everything back to its original location.
+- We use "atomic writes" for this file, meaning it's written to a temporary file first to prevent corruption if the app crashes mid-write.
+
+---
+
+## 📂 Export Logic
+
+When you press **Enter** to finalize, the app doesn't just dump everything into a flat folder. It preserves your directory structure.
+
+For example, if you have:
+`Shoot/Day1/IMG_001.jpg`
+
+And you rate it as **GOOD**, it will move to:
+`GOOD/Shoot/Day1/IMG_001.jpg`
+
+This makes it easy to integrate the sorted photos back into your existing organization.
+
+---
+
+## 💬 A Note on Simplicity
+
+Photo Sorter V1 isn't meant to replace your professional cataloging software. It's a "pre-filter" designed to save you time before you import your photos into heavier editors. We hope it makes your workflow a little less tedious.
