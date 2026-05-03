@@ -1,131 +1,200 @@
 # Photo Sorter V1
 
-A professional-grade, high-performance desktop utility for rapid photo culling and organization. Designed for photographers who need to move through large shoots with speed and precision.
+A professional, high-performance desktop application designed for rapid photo culling and organization. Whether you are a professional photographer or a hobbyist, Photo Sorter V1 helps you move through thousands of photos with zero lag and total precision.
 
 ---
 
-## Overview
+## 📸 Overview
 
-Photo Sorter V1 is a lightweight yet robust tool that prioritizes workflow efficiency. It allows you to quickly categorize images into three simple buckets (**BAD**, **OK**, and **GOOD**) using a keyboard-first interface. Built with Python and PyQt6, it handles both standard web formats and professional RAW files with ease.
+Photo Sorter V1 is built for **speed**. It allows you to sort your photos into three categories (**BAD**, **OK**, **GOOD**) using simple keyboard shortcuts. The application is designed to be "photo-first," meaning the image is always the hero of the interface, with controls staying quietly out of your way.
 
-## Why Photo Sorter?
-
-Most photo managers are bloated and slow. Photo Sorter is built for a single purpose: **Fast Culling**. It stays out of your way and focuses on making your selection process as frictionless as possible.
-
----
-
-## Key Features
-
-- **High-Performance Architecture**: Uses a multi-threaded `QThreadPool` loader with bounded concurrency to keep the UI responsive, even with large RAW files.
-- **Intelligent Caching**: Implements a memory-bounded LRU (Least Recently Used) cache to keep your experience smooth without exhausting system RAM.
-- **Standardized Zoom**: Unified zoom mechanics across Windows, macOS, and Linux, supporting mouse wheels, precision touchpads, and native pinch gestures.
-- **Smart RAW Pipeline**: Optimized for speed using a fallback chain (Embedded Thumbnail → Half-size Demosaic → Full Demosaic).
-- **Safety First**: Features an atomic checkpoint system (v2.0) with SHA1 validation to ensure your files are always recoverable.
-- **Preserved Hierarchy**: Maintains your original subfolder structure during export (Option A).
-- **Cross-Platform**: Tailored experience for Windows, macOS (Retina/Silicon support), and Linux.
+### Why use Photo Sorter?
+- **Zero Lag**: Images load instantly using a multi-threaded background loader.
+- **Smart Memory**: Doesn't slow down your computer; it manages its own memory budget.
+- **RAW Support**: Works natively with professional formats (CR2, ARW, NEF).
+- **Safety**: Your original files are never deleted. Every action is reversible via the Checkpoint system.
 
 ---
 
-## Keyboard Shortcuts
+## 🚀 Installation Guide
 
-### Sorting & Workflow
-| Key | Action |
-| :--- | :--- |
-| **1** | Rate as **BAD** (Red Flash) |
-| **2** | Rate as **OK** (Yellow Flash) |
-| **3** | Rate as **GOOD** (Green Flash) |
-| **Enter** | **Finalize Export** (Moves rated files to category folders) |
-| **ESC** | Return to Menu (with confirmation if progress exists) |
+This guide is written for everyone, even if you have never used a command line before. Follow the steps for your specific computer type.
 
-### Navigation & View
-| Key | Action |
-| :--- | :--- |
-| **N** | Next Image |
-| **P** | Previous Image |
-| **F** | Toggle Fullscreen |
-| **Ctrl + Scroll** | Smooth Zoom (Cmd on macOS) |
-| **Pinch** | Native Pinch-to-Zoom (if supported by hardware) |
-| **Ctrl + 0** | Reset Zoom to Fit (Cmd on macOS) |
-| **Double-Click** | Reset Zoom to Fit |
+### 🪟 Windows (Windows 10 & 11)
 
----
+#### 1. Install Python
+Python is the "engine" that runs this app.
+1. Go to [python.org/downloads](https://www.python.org/downloads/).
+2. Click the yellow **Download Python 3.xx** button.
+3. **CRITICAL STEP**: When the installer starts, check the box that says **"Add Python to PATH"** at the bottom. If you miss this, the app won't run!
+4. Click **Install Now**.
 
-## Supported Formats
+#### 2. Open the Command Terminal
+1. Press the **Windows Key** on your keyboard.
+2. Type `cmd` and press **Enter**. This opens the Command Prompt.
+3. Verify it works by typing `python --version` and pressing Enter. You should see "Python 3.xx.x".
 
-- **Standard**: `.jpg`, `.jpeg`, `.png`, `.webp`
-- **RAW**: `.cr2` (Canon), `.arw` (Sony), `.nef` (Nikon)
-  - *Requires `rawpy` for RAW support.*
+#### 3. Setup the Project
+1. Navigate to where you downloaded this project. For example, if it's on your Desktop:
+   ```cmd
+   cd Desktop\photo-sorter
+   ```
+2. Create a "Virtual Environment" (a clean space for the app):
+   ```cmd
+   python -m venv venv
+   ```
+3. Activate the environment:
+   ```cmd
+   venv\Scripts\activate
+   ```
+   *(You should now see `(venv)` appearing at the start of your command line.)*
 
----
-
-## Installation
-
-### Prerequisites
-- **Python 3.9+**
-- **pip** (Python package manager)
-
-### Setup
-1. Clone or download the repository.
-2. Install dependencies:
-   ```bash
+#### 4. Install Dependencies & Run
+1. Install the needed libraries:
+   ```cmd
    pip install -r requirements.txt
    ```
-3. Run the application:
-   ```bash
+2. Start the app:
+   ```cmd
    python sorter.py
    ```
 
-### Platform-Specific Notes
-
-#### macOS
-- Installs via virtual environment are highly recommended.
-- You may need to install `libraw` via Homebrew for RAW support:
-  ```bash
-  brew install libraw
-  ```
-
-#### Linux
-- Ensure `qt6-base` is installed for your distribution.
-- For RAW support, ensure `libraw` is available (e.g., `sudo pacman -S libraw` or `sudo apt install libraw-dev`).
+**Windows Troubleshooting:**
+- **"Python not found"**: You forgot to check "Add Python to PATH" during installation. Uninstall and reinstall Python, making sure to check that box.
+- **SmartScreen/Defender**: If Windows warns you about running a script, click "More Info" and then "Run Anyway". This is common for local Python scripts.
+- **Missing DLLs**: If you get a "DLL load failed" error, you might need the [Microsoft Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
 
 ---
 
-## How Export Works
+### 🍎 macOS (Intel & Apple Silicon M1/M2/M3/M4)
 
-When you finalize an export:
-1. The app calculates the relative path of your rated images.
-2. It creates `/BAD`, `/OK`, and `/GOOD` folders in your root directory.
-3. It moves your files into these folders, **preserving the original subfolder hierarchy**.
-4. Files you did not rate remain untouched in their original locations.
+MacOS comes with Python, but we recommend a clean installation using **Homebrew**.
+
+#### 1. Install Homebrew (The Mac Package Manager)
+1. Open the **Terminal** app (Press `Cmd + Space`, type `Terminal`, and hit Enter).
+2. Paste this command and hit Enter:
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+3. Follow the instructions on the screen (it may ask for your Mac password).
+
+#### 2. Install Python & LibRaw
+1. In the same terminal, run:
+   ```bash
+   brew install python libraw
+   ```
+
+#### 3. Setup the Project
+1. Navigate to the project folder:
+   ```bash
+   cd ~/Downloads/photo-sorter
+   ```
+2. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+#### 4. Install & Run
+1. Install libraries:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Start the app:
+   ```bash
+   python3 sorter.py
+   ```
+
+**macOS Troubleshooting:**
+- **Permissions**: If the app can't see your photos, go to `System Settings > Privacy & Security > Full Disk Access` and ensure `Terminal` (or your code editor) is allowed.
+- **Intel vs Silicon**: The commands above work for both. `pip` will automatically download the correct version for your chip.
 
 ---
 
-## Checkpoint & Restore
+### 🐧 Linux (All Major Distributions)
 
-Photo Sorter maintains a `.photosorter_checkpoint.json` file in your project folder.
-- **Atomic Writes**: Uses temporary file replacement to prevent data loss during crashes.
-- **Validation**: Tracks file sizes and SHA1 hashes to ensure integrity.
-- **Restore**: The "Restore" feature will reverse all moves and clean up empty generated folders, returning your directory to its exact original state.
+Linux users typically need to install a few system libraries before the Python libraries can work.
+
+#### **Debian / Ubuntu / Linux Mint / Pop!_OS**
+```bash
+sudo apt update
+sudo apt install python3-venv libraw-dev
+```
+
+#### **Arch Linux / Manjaro / EndeavourOS**
+```bash
+sudo pacman -S python libraw qt6-base
+```
+
+#### **Fedora / Nobara**
+```bash
+sudo dnf install python3 libraw-devel qt6-qtbase
+```
+
+#### **openSUSE Tumbleweed / Leap**
+```bash
+sudo zypper install python3 libraw-devel libqt6-qtbase-devel
+```
+
+#### **Setup & Run (Universal for Linux)**
+1. Navigate to the folder: `cd photo-sorter`
+2. Create venv: `python3 -m venv venv`
+3. Activate: `source venv/bin/activate`
+4. Install: `pip install -r requirements.txt`
+5. Run: `python3 sorter.py`
+
+**Linux Troubleshooting:**
+- **Wayland Issues**: If the UI looks strange or fails to launch, try running with `QT_QPA_PLATFORM=xcb python3 sorter.py`.
+- **Permissions**: Ensure your user has read/write access to the photo folders.
 
 ---
 
-## Troubleshooting
+## ⌨️ Keyboard Shortcuts
 
-- **Sluggish RAW loading**: This is usually due to missing embedded thumbnails in old or obscure RAW formats. The app will fallback to a half-size render.
-- **UI Scaling Issues**: On High-DPI displays (Windows/Retina), the app automatically applies a `PassThrough` policy. If things look small, check your OS scaling settings.
-- **Missing Shortcuts**: Some Linux desktop environments intercept standard keys. Check your global shortcut settings if `N` or `P` are not registering.
+| Key | Action |
+| :--- | :--- |
+| **1** | Rate **BAD** (Red Flash) |
+| **2** | Rate **OK** (Yellow Flash) |
+| **3** | Rate **GOOD** (Green Flash) |
+| **N / P** | Next / Previous Image |
+| **F** | Toggle Fullscreen |
+| **Ctrl + Scroll** | Zoom In/Out (Cmd ⌘ on Mac) |
+| **Pinch** | Native Trackpad Pinch-to-Zoom |
+| **Enter** | **Finalize Export** (Moves files to folders) |
+| **ESC** | Back to Menu |
 
 ---
 
-## Roadmap
+## 🛠️ How it Works (The Simple Version)
 
-- [ ] Native support for DNG and HEIC formats.
-- [ ] Side-by-side comparison mode.
-- [ ] Non-destructive rating (XMP metadata writing).
-- [ ] Integrated histogram display.
+1. **Select Folder**: Point the app to a folder full of photos.
+2. **Cull**: Use the `1`, `2`, and `3` keys to rate your images.
+3. **Finish**: Press **Enter**. The app creates three folders: `/BAD`, `/OK`, and `/GOOD`.
+4. **Export**: It moves your rated photos into those folders. **Don't worry**, it preserves your subfolder structure! If your photo was in `Summer/Beach.jpg`, it will move to `GOOD/Summer/Beach.jpg`.
 
 ---
 
-## License
+## 🛡️ Safety & Checkpoints
 
-*This project is provided as-is for personal use. [LICENSE placeholder]*
+Photo Sorter is non-destructive.
+- **Checkpoint**: Every folder you open gets a hidden `.photosorter_checkpoint.json` file. This acts as a "memory" of where your files were originally.
+- **Restore**: If you made a mistake or want to "undo" your sorting, just click the **Restore Checkpoint** button. The app will move every file back to its original spot and remove the category folders.
+
+---
+
+## 📋 Requirements
+
+- **Python 3.9 or newer**
+- **PyQt6** (Interface)
+- **rawpy** (For RAW support)
+- **numpy** (For image math)
+
+*Note: The app will run without RAW support if `rawpy` fails to install, but you will only be able to sort standard images like JPG and PNG.*
+
+---
+
+## ✉️ Final Note for Beginners
+
+Don't be intimidated by the command line! Once you have it set up once, running the app is as simple as opening your terminal and typing `python sorter.py`. If you run into any errors, look closely at the "Troubleshooting" section for your OS—99% of issues are solved by installing Python correctly.
+
+Happy Sorting!
