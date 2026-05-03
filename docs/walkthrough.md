@@ -11,13 +11,19 @@ The interface is intentionally minimal. When you start sorting, the image takes 
 ![Main Menu](../ss/main%20menu.png)
 
 ### Sorting & Rating
-The main goal is to get through your images quickly. When you press a rating key (`1`, `2`, or `3`), a subtle color flash confirms your choice.
+The main goal is to get through your images quickly. You have three rating categories, each mapped to a number key:
 
-![Rating Feedback](../ss/good%20green.png)
+<p align="center">
+  <img src="../ss/bad yellow.png" width="200" alt="Rating: BAD">
+  <img src="../ss/ok yellow.png" width="200" alt="Rating: OK">
+  <img src="../ss/good green.png" width="200" alt="Rating: GOOD">
+</p>
 
-- **Red**: Rate as BAD (to be discarded).
-- **Yellow**: Rate as OK (middle ground).
-- **Green**: Rate as GOOD (your best shots).
+- **Key [1] - BAD (Red Flash)**: For photos to be discarded or archived.
+- **Key [2] - OK (Yellow Flash)**: For middle-ground photos that aren't quite "keepers."
+- **Key [3] - GOOD (Green Flash)**: For your best shots.
+
+The color flash provides immediate confirmation of your choice so you can move to the next image with confidence.
 
 ---
 

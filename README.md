@@ -22,14 +22,19 @@ It was built to solve a specific workflow problem: moving through hundreds of im
 
 ## ✨ How it Works
 
-The workflow is centered around your keyboard, allowing you to stay focused on the images.
+The workflow is centered around your keyboard, allowing you to stay focused on the images. You can quickly categorize any image into one of three buckets:
 
 <p align="center">
-  <img src="ss/good green.png" alt="Sorting Interface" width="600">
+  <img src="ss/bad yellow.png" width="250" alt="Rating: BAD">
+  <img src="ss/ok yellow.png" width="250" alt="Rating: OK">
+  <img src="ss/good green.png" width="250" alt="Rating: GOOD">
 </p>
 
 1. **Select a folder** containing your photos.
-2. **Rate images** using the `1`, `2`, and `3` keys.
+2. **Rate images** using the number keys:
+   - `1` : **BAD** (Red overlay) - Photos to be discarded or archived.
+   - `2` : **OK** (Yellow overlay) - Photos that are acceptable but not top-tier.
+   - `3` : **GOOD** (Green overlay) - Your best shots.
 3. **Navigate** with `N` (Next) and `P` (Previous).
 4. **Finalize** by pressing `Enter`. The app moves your rated files into `/BAD`, `/OK`, and `/GOOD` folders.
 
@@ -38,7 +43,7 @@ The workflow is centered around your keyboard, allowing you to stay focused on t
 ## 🛠️ Key Design Choices
 
 - **Keyboard-First**: Designed so you don't have to reach for your mouse while culling.
-- **Visual Feedback**: Simple color overlays provide immediate confirmation of your rating.
+- **Visual Feedback**: Immediate color flashes confirm your rating choice for each category.
 - **Safe Operations**: A checkpoint system tracks every move. If you change your mind or make a mistake, you can restore everything to its original state.
 - **Hierarchy Preservation**: If your photos are in subfolders, the app maintains that structure within the category folders.
 
@@ -46,13 +51,15 @@ The workflow is centered around your keyboard, allowing you to stay focused on t
 
 ## ⌨️ Shortcuts
 
-| Key | Action |
-| :--- | :--- |
-| **1 / 2 / 3** | Rate **BAD** / **OK** / **GOOD** |
-| **N / P** | Next / Previous Image |
-| **F** | Toggle Fullscreen |
-| **Ctrl + Scroll** | Zoom In/Out |
-| **Enter** | **Finalize Export** |
+| Key | Action | Rating |
+| :--- | :--- | :--- |
+| **1** | Rate **BAD** | 🔴 Red Flash |
+| **2** | Rate **OK** | 🟡 Yellow Flash |
+| **3** | Rate **GOOD** | 🟢 Green Flash |
+| **N / P** | Next / Previous Image | - |
+| **F** | Toggle Fullscreen | - |
+| **Ctrl + Scroll** | Zoom In/Out | - |
+| **Enter** | **Finalize Export** | - |
 
 ---
 
