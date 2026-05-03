@@ -60,6 +60,30 @@ To keep things safe, the app creates a small file called `.photosorter_checkpoin
 - **Linux**: You might need `libraw` installed for `rawpy` to work. If RAW support fails, the app will just skip those files and let you keep working with JPGs.
 - **macOS**: Uses the **Command (⌘)** key instead of Ctrl for shortcuts. Fullscreen follows the standard macOS "Spaces" style.
 
+### Linux Notes
+
+On some distributions (especially Arch-based), you may need:
+
+- `libraw` (for RAW support via rawpy)
+- `qt6-base` (for PyQt6 GUI)
+
+Using a virtual environment is recommended:
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+### macOS Notes
+
+You may need to install `libraw` manually:
+```bash
+brew install libraw
+```
+
+Also recommended:
+- Use Python 3.9 or newer
+- Use a virtual environment
+
 ---
 
 ## DPI & Scaling

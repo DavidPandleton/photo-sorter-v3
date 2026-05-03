@@ -50,7 +50,7 @@ Biar aman, aplikasi bakal bikin file tersembunyi namanya `.photosorter_checkpoin
 
 - **Fungsinya**: Nyimpen data lokasi awal foto dan folder apa aja yang dibuat sama aplikasi ini.
 - **Kalau Buka Lagi**: Kalau kamu buka folder yang sama, aplikasi bakal nanya mau pakai data lama atau mulai dari nol.
-- **Fitur Restore**: Kalau mau batalin semua sortirannya, klik tombol **Restore**. Foto bakal balik ke posisi asal dan folder kosong (`/BAD`, `/OK`, `/GOOD`) bakal dihapus otomatis.
+- **Fitur Restore**: Kalau mau batalin semua sortirannya, klik tombol **Restore**. Foto bakal balik ke posisi asal dan folder kosong (`/BAD`, `/OK`, (`/GOOD`) bakal dihapus otomatis.
 
 ---
 
@@ -59,6 +59,30 @@ Biar aman, aplikasi bakal bikin file tersembunyi namanya `.photosorter_checkpoin
 - **Windows**: Biasanya langsung jalan tanpa masalah.
 - **Linux**: Mungkin butuh install `libraw` biar `rawpy` bisa jalan. Kalau RAW ga kebaca, aplikasi bakal otomatis skip file RAW dan lanjut di JPG saja.
 - **macOS**: Pakai tombol **Command (⌘)** buat shortcut (bukan Ctrl). Fullscreen-nya juga pakai gaya macOS (Spaces).
+
+### Catatan Linux
+
+Di beberapa distro (terutama keluarga Arch), kamu mungkin butuh:
+
+- `libraw` (buat support RAW lewat rawpy)
+- `qt6-base` (buat GUI PyQt6)
+
+Sangat disarankan pakai virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+### Catatan macOS
+
+Kamu mungkin perlu install `libraw` manual:
+```bash
+brew install libraw
+```
+
+Disarankan juga:
+- Pakai Python 3.9 atau yang lebih baru
+- Pakai virtual environment
 
 ---
 
