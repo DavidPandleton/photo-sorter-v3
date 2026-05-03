@@ -1,17 +1,17 @@
-# Photo Sorter V1: Workflow Walkthrough
+# Photo Sorter V1: A quick walkthrough
 
-This document explains the features and design of Photo Sorter V1. The tool is designed to be a simple companion for the first stage of your photo editing workflow.
+I wanted to make a tool that felt simple and fast. This document walks you through how I set up the workflow and what everything does.
 
 ---
 
-## 🖥️ The Interface
+## 🖥️ The Main Screen
 
-The interface is intentionally minimal. When you start sorting, the image takes center stage.
+I tried to keep the interface as quiet as possible. When you open the app, you're greeted with just a few options. I didn't want you to have to dig through menus just to get started.
 
 ![Main Menu](../ss/main%20menu.png)
 
-### Sorting & Rating
-The main goal is to get through your images quickly. You have three rating categories, each mapped to a number key:
+### Picking your best shots
+Once you're in, the image is the only thing that matters. To keep you moving fast, I mapped the rating keys to `1`, `2`, and `3`. 
 
 <p align="center">
   <img src="../ss/bad yellow.png" width="200" alt="Rating: BAD">
@@ -19,47 +19,37 @@ The main goal is to get through your images quickly. You have three rating categ
   <img src="../ss/good green.png" width="200" alt="Rating: GOOD">
 </p>
 
-- **Key [1] - BAD (Red Flash)**: For photos to be discarded or archived.
-- **Key [2] - OK (Yellow Flash)**: For middle-ground photos that aren't quite "keepers."
-- **Key [3] - GOOD (Green Flash)**: For your best shots.
-
-The color flash provides immediate confirmation of your choice so you can move to the next image with confidence.
+I added the color flashes (Red for BAD, Yellow for OK, Green for GOOD) so you can be 100% sure you hit the right key without having to look away from the screen.
 
 ---
 
-## 🛠️ Performance & Caching
+## 🛠️ Performance stuff
 
-To keep the experience fluid, the app does a few things in the background:
-- **Background Loading**: The app tries to decode the next few images while you are looking at the current one.
-- **Memory Management**: We track how much RAM the image previews are using and clear out older ones when a 1GB limit is reached. This helps keep your system responsive.
-
----
-
-## 🛡️ Data Safety
-
-We know how important your photos are. Photo Sorter is designed to be non-destructive and reversible.
-
-### The Checkpoint System
-Every time you finalize a session, a `.photosorter_checkpoint.json` file is created. This file stores exactly where every photo was moved.
-- If you need to undo your work, the **Restore** feature uses this file to move everything back to its original location.
-- We use "atomic writes" for this file, meaning it's written to a temporary file first to prevent corruption if the app crashes mid-write.
+I spent a lot of time making sure the app doesn't slow you down:
+- **Background Loading**: While you're judging the current photo, the app is already decoding the next few in the background.
+- **Memory Management**: High-res photos take up a lot of RAM. I set a 1GB limit—once the app hits that, it starts clearing out the oldest previews to keep your system from getting sluggish.
 
 ---
 
-## 📂 Export Logic
+## 🛡️ Keeping your data safe
 
-When you press **Enter** to finalize, the app doesn't just dump everything into a flat folder. It preserves your directory structure.
+Moving files is serious business. I built the app to be non-destructive and completely reversible.
 
-For example, if you have:
-`Shoot/Day1/IMG_001.jpg`
-
-And you rate it as **GOOD**, it will move to:
-`GOOD/Shoot/Day1/IMG_001.jpg`
-
-This makes it easy to integrate the sorted photos back into your existing organization.
+### The Checkpoint File
+Every time you finish a sorting session, a hidden `.photosorter_checkpoint.json` file is created. This is basically an "undo" button for the whole folder. 
+- If you make a mistake, just hit **Restore** and the app uses that file to move everything back exactly where it was.
+- It uses "atomic writes," which is just a fancy way of saying it writes to a temporary file first so that if your computer crashes mid-save, your checkpoint doesn't get corrupted.
 
 ---
 
-## 💬 A Note on Simplicity
+## 📂 Handling folders
 
-Photo Sorter V1 isn't meant to replace your professional cataloging software. It's a "pre-filter" designed to save you time before you import your photos into heavier editors. We hope it makes your workflow a little less tedious.
+When you're ready to move the files (by hitting **Enter**), the app respects your existing organization. 
+
+If your photos are tucked into subfolders like `Shoot/Day1/IMG_001.jpg`, the app will recreate those folders inside the category buckets. You'll end up with `GOOD/Shoot/Day1/IMG_001.jpg`. It keeps things tidy and easy to find later.
+
+---
+
+## 💬 A final thought
+
+I built Photo Sorter V1 to be a "pre-filter." It's not here to replace your main editor, but hopefully, it makes that first hour after a big shoot a lot less painful. If you have any ideas on how to make it better, I'm all ears.
