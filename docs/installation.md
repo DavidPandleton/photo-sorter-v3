@@ -19,7 +19,10 @@ This guide provides comprehensive instructions for installing and running Photo 
 
 ### 3. Install & Run
 1. `pip install -r requirements.txt`
-2. `python src/sorter.py`
+2. `python sorter.py`
+
+> [!TIP]
+> If you plan to use a gamepad (Xbox, PlayStation, or generic), ensure the `inputs` library was installed correctly (it's included in `requirements.txt`).
 
 ---
 
@@ -36,7 +39,7 @@ This guide provides comprehensive instructions for installing and running Photo 
 
 ### 3. Install & Run
 1. `pip install -r requirements.txt`
-2. `python3 src/sorter.py`
+2. `python3 sorter.py`
 
 ---
 
@@ -51,7 +54,14 @@ This guide provides comprehensive instructions for installing and running Photo 
 1. `python3 -m venv venv`
 2. `source venv/bin/activate`
 3. `pip install -r requirements.txt`
-4. `python3 src/sorter.py`
+4. `python3 sorter.py`
+
+---
+
+## 🎮 Gamepad Notes
+Gamepad support relies on the `inputs` library. On some Linux distributions, you may need to add your user to the `input` group to access joystick events:
+`sudo usermod -a -G input $USER`
+(Log out and back in for changes to take effect).
 
 ---
 

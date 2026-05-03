@@ -18,15 +18,36 @@
 
 ## 📸 What is this?
 
-Photo Sorter V1 is a simple tool I built to solve a specific problem: culling large batches of photos quickly. It isn't trying to be Lightroom or a complex management system. It's just a fast way to decide what to keep and what to toss before you start editing.
+Photo Sorter V1 is a tool I built to solve a specific problem: culling large batches of photos quickly. It isn't trying to be Lightroom or a complex cataloging system. It's just a fast, distraction-free way to decide what to keep and what to toss before you start editing.
 
-If you've ever had to click through hundreds of images from a shoot and wished you could just do it with a few keystrokes without your computer lagging, this is for you.
+If you've ever had to click through hundreds of images from a shoot and wished you could just do it with a few keystrokes (or a gamepad) without your computer lagging, this is for you.
+
+---
+
+## ✨ What's New?
+
+- **Filmstrip Navigator**: A sleek "minimap" at the bottom to see where you are in your batch.
+- **Universal Gamepad Support**: Works with Xbox, PlayStation (PS2-PS5), and most generic controllers.
+- **Improved Performance**: Faster RAW loading and a dedicated thumbnail engine.
+- **Image Rotation**: Fix orientation on the fly with the keyboard or gamepad triggers.
+- **Premium UI**: Refined dark theme with smooth animations and better feedback.
+
+---
+
+## 🎞️ The Filmstrip Navigator
+
+The new filmstrip at the bottom gives you visual context without cluttering the screen:
+- **Visual Context**: See your previous and upcoming shots at a glance.
+- **Rating Ribbons**: Each thumbnail has a color-coded strip (Red/Yellow/Green) so you can see your sorting progress visually.
+- **Jump Anywhere**: Just click a thumbnail to jump straight to that photo.
+- **Auto-Sync**: The strip follows your navigation and auto-centers the current image.
+- **Configurable**: You can change how many thumbnails are visible via **Settings > Filmstrip Window Size**.
 
 ---
 
 ## ✨ The Workflow
 
-The whole idea is to keep your hands on the keyboard and your eyes on the images. You just pick a folder and start sorting into three simple buckets:
+The whole idea is to keep your hands on your input device and your eyes on the images. You just pick a folder and start sorting into three simple buckets:
 
 <p align="center">
   <img src="assets/screenshots/bad yellow.png" width="250" alt="Rating: BAD">
@@ -35,44 +56,55 @@ The whole idea is to keep your hands on the keyboard and your eyes on the images
 </p>
 
 1. **Pick your folder** containing the photos.
-2. **Rate as you go** using the number keys:
-   - `1` : **BAD** (Red flash) - For the blurry ones or the mistakes.
-   - `2` : **OK** (Yellow flash) - For the "maybe" pile.
-   - `3` : **GOOD** (Green flash) - Your winners.
-3. **Move around** with `N` (Next) and `P` (Previous).
-4. **Finish up**: Hit `Enter`. The app moves everything you rated into `/BAD`, `/OK`, and `/GOOD` folders in your directory.
+2. **Rate as you go** using the number keys or gamepad buttons:
+   - `1` / **[B / ○]** : **BAD** (Red flash) - For the blurry ones or the mistakes.
+   - `2` / **[X / □]** : **OK** (Yellow flash) - For the "maybe" pile.
+   - `3` / **[A / ✕]** : **GOOD** (Green flash) - Your winners.
+3. **Move around** with `N`/`P` or the D-Pad.
+4. **Finish up**: Hit `Enter` or the **Start** button. The app moves everything into `/BAD`, `/OK`, and `/GOOD` folders in your directory.
 
 ---
 
-## 🛠️ Why I built it this way
-
-- **No mouse needed**: I hate reaching for the mouse while culling. Every core action is mapped to a key.
-- **Instant feedback**: The color flashes are there so you know you hit the right key without having to look at a small UI label.
-- **Safety**: I know how scary it is to have a tool move your files. Every session creates a checkpoint file. If you make a mistake or want to undo the whole thing, just hit **Restore** and everything moves back to exactly where it was.
-- **Organization**: If you have photos in subdirectories, the app preserves that structure within the category folders so you don't lose your folder organization.
-
----
-
-## ⌨️ Shortcuts
+## ⌨️ Keyboard Shortcuts
 
 | Key | Action | What happens |
 | :--- | :--- | :--- |
-| **1** | Rate **BAD** | 🔴 Red Flash |
-| **2** | Rate **OK** | 🟡 Yellow Flash |
-| **3** | Rate **GOOD** | 🟢 Green Flash |
+| **1 / 2 / 3** | Rate Image | 🔴 / 🟡 / 🟢 Feedback |
 | **N / P** | Next / Previous | Switch images |
+| **R / Shift+R** | Rotate Right / Left | Fix orientation |
 | **F** | Fullscreen | Toggle view |
-| **Ctrl + Scroll** | Zoom | Focus in |
+| **H** | Toggle HUD | Show/Hide shortcuts |
+| **Ctrl + Scroll** | Zoom | Focus in (anchored to center) |
 | **Enter** | **Finalize** | Move the files |
 
 ---
 
-## 📖 A few things to note
+## 🎮 Universal Gamepad Support
 
-### ⚠️ Current Tradeoffs & Limitations
-- **RAW Files**: This depends on `rawpy`. If that library isn't on your system, the app will just skip the RAW files and stick to standard images like JPG/PNG.
-- **Speed**: I use background loading to keep things fast, but if you're on a slower drive or working with massive RAW files, you might see a brief loading state. 
-- **Experimental**: I've focused on making this safe and stable, but it's still a work in progress. I'd always recommend having a backup of your photos before running major operations with any new tool.
+The app now supports Xbox, PlayStation, and generic controllers. The UI legend automatically updates to show icons for your device (e.g., `[A / ✕]`).
+
+| Button | Action |
+| :--- | :--- |
+| **A / ✕** | Rate **GOOD** (Sorting) / Confirm (Menu) |
+| **X / □** | Rate **OK** |
+| **B / ○** | Rate **BAD** |
+| **LB / RB** | Next / Previous Image |
+| **L-Stick** | Pan Image |
+| **R-Stick** | Zoom In/Out |
+| **LT / RT** (L2 / R2) | Rotate Left / Right |
+| **R-Thumb** | Toggle Hotkey HUD |
+| **Y / △** | Reset Zoom |
+| **Start** | Finalize Export |
+| **Back/Select** | Return to Menu |
+
+---
+
+## 🛠️ Performance & Reliability
+
+- **Dedicated Engines**: The main viewer and the filmstrip use separate thread pools, so loading thumbnails never slows down your high-res sorting.
+- **RAW Extraction**: We use embedded previews for RAW files to give you near-instant viewing.
+- **Safety First**: Every session creates a `.photosorter_checkpoint.json`. If you want to undo the whole export, just use the **Restore** feature and everything will move back to its original location.
+- **Settings Persistence**: Your filmstrip window size and other preferences are saved to `settings.json`.
 
 ---
 
@@ -82,12 +114,12 @@ The whole idea is to keep your hands on the keyboard and your eyes on the images
 2. Run **`install.bat`** (Windows) or **`install.sh`** (Linux/macOS).
 3. Run **`run.bat`** or **`run.sh`** to launch.
 
-For more details on setting things up manually, check the **[Installation Guide](docs/installation.md)**.
+For manual setup details, see the **[Installation Guide](docs/installation.md)**.
 
 ---
 
 ## 💬 Feedback
 
-I made this to be a useful tool for my own work, and I hope it's useful for yours too. If you find any bugs or have ideas on how to keep it fast and simple, feel free to reach out.
+I made this to be a useful tool for my own photography work. If you find bugs or have ideas on how to make it even better while keeping it simple, please let me know.
 
 Licensed under the [MIT License](LICENSE).

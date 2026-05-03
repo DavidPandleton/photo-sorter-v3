@@ -18,15 +18,36 @@
 
 ## 📸 Apa ini?
 
-Photo Sorter V1 adalah tool simpel yang saya bikin buat nyelesain satu masalah spesifik: nyortir foto dalam jumlah banyak dengan cepat. Tool ini bukan pengganti Lightroom atau sistem manajemen foto yang ribet. Fungsinya cuma satu: bantu kamu nentuin mana foto yang mau dipake dan mana yang mau dibuang sebelum masuk ke tahap editing.
+Photo Sorter V1 adalah tool yang saya bikin buat nyelesain satu masalah spesifik: nyortir foto dalam jumlah banyak dengan cepat. Tool ini bukan pengganti Lightroom atau sistem manajemen foto yang ribet. Fungsinya cuma satu: bantu kamu nentuin mana foto yang mau dipake dan mana yang mau dibuang sebelum masuk ke tahap editing.
 
-Kalau kamu pernah ngerasa pegel harus ngeklik ratusan foto hasil pemotretan dan berharap ada cara yang lebih cepet lewat keyboard tanpa bikin komputer lemot, nah tool ini cocok buat kamu.
+Kalau kamu pernah ngerasa pegel harus ngeklik ratusan foto hasil pemotretan dan berharap ada cara yang lebih cepet lewat keyboard atau gamepad tanpa bikin komputer lemot, nah tool ini cocok buat kamu.
+
+---
+
+## ✨ Apa yang Baru?
+
+- **Filmstrip Navigator**: "Minimap" keren di bagian bawah buat liat posisi kamu di antara ribuan foto.
+- **Dukungan Gamepad Universal**: Bisa pake Xbox, PlayStation (PS2-PS5), dan kebanyakan kontroler generik.
+- **Performa Lebih Kenceng**: Loading RAW lebih cepet dan ada engine thumbnail khusus.
+- **Rotasi Gambar**: Perbaiki orientasi foto langsung lewat keyboard atau trigger gamepad.
+- **UI Premium**: Tema gelap yang lebih rapih dengan animasi halus dan feedback yang lebih oke.
+
+---
+
+## 🎞️ Filmstrip Navigator
+
+Filmstrip baru di bagian bawah bantu kamu dapet konteks visual tanpa menuh-menuhin layar:
+- **Konteks Visual**: Liat foto sebelum dan sesudahnya dengan sekali lirik.
+- **Rating Ribbon**: Tiap thumbnail punya garis warna (Merah/Kuning/Hijau) biar kamu bisa liat progres sortir secara visual.
+- **Klik & Lompat**: Tinggal klik thumbnail buat langsung lompat ke foto itu.
+- **Auto-Sync**: Strip ini bakal ngikutin navigasi kamu dan otomatis nengahin foto yang lagi aktif.
+- **Bisa Diatur**: Kamu bisa ganti jumlah thumbnail yang keliatan lewat menu **Settings > Filmstrip Window Size**.
 
 ---
 
 ## ✨ Alur Kerja
 
-Konsep utamanya adalah tangan tetep di keyboard dan mata fokus ke foto. Kamu tinggal pilih folder, terus mulai sortir foto ke tiga kategori:
+Konsep utamanya adalah tangan tetep di input device dan mata fokus ke foto. Kamu tinggal pilih folder, terus mulai sortir foto ke tiga kategori:
 
 <p align="center">
   <img src="../../assets/screenshots/bad yellow.png" width="250" alt="Rating: BAD">
@@ -35,21 +56,12 @@ Konsep utamanya adalah tangan tetep di keyboard dan mata fokus ke foto. Kamu tin
 </p>
 
 1. **Pilih folder** yang isinya foto-foto kamu.
-2. **Kasih rating sambil jalan** pake tombol angka:
-   - `1` : **BAD** (Overlay Merah) - Buat foto yang blur atau gagal.
-   - `2` : **OK** (Overlay Kuning) - Buat foto yang "lumayan".
-   - `3` : **GOOD** (Overlay Hijau) - Foto-foto terbaik kamu.
-3. **Navigasi** pake `N` (Next/Selanjutnya) dan `P` (Previous/Sebelumnya).
-4. **Selesai**: Tekan `Enter`. Aplikasi bakal mindahin semua foto yang udah kamu rating ke folder `/BAD`, `/OK`, dan `/GOOD` di dalam direktori kamu.
-
----
-
-## 🛠️ Kenapa saya bikin begini?
-
-- **Nggak butuh mouse**: Saya paling males kalau harus bolak-balik pegang mouse pas lagi nyortir. Semua fungsi utama ada di keyboard.
-- **Feedback instan**: Overlay warna itu ada biar kamu tau tombol mana yang kepencet tanpa harus liat label UI yang kecil.
-- **Keamanan**: Saya tau rasanya ngeri kalau ada tool yang mindah-mindahin file. Makanya, tiap sesi bakal bikin file checkpoint. Kalau ada salah atau mau batalin semuanya, tinggal klik **Restore** dan semua file bakal balik ke posisi semula.
-- **Struktur Folder**: Kalau foto kamu ada di dalam sub-folder, aplikasi ini bakal tetep jaga strukturnya di dalam folder kategori. Jadi rapihnya nggak ilang.
+2. **Kasih rating sambil jalan** pake tombol angka atau tombol gamepad:
+   - `1` / **[B / ○]** : **BAD** (Flash Merah) - Buat foto yang blur atau gagal.
+   - `2` / **[X / □]** : **OK** (Flash Kuning) - Buat foto yang "lumayan".
+   - `3` / **[A / ✕]** : **GOOD** (Flash Hijau) - Foto-foto terbaik kamu.
+3. **Navigasi** pake `N`/`P` atau D-Pad.
+4. **Selesai**: Tekan `Enter` atau tombol **Start**. Aplikasi bakal mindahin semua foto ke folder `/BAD`, `/OK`, dan `/GOOD`.
 
 ---
 
@@ -57,22 +69,42 @@ Konsep utamanya adalah tangan tetep di keyboard dan mata fokus ke foto. Kamu tin
 
 | Tombol | Aksi | Apa yang terjadi |
 | :--- | :--- | :--- |
-| **1** | Rating **BAD** | 🔴 Flash Merah |
-| **2** | Rating **OK** | 🟡 Flash Kuning |
-| **3** | Rating **GOOD** | 🟢 Flash Hijau |
-| **N / P** | Next / Previous | Ganti foto |
+| **1 / 2 / 3** | Rating Foto | Feedback 🔴 / 🟡 / 🟢 |
+| **N / P** | Selanjutnya / Sebelumnya | Ganti foto |
+| **R / Shift+R** | Putar Kanan / Kiri | Perbaiki orientasi |
 | **F** | Fullscreen | Layar penuh |
-| **Ctrl + Scroll** | Zoom | Fokus detail |
+| **H** | Toggle HUD | Muncul/Sembunyikan shortcut |
+| **Ctrl + Scroll** | Zoom | Fokus detail (tengah) |
 | **Enter** | **Finalize** | Pindahin file |
 
 ---
 
-## 📖 Catatan Penting
+## 🎮 Dukungan Gamepad Universal
 
-### ⚠️ Limitasi & Tradeoffs
-- **File RAW**: Tool ini butuh `rawpy`. Kalau di sistem kamu nggak ada, aplikasi bakal skip file RAW dan cuma nampilin gambar standar kayak JPG/PNG.
-- **Kecepatan**: Saya pake sistem background loading biar cepet, tapi kalau harddisk kamu lambat atau file RAW-nya gede banget, mungkin bakal ada loading bentar.
-- **Eksperimental**: Saya fokus bikin tool ini aman dan stabil, tapi tetep aja ini masih tahap pengembangan. Selalu disaranin buat backup foto kamu dulu sebelum pake tool baru apa pun.
+Sekarang udah dukung Xbox, PlayStation, dan kontroler generik. Legend di UI bakal otomatis ganti ikon sesuai device kamu (misal: `[A / ✕]`).
+
+| Tombol | Aksi |
+| :--- | :--- |
+| **A / ✕** | Rating **GOOD** (Sortir) / Pilih (Menu) |
+| **X / □** | Rating **OK** |
+| **B / ○** | Rating **BAD** |
+| **LB / RB** | Selanjutnya / Sebelumnya |
+| **L-Stick** | Geser Foto (Pan) |
+| **R-Stick** | Zoom Foto |
+| **LT / RT** (L2 / R2) | Putar Kiri / Kanan |
+| **R-Thumb** | Toggle Hotkey HUD |
+| **Y / △** | Reset Zoom |
+| **Start** | Selesai & Pindah File |
+| **Back/Select** | Kembali ke Menu |
+
+---
+
+## 🛠️ Performa & Keamanan
+
+- **Engine Terpisah**: Viewer utama dan filmstrip pake thread pool yang beda, jadi loading thumbnail nggak bakal ganggu kecepatan sortir kamu.
+- **Ekstraksi RAW**: Kita pake preview bawaan dari file RAW biar nampilnya instan.
+- **Keamanan Utama**: Tiap sesi bakal bikin `.photosorter_checkpoint.json`. Kalau mau batalin semua export, tinggal pake fitur **Restore** dan semua file balik ke tempat asalnya.
+- **Pengaturan Tersimpan**: Ukuran window filmstrip dan preferensi lainnya bakal kesimpen di `settings.json`.
 
 ---
 
@@ -88,6 +120,6 @@ Buat detail cara instalasi manual, cek **[Panduan Instalasi](install.md)**.
 
 ## 💬 Feedback
 
-Saya bikin ini buat bantu kerjaan saya sendiri, dan semoga bisa bantu kerjaan kamu juga. Kalau nemu bug atau punya ide biar tool ini tetep simpel dan kenceng, jangan ragu buat kasih tau ya.
+Saya bikin ini buat bantu kerjaan fotografi saya sendiri. Kalau nemu bug atau punya ide biar tool ini makin oke tapi tetep simpel, kabarin ya.
 
 Lisensi di bawah [MIT License](../../LICENSE).

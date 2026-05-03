@@ -46,7 +46,18 @@ Every time you finish a sorting session, a hidden `.photosorter_checkpoint.json`
 
 When you're ready to move the files (by hitting **Enter**), the app respects your existing organization. 
 
-If your photos are tucked into subfolders like `Shoot/Day1/IMG_001.jpg`, the app will recreate those folders inside the category buckets. You'll end up with `GOOD/Shoot/Day1/IMG_001.jpg`. It keeps things tidy and easy to find later.
+If your photos are tucked into subfolders like `Shoot/Day1/IMG_001.jpg`, the app will recreate those folders inside the category buckets. You'll end up with `GOOD/Shoot/Day1/IMG_001.jpg`. ItThis makes it easy to integrate the sorted photos back into your existing organization.
+
+---
+
+## 🎮 Gamepad Support
+
+I added support for Xbox 360 controllers because sometimes culling thousands of photos is better done from a comfortable chair. 
+
+- **Rating**: Use the face buttons (A, B, X) to rate. The color flashes still work exactly the same way.
+- **Navigation**: Use the Bumpers (LB/RB) or the D-Pad to flip through images.
+- **Rotation**: If a photo is sideways, use the **Left and Right Triggers (LT/RT)** to rotate it instantly.
+- **Efficiency**: You can finalize the whole session by hitting the **Start** button, or go back to the menu with **Select**.
 
 ---
 
