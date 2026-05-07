@@ -27,6 +27,7 @@ If you've ever had to click through hundreds of images from a shoot and wished y
 ## ✨ What's New?
 
 - **Filmstrip Navigator**: A sleek "minimap" at the bottom to see where you are in your batch.
+- **Blur Detection (AI Assisted)**: Real-time focus analysis that labels thumbnails as SHARP, SOFT, or BLUR.
 - **Universal Gamepad Support**: Works with Xbox, PlayStation (PS2-PS5), and most generic controllers.
 - **Improved Performance**: Faster RAW loading and a dedicated thumbnail engine.
 - **Image Rotation**: Fix orientation on the fly with the keyboard or gamepad triggers.

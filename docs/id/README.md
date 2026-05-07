@@ -27,6 +27,7 @@ Kalau kamu pernah ngerasa pegel harus ngeklik ratusan foto hasil pemotretan dan 
 ## ✨ Apa yang Baru?
 
 - **Filmstrip Navigator**: "Minimap" keren di bagian bawah buat liat posisi kamu di antara ribuan foto.
+- **Deteksi Blur Otomatis**: Analisis fokus real-time yang ngasih label SHARP, SOFT, atau BLUR di thumbnail.
 - **Dukungan Gamepad Universal**: Bisa pake Xbox, PlayStation (PS2-PS5), dan kebanyakan kontroler generik.
 - **Performa Lebih Kenceng**: Loading RAW lebih cepet dan ada engine thumbnail khusus.
 - **Rotasi Gambar**: Perbaiki orientasi foto langsung lewat keyboard atau trigger gamepad.
