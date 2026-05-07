@@ -22,7 +22,9 @@ This guide provides comprehensive instructions for installing and running Photo 
 2. `python sorter.py`
 
 > [!TIP]
-> If you plan to use a gamepad (Xbox, PlayStation, or generic), ensure the `inputs` library was installed correctly (it's included in `requirements.txt`).
+> You can also use the helper scripts in the `scripts/` folder:
+> - Run `.\scripts\install.bat` for automatic setup.
+> - Run `.\scripts\run.bat` to launch the app.
 
 ---
 

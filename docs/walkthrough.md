@@ -46,7 +46,7 @@ Every time you finish a sorting session, a hidden `.photosorter_checkpoint.json`
 
 When you're ready to move the files (by hitting **Enter**), the app respects your existing organization. 
 
-If your photos are tucked into subfolders like `Shoot/Day1/IMG_001.jpg`, the app will recreate those folders inside the category buckets. You'll end up with `GOOD/Shoot/Day1/IMG_001.jpg`. ItThis makes it easy to integrate the sorted photos back into your existing organization.
+If your photos are tucked into subfolders like `Shoot/Day1/IMG_001.jpg`, the app will recreate those folders inside the category buckets. You'll end up with `GOOD/Shoot/Day1/IMG_001.jpg`. This makes it easy to integrate the sorted photos back into your existing organization.
 
 ---
 

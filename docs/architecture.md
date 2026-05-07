@@ -3,24 +3,24 @@
 Photo Sorter follows a modular, event-driven architecture built on top of the **PyQt6** framework. It leverages a custom threading model and caching strategy to handle high-resolution image data without blocking the main UI thread.
 
 ## Core Components
-- **`PhotoSorter` (QMainWindow)**: The central controller. Manages state (image paths, results, current index), UI stack transitions, and the export/restore logic.
-- **`PhotoViewer` (QGraphicsView)**: The hero component. Optimized for high-performance rendering of pixmaps with built-in panning and normalized zooming.
-- **`ZoomController`**: A dedicated subsystem for input normalization. Translates varying hardware signals (mouse, trackpad, gestures) into a symmetric exponential scaling curve.
+- **`PhotoSorter` (QMainWindow)**: The central controller located in `photosorter/main.py`. Manages state (image paths, results, current index), UI stack transitions, and the export/restore logic.
+- **`PhotoViewer` (QGraphicsView)**: The hero component in `photosorter/ui.py`. Optimized for high-performance rendering of pixmaps with built-in panning and normalized zooming.
+- **`ZoomController`**: A dedicated subsystem for input normalization in `photosorter/ui.py`. Translates varying hardware signals (mouse, trackpad, gestures) into a symmetric exponential scaling curve.
 
 ## Threading Model
 
-To ensure a "zero-lag" UI, all image decoding operations are offloaded to a background thread pool.
+To ensure a "zero-lag" UI, all image decoding operations are offloaded to a background thread pool defined in `photosorter/workers.py`.
 
 - **Bounded Concurrency**: Uses `QThreadPool` with a maximum of 6 worker threads to handle simultaneous preloading and UI tasks without saturation.
-- **`ImageLoadTask` (QRunnable)**: Encapsulates the loading logic. It supports "cancellation" via a flag, allowing the pool to bail early if the user navigates past an image before it finishes loading.
+- **`ImageLoadTask` (QRunnable)**: Encapsulates the loading logic in `photosorter/workers.py`. It supports "cancellation" via a flag, allowing the pool to bail early if the user navigates past an image before it finishes loading.
 - **Signal/Slot Communication**: Workers communicate back to the UI thread via `WorkerSignals` to ensure thread-safe UI updates.
 
 ## Filmstrip Navigator & Thumbnail Engine
 
-To provide visual context without impacting main viewer performance, a secondary high-performance pipeline was implemented:
+To provide visual context without impacting main viewer performance, a secondary high-performance pipeline was implemented in `photosorter/ui.py`:
 
 - **Isolated Thread Pool**: A dedicated `QThreadPool` (4 workers) handles all filmstrip thumbnail generation. This ensures that even during rapid scrolling in the filmstrip, the main high-res image decoding (handled by the primary 6-worker pool) remains prioritized.
-- **`ThumbnailTask` (QRunnable)**: Specifically optimized for rapid visual feedback:
+- **`ThumbnailTask` (QRunnable)**: Specifically optimized for rapid visual feedback in `photosorter/workers.py`:
     - **RAW Optimization**: Uses `rawpy.extract_thumb()` to fetch the camera-embedded JPEG preview instead of full demosaicing.
     - **Memory-Efficient Scaling**: Uses `QImageReader.setScaledSize()` to decode directly into the target thumbnail dimensions, drastically reducing memory overhead during load.
 - **Layered Caching**: A secondary `MemoryBoundedCache` (200MB budget) stores rendered thumbnails, allowing for instantaneous scrolling through previously viewed regions of the strip.
