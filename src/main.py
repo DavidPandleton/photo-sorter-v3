@@ -154,6 +154,12 @@ try:
 except ImportError:
     RAW_SUPPORTED = False
 
+try:
+    import numpy as np
+    NUMPY_SUPPORTED = True
+except ImportError:
+    NUMPY_SUPPORTED = False
+
 
 # DEPENDENCIES:
 # pip install PyQt6 rawpy numpy
@@ -250,6 +256,7 @@ class MemoryBoundedCache:
 
 class WorkerSignals(QObject):
     loaded = pyqtSignal(str, QImage)
+    thumb_loaded = pyqtSignal(str, QImage, float)  # path, image, blur_score
     error = pyqtSignal(str, str)
 
 
@@ -387,9 +394,43 @@ class ThumbnailTask(QRunnable):
                 # Downscale further if needed for perfect UI fit
                 if qimage.height() > self.target_height:
                     qimage = qimage.scaledToHeight(self.target_height, Qt.TransformationMode.SmoothTransformation)
-                self.signals.loaded.emit(self.path, qimage)
+                
+                # Blur Detection (AI Rating)
+                blur_score = 0.0
+                if NUMPY_SUPPORTED:
+                    blur_score = self.detect_blur(qimage)
+
+                self.signals.thumb_loaded.emit(self.path, qimage, blur_score)
         except:
             pass
+
+    def detect_blur(self, qimage: QImage) -> float:
+        """Calculates a focus score using the variance of the Laplacian."""
+        try:
+            # Ensure it's in a format we can work with (Grayscale)
+            img = qimage.convertToFormat(QImage.Format.Format_Grayscale8)
+            width = img.width()
+            height = img.height()
+            
+            if width < 3 or height < 3:
+                return 0.0
+
+            ptr = img.bits()
+            ptr.setsize(height * width)
+            arr = np.frombuffer(ptr, np.uint8).reshape((height, width))
+            
+            # Laplacian kernel convolution using numpy slices
+            # [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
+            laplacian = (
+                arr[1:-1, 0:-2].astype(np.int32) + 
+                arr[1:-1, 2:].astype(np.int32) + 
+                arr[0:-2, 1:-1].astype(np.int32) + 
+                arr[2:, 1:-1].astype(np.int32) - 
+                4 * arr[1:-1, 1:-1].astype(np.int32)
+            )
+            return float(np.var(laplacian))
+        except:
+            return 0.0
 
 
 class ThumbnailItem(QFrame):
@@ -427,18 +468,69 @@ class ThumbnailItem(QFrame):
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.img_label.setStyleSheet("background-color: #1a1a1a; border-radius: 3px;")
         self.layout.addWidget(self.img_label)
+
+        # Blur/Focus Score Overlay (Bottom Right)
+        self.blur_label = QLabel(self)
+        self.blur_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.blur_label.setStyleSheet("""
+            background-color: rgba(0, 0, 0, 180);
+            color: #eee;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 4px;
+            border: 1px solid #444;
+        """)
+        self.blur_label.hide()
         
         self.set_active(False)
 
     def set_image(self, qimage: QImage):
         pixmap = QPixmap.fromImage(qimage)
         # Scaled smoothly for the UI cell
-        self.img_label.setPixmap(pixmap.scaled(
+        scaled = pixmap.scaled(
             self.width() - 8, self.target_height - 10, 
             Qt.AspectRatioMode.KeepAspectRatio, 
             Qt.TransformationMode.SmoothTransformation
-        ))
+        )
+        self.img_label.setPixmap(scaled)
+        
+        # Position blur label relative to the scaled image
+        # This is a simple approximation; for perfect center it needs more math
+        self.blur_label.raise_()
         self.update_tooltip()
+
+    def set_blur(self, score: float):
+        """Sets the focus score and updates the UI indicator."""
+        if score <= 0:
+            self.blur_label.hide()
+            return
+            
+        # Qualitative thresholds (empirically derived for 400px thumbnails)
+        # > 1500: Tack Sharp
+        # > 500: Acceptable
+        # < 200: Blurry
+        text = "SHARP" if score > 1000 else "SOFT" if score > 300 else "BLUR"
+        color = "#4caf50" if score > 1000 else "#ff9800" if score > 300 else "#f44336"
+        
+        self.blur_label.setText(text)
+        self.blur_label.setStyleSheet(f"""
+            background-color: rgba(0, 0, 0, 180);
+            color: {color};
+            font-size: 9px;
+            font-weight: 800;
+            padding: 1px 4px;
+            border-radius: 3px;
+            border: 1px solid {color}44;
+        """)
+        self.blur_label.show()
+        
+        # Reposition to bottom right of the image container
+        self.blur_label.adjustSize()
+        self.blur_label.move(
+            self.width() - self.blur_label.width() - 8,
+            self.height() - self.blur_label.height() - 8
+        )
 
     def set_rating(self, rating: str):
         self.rating = rating
@@ -556,9 +648,11 @@ class FilmstripWidget(QScrollArea):
         viewport_width = self.viewport().width()
         scroll_bar.setValue(item_center - viewport_width // 2)
 
-    def set_thumbnail(self, path: str, qimage: QImage):
+    def set_thumbnail(self, path: str, qimage: QImage, blur_score: float = 0.0):
         if path in self.items:
             self.items[path].set_image(qimage)
+            if blur_score > 0:
+                self.items[path].set_blur(blur_score)
 
 
 class ZoomController:
@@ -789,6 +883,7 @@ class PhotoSorter(QMainWindow):
         self.thumb_pool.setMaxThreadCount(4)
         self.thumb_cache = MemoryBoundedCache(max_mb=200)
         self.active_thumbs = {}
+        self.blur_scores: dict[str, float] = {}
         
         # Gamepad Support (Optional)
         self.gamepad_thread = None
@@ -1395,23 +1490,26 @@ class PhotoSorter(QMainWindow):
     def request_thumb(self, path: str):
         """Requests a low-resolution thumbnail for the filmstrip."""
         if path in self.thumb_cache:
-            self.filmstrip.set_thumbnail(path, self.thumb_cache.get(path))
+            blur = self.blur_scores.get(path, 0.0)
+            self.filmstrip.set_thumbnail(path, self.thumb_cache.get(path), blur)
             return
         
         if path in self.active_thumbs:
             return
             
         task = ThumbnailTask(path)
-        task.signals.loaded.connect(self.on_thumb_loaded)
+        task.signals.thumb_loaded.connect(self.on_thumb_loaded)
         self.active_thumbs[path] = task
         self.thumb_pool.start(task)
 
-    def on_thumb_loaded(self, path, qimage):
+    def on_thumb_loaded(self, path, qimage, blur_score):
         """Callback for when a thumbnail finishes background loading."""
         if path in self.active_thumbs:
             del self.active_thumbs[path]
+        
         self.thumb_cache.put(path, qimage)
-        self.filmstrip.set_thumbnail(path, qimage)
+        self.blur_scores[path] = blur_score
+        self.filmstrip.set_thumbnail(path, qimage, blur_score)
 
     def next_image(self) -> None:
         """Moves to the next image in the library."""
