@@ -32,42 +32,27 @@ def extract_exif(path: str) -> dict:
     return result
 
 
+def _set_if_not_none(d: dict, key: str, value) -> None:
+    if value is not None:
+        d[key] = value
+
 def _extract_rawpy_metadata(raw) -> dict:
     result = {}
     try:
-        result["ISOSpeedRatings"] = getattr(raw, "iso", None)
+        _set_if_not_none(result, "ISOSpeedRatings", getattr(raw, "iso", None))
     except Exception:
         pass
     try:
-        result["ISOSpeedRatings"] = raw.metadata.get("iso_speed", None)
-    except Exception:
-        pass
-    try:
-        result["ISOSpeedRatings"] = raw.metadata.get("ison", None)
-    except Exception:
-        pass
-    try:
-        result["ApertureValue"] = raw.metadata.get("aperture", None)
-    except Exception:
-        pass
-    try:
-        result["ShutterSpeedValue"] = raw.metadata.get("shutter", None)
-    except Exception:
-        pass
-    try:
-        result["FocalLength"] = raw.metadata.get("focal_length", None)
-    except Exception:
-        pass
-    try:
-        result["Model"] = raw.metadata.get("camera_model", None)
-    except Exception:
-        pass
-    try:
-        result["LensModel"] = raw.metadata.get("lens", None)
-    except Exception:
-        pass
-    try:
-        result["DateTimeOriginal"] = raw.metadata.get("timestamp", None)
+        meta = raw.metadata
+        if meta is not None:
+            _set_if_not_none(result, "ISOSpeedRatings", meta.get("iso_speed") if hasattr(meta, "get") else None)
+            _set_if_not_none(result, "ISOSpeedRatings", meta.get("ison") if hasattr(meta, "get") else None)
+            _set_if_not_none(result, "ApertureValue", meta.get("aperture") if hasattr(meta, "get") else None)
+            _set_if_not_none(result, "ShutterSpeedValue", meta.get("shutter") if hasattr(meta, "get") else None)
+            _set_if_not_none(result, "FocalLength", meta.get("focal_length") if hasattr(meta, "get") else None)
+            _set_if_not_none(result, "Model", meta.get("camera_model") if hasattr(meta, "get") else None)
+            _set_if_not_none(result, "LensModel", meta.get("lens") if hasattr(meta, "get") else None)
+            _set_if_not_none(result, "DateTimeOriginal", meta.get("timestamp") if hasattr(meta, "get") else None)
     except Exception:
         pass
     return result

@@ -67,7 +67,7 @@ class PhotoSorter(QMainWindow):
         self.gamepad_mode = False
         self.left_stick = [0, 0]
         self.right_stick = [0, 0]
-        self.settings = {"filmstrip_window": 15, "filmstrip_visible": True}
+        self.settings = {"filmstrip_window": 15, "filmstrip_visible": True, "panel_side": "left"}
         self.load_settings()
 
         if GAMEPAD_SUPPORTED:
@@ -84,6 +84,7 @@ class PhotoSorter(QMainWindow):
             logging.info("Gamepad support disabled: 'inputs' library not found.")
 
         self.is_processing = False
+        self._compare_idx = -1  # which image is shown as compare
         self.folder_browser: FolderBrowser | None = None
         self.search_bar: SearchBar | None = None
         self.date_browser: DateBrowser | None = None
@@ -153,8 +154,11 @@ class PhotoSorter(QMainWindow):
         img = self.ctrl.get_image(path)
         if img:
             self.viewer.set_pick(bool(img["pick"]))
-            self.viewer.set_stars(img["star_rating"] or 0)
+            stars = img["star_rating"] or 0
+            self.viewer.set_stars(stars)
+            self.filmstrip.update_stars(path, stars)
 
+        self.viewer._update_minimap()
         self.update_preload_window()
 
     def _on_pick_toggled(self, picked: bool):
@@ -162,6 +166,9 @@ class PhotoSorter(QMainWindow):
 
     def _on_star_changed(self, stars: int):
         self.viewer.set_stars(stars)
+        if 0 <= self.ctrl.current_index < len(self.ctrl.image_paths):
+            path = self.ctrl.image_paths[self.ctrl.current_index]
+            self.filmstrip.update_stars(path, stars)
 
     def _on_rotation_applied(self, rotation: int):
         self.viewer.set_rotation(rotation)
@@ -186,6 +193,14 @@ class PhotoSorter(QMainWindow):
 
     def _on_filmstrip_rebuild(self, paths: list):
         self.filmstrip.rebuild(paths)
+        # Restore star ratings on thumbnails
+        db = self.ctrl.get_db()
+        pid = self.ctrl.get_project_id()
+        if db and pid:
+            all_imgs = db.get_images(pid)
+            for img in all_imgs:
+                if img["star_rating"]:
+                    self.filmstrip.update_stars(img["path"], img["star_rating"])
         self.update_stats()
 
     def _on_filmstrip_rating(self, path: str, rating):
@@ -304,6 +319,13 @@ class PhotoSorter(QMainWindow):
         self.btn_browser.clicked.connect(self.toggle_side_panels)
         top_layout.addWidget(self.btn_browser)
 
+        side = self.settings.get("panel_side", "left")
+        self.btn_panel_side = QPushButton("▶" if side == "left" else "◀")
+        self.btn_panel_side.setFixedWidth(32)
+        self.btn_panel_side.setToolTip("Move side panel to right" if side == "left" else "Move side panel to left")
+        self.btn_panel_side.clicked.connect(self.toggle_panel_side)
+        top_layout.addWidget(self.btn_panel_side)
+
         btn_restore = QPushButton("Restore Checkpoint")
         btn_restore.clicked.connect(self.restore_checkpoint)
         top_layout.addWidget(btn_restore)
@@ -414,7 +436,7 @@ class PhotoSorter(QMainWindow):
                 "<span style='color:#66bb6a'>[3]</span> GOOD",
                 "<span style='color:#888'>[0]</span> Unrate | <b>[DEL]</b> Delete",
                 "<b>[SPACE]</b> Pick | <b>[I]</b> EXIF | <b>[C]</b> Compare",
-                "<b>[P/N]</b> Prev / Next | <b>[H]</b> HUD | <b>[U]</b> Filter",
+                "<b>[M]</b> Minimap | <b>[P/N]</b> Prev/Next | <b>[H]</b> HUD | <b>[U]</b> Filter",
                 "<b>[CTRL+Z]</b> Undo | <b>[CTRL+1-5]</b> Stars",
                 "<b>[CTRL+G]</b> Jump | <b>[CTRL +/-]</b> Zoom",
                 "<b>[F]</b> Fullscreen | <b>[ESC]</b> Exit",
@@ -644,6 +666,26 @@ class PhotoSorter(QMainWindow):
         if self.date_browser:
             self.date_browser.setVisible(visible)
 
+    def toggle_panel_side(self):
+        current = self.settings.get("panel_side", "left")
+        new_side = "right" if current == "left" else "left"
+        self.settings["panel_side"] = new_side
+        self.save_settings()
+
+        # Remove and re-insert side scroll in the layout
+        content_layout = self.side_scroll.parentWidget().layout() if self.side_scroll.parentWidget() else None
+        if content_layout:
+            idx = content_layout.indexOf(self.side_scroll)
+            if idx >= 0:
+                content_layout.removeWidget(self.side_scroll)
+            if new_side == "right":
+                content_layout.addWidget(self.side_scroll)
+            else:
+                content_layout.insertWidget(0, self.side_scroll)
+
+        self.btn_panel_side.setText("▶" if new_side == "left" else "◀")
+        self.btn_panel_side.setToolTip("Move side panel to right" if new_side == "left" else "Move side panel to left")
+
     # ----- Settings -----
 
     def load_settings(self):
@@ -778,9 +820,15 @@ class PhotoSorter(QMainWindow):
             return
 
         if key == Qt.Key.Key_N:
-            self.ctrl.next_image()
+            if self.viewer.showing_compare:
+                self._navigate_compare(1)
+            else:
+                self.ctrl.next_image()
         elif key == Qt.Key.Key_P:
-            self.ctrl.prev_image()
+            if self.viewer.showing_compare:
+                self._navigate_compare(-1)
+            else:
+                self.ctrl.prev_image()
         elif key == Qt.Key.Key_1:
             self.ctrl.rate_current_image("BAD", QColor(239, 83, 80))
         elif key == Qt.Key.Key_2:
@@ -794,6 +842,8 @@ class PhotoSorter(QMainWindow):
             self.show_filter_indicator()
         elif key == Qt.Key.Key_Space:
             self.ctrl.toggle_pick()
+        elif key == Qt.Key.Key_M:
+            self.viewer.toggle_minimap()
         elif key == Qt.Key.Key_I:
             self.toggle_exif_overlay()
         elif key == Qt.Key.Key_C:
@@ -853,11 +903,31 @@ class PhotoSorter(QMainWindow):
         if self.ctrl.current_index < 0:
             return
         showing = self.viewer.toggle_compare()
-        if showing and self.ctrl.current_index > 0:
-            prev_path = self.ctrl.image_paths[self.ctrl.current_index - 1]
-            prev_img = self.cache.get(prev_path)
-            if prev_img:
-                self.viewer.set_compare_image(prev_img)
+        if showing:
+            self._compare_idx = max(0, self.ctrl.current_index - 1)
+            self._update_compare_image()
+        else:
+            self._compare_idx = -1
+
+    def _update_compare_image(self):
+        if self._compare_idx < 0 or self._compare_idx >= len(self.ctrl.image_paths):
+            return
+        cpath = self.ctrl.image_paths[self._compare_idx]
+        cimg = self.cache.get(cpath)
+        if cimg:
+            self.viewer.set_compare_image(cimg)
+        else:
+            self.request_load(cpath, is_preload=False)
+
+    def _navigate_compare(self, direction: int):
+        """Cycle the compare image forward or backward."""
+        total = len(self.ctrl.image_paths)
+        if total < 2:
+            return
+        self._compare_idx = (self._compare_idx + direction) % total
+        if self._compare_idx == self.ctrl.current_index:
+            self._compare_idx = (self._compare_idx + direction) % total
+        self._update_compare_image()
 
     def delete_current_image(self):
         if self.ctrl.current_index < 0:

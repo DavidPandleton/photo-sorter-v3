@@ -51,6 +51,7 @@ class ThumbnailItem(QFrame):
 
         # Explicit State Initialization
         self.rating = None
+        self.stars = 0
         self.is_active = False
 
         self.layout = QVBoxLayout(self)
@@ -82,6 +83,19 @@ class ThumbnailItem(QFrame):
             border: 1px solid #444;
         """)
         self.blur_label.hide()
+
+        # Star Rating Overlay (Top Right)
+        self.star_label = QLabel(self)
+        self.star_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.star_label.setStyleSheet("""
+            background-color: rgba(0, 0, 0, 160);
+            color: #ffc107;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 1px 4px;
+            border-radius: 3px;
+        """)
+        self.star_label.hide()
 
         self.set_active(False)
 
@@ -143,6 +157,16 @@ class ThumbnailItem(QFrame):
         self.ribbon.setStyleSheet(f"background-color: {colors.get(rating, 'transparent')}; border-radius: 2px;")
         self.ribbon.show()
         self.update_tooltip()
+
+    def set_stars(self, count: int):
+        self.stars = count
+        if count > 0:
+            self.star_label.setText("★" * count)
+            self.star_label.adjustSize()
+            self.star_label.move(self.width() - self.star_label.width() - 6, 6)
+            self.star_label.show()
+        else:
+            self.star_label.hide()
 
     def update_tooltip(self):
         # Defensive metadata extraction
@@ -230,6 +254,10 @@ class FilmstripWidget(QScrollArea):
         if path in self.items:
             self.items[path].set_rating(rating)
 
+    def update_stars(self, path: str, count: int):
+        if path in self.items:
+            self.items[path].set_stars(count)
+
     def set_active(self, path: str):
         if self.current_path in self.items:
             self.items[self.current_path].set_active(False)
@@ -302,12 +330,14 @@ class ZoomController:
         """Applies zoom anchored at the viewport center (global zoom)."""
         current_scale = self.viewer.transform().m11()
         fit_scale = self.viewer.get_fit_scale()
+        target_scale = current_scale * factor
+        max_scale = fit_scale * self.max_scale_multiplier
+        min_scale = fit_scale * 0.1
 
-        if factor > 1.0 and current_scale > fit_scale * self.max_scale_multiplier:
+        if target_scale > max_scale:
             return
-        if factor < 1.0 and current_scale <= fit_scale:
-            self.viewer.force_fit()
-            return
+        if target_scale < min_scale:
+            factor = min_scale / current_scale
 
         old_anchor = self.viewer.transformationAnchor()
         self.viewer.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
@@ -325,18 +355,19 @@ class ZoomController:
         return False
 
     def apply_zoom(self, factor: float) -> None:
-        """Applies a relative zoom factor while enforcing min/max scale boundaries."""
+        """Applies a relative zoom factor while enforcing only max scale boundary."""
         current_scale = self.viewer.transform().m11()
         target_scale = current_scale * factor
 
         fit_scale = self.viewer.get_fit_scale()
         max_scale = fit_scale * self.max_scale_multiplier
+        min_scale = fit_scale * 0.1  # Allow zoom out to 10% of fit
 
         # Enforce boundaries
-        if target_scale < fit_scale:
-            factor = fit_scale / current_scale
-        elif target_scale > max_scale:
+        if target_scale > max_scale:
             factor = max_scale / current_scale
+        elif target_scale < min_scale:
+            factor = min_scale / current_scale
 
         if abs(factor - 1.0) > 0.0001:
             self.viewer.scale(factor, factor)
@@ -412,9 +443,31 @@ class PhotoViewer(QGraphicsView):
 
         self.showing_exif = False
         self.showing_compare = False
+        self.showing_minimap = False
         self._exif_text = ""
         self._picked = False
         self._stars = 0
+
+        # Minimap
+        self.minimap_bg = QGraphicsRectItem()
+        self.minimap_bg.setBrush(QBrush(QColor(0, 0, 0, 180)))
+        self.minimap_bg.setPen(QPen(Qt.PenStyle.NoPen))
+        self.minimap_bg.setZValue(10)
+        self.minimap_bg.hide()
+
+        self.minimap_item = QGraphicsPixmapItem()
+        self.minimap_item.setZValue(11)
+        self.minimap_item.hide()
+
+        self.minimap_viewport_rect = QGraphicsRectItem()
+        self.minimap_viewport_rect.setPen(QPen(QColor(255, 255, 255, 200), 2))
+        self.minimap_viewport_rect.setBrush(QBrush(QColor(255, 255, 255, 30)))
+        self.minimap_viewport_rect.setZValue(12)
+        self.minimap_viewport_rect.hide()
+
+        self.scene.addItem(self.minimap_bg)
+        self.scene.addItem(self.minimap_item)
+        self.scene.addItem(self.minimap_viewport_rect)
 
         self.anim: QVariantAnimation | None = None
         self.zoom_controller = ZoomController(self)
@@ -512,6 +565,7 @@ class PhotoViewer(QGraphicsView):
         self.overlay_item.setRect(rect)
         self.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
         self._reposition_overlays()
+        self._update_minimap()
 
     def set_rotation(self, angle: int) -> None:
         """Sets the visual rotation of the image."""
@@ -567,6 +621,7 @@ class PhotoViewer(QGraphicsView):
         super().resizeEvent(a0)
         if self.transform().m11() <= self.zoom_controller.viewer.get_fit_scale():
             self.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+        self._update_minimap()
 
     def get_fit_scale(self) -> float:
         """Calculates the scaling factor required to fit the image to the viewport."""
@@ -581,4 +636,47 @@ class PhotoViewer(QGraphicsView):
         if not self.pixmap_item.pixmap().isNull():
             self.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
+    def toggle_minimap(self) -> bool:
+        self.showing_minimap = not self.showing_minimap
+        if self.showing_minimap:
+            self._update_minimap()
+            self.minimap_bg.show()
+            self.minimap_item.show()
+            self.minimap_viewport_rect.show()
+        else:
+            self.minimap_bg.hide()
+            self.minimap_item.hide()
+            self.minimap_viewport_rect.hide()
+        return self.showing_minimap
+
+    def _update_minimap(self):
+        if not self.showing_minimap:
+            return
+        pixmap = self.pixmap_item.pixmap()
+        if pixmap.isNull():
+            return
+        vpw = self.viewport().width()
+        vph = self.viewport().height()
+        mw, mh = 180, 120
+        mx = vpw - mw - 15
+        my = vph - mh - 15
+
+        self.minimap_bg.setRect(mx - 4, my - 4, mw + 8, mh + 8)
+
+        thumb = pixmap.scaled(mw, mh, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.minimap_item.setPixmap(thumb)
+        self.minimap_item.setPos(mx, my)
+
+        # Viewport indicator rectangle
+        scene_rect = self.pixmap_item.sceneBoundingRect()
+        if scene_rect.width() <= 0 or scene_rect.height() <= 0:
+            return
+        vr = self.mapToScene(self.viewport().rect()).boundingRect()
+        ratio_x = thumb.width() / scene_rect.width()
+        ratio_y = thumb.height() / scene_rect.height()
+        rx = mx + vr.x() * ratio_x - scene_rect.x() * ratio_x
+        ry = my + vr.y() * ratio_y - scene_rect.y() * ratio_y
+        rw = vr.width() * ratio_x
+        rh = vr.height() * ratio_y
+        self.minimap_viewport_rect.setRect(rx, ry, rw, rh)
 
