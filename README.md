@@ -12,115 +12,122 @@
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platforms">
   <img src="https://img.shields.io/badge/Python-3.9%2B-blueviolet" alt="Python Version">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/tests-40%20passing-brightgreen" alt="Tests">
 </p>
 
----
-
-## 📸 What is this?
-
-Photo Sorter V1 is a tool I built to solve a specific problem: culling large batches of photos quickly. It isn't trying to be Lightroom or a complex cataloging system. It's just a fast, distraction-free way to decide what to keep and what to toss before you start editing.
-
-If you've ever had to click through hundreds of images from a shoot and wished you could just do it with a few keystrokes (or a gamepad) without your computer lagging, this is for you.
+Photo Sorter V1 is a fast, distraction-free tool for culling large batches of photos. It is **not** Lightroom — it is a pre-filter to quickly decide what to keep before you start editing.
 
 ---
 
-## ✨ What's New?
+## Quick Start
 
-- **Filmstrip Navigator**: A sleek "minimap" at the bottom to see where you are in your batch.
-- **Blur Detection (AI Assisted)**: Real-time focus analysis that labels thumbnails as SHARP, SOFT, or BLUR.
-- **Universal Gamepad Support**: Works with Xbox, PlayStation (PS2-PS5), and most generic controllers.
-- **Improved Performance**: Faster RAW loading and a dedicated thumbnail engine.
-- **Image Rotation**: Fix orientation on the fly with the keyboard or gamepad triggers.
-- **Premium UI**: Refined dark theme with smooth animations and better feedback.
+1. **Python 3.9+** required.
+2. Run `scripts/install.bat` (Windows) or `scripts/install.sh` (Linux/macOS).
+3. Run `scripts/run.bat` or `scripts/run.sh` to launch.
 
----
+Or manually:
 
-## 🎞️ The Filmstrip Navigator
-
-The new filmstrip at the bottom gives you visual context without cluttering the screen:
-- **Visual Context**: See your previous and upcoming shots at a glance.
-- **Rating Ribbons**: Each thumbnail has a color-coded strip (Red/Yellow/Green) so you can see your sorting progress visually.
-- **Jump Anywhere**: Just click a thumbnail to jump straight to that photo.
-- **Auto-Sync**: The strip follows your navigation and auto-centers the current image.
-- **Configurable**: You can change how many thumbnails are visible via **Settings > Filmstrip Window Size**.
+```bash
+python -m venv venv
+venv\Scripts\activate    # Windows
+# source venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
+python sorter.py
+```
 
 ---
 
-## ✨ The Workflow
+## Features
 
-The whole idea is to keep your hands on your input device and your eyes on the images. You just pick a folder and start sorting into three simple buckets:
+### Core Workflow
 
-<p align="center">
-  <img src="assets/screenshots/bad yellow.png" width="250" alt="Rating: BAD">
-  <img src="assets/screenshots/ok yellow.png" width="250" alt="Rating: OK">
-  <img src="assets/screenshots/good green.png" width="250" alt="Rating: GOOD">
-</p>
+| Action | Key | Description |
+|--------|-----|-------------|
+| BAD | `1` | Red flash — blurry, mistakes |
+| OK | `2` | Yellow flash — maybes |
+| GOOD | `3` | Green flash — winners |
+| Unrate | `0` | Remove rating, gray flash |
+| Next/Prev | `N` / `P` | Navigate images |
+| Finish Export | `Enter` | Moves files into BAD/OK/GOOD folders |
+| Delete | `Del` | Permanently delete with confirmation |
+| Undo Rating | `Ctrl+Z` | Stack-based revert of last rating |
 
-1. **Pick your folder** containing the photos.
-2. **Rate as you go** using the number keys or gamepad buttons:
-   - `1` / **[B / ○]** : **BAD** (Red flash) - For the blurry ones or the mistakes.
-   - `2` / **[X / □]** : **OK** (Yellow flash) - For the "maybe" pile.
-   - `3` / **[A / ✕]** : **GOOD** (Green flash) - Your winners.
-3. **Move around** with `N`/`P` or the D-Pad.
-4. **Finish up**: Hit `Enter` or the **Start** button. The app moves everything into `/BAD`, `/OK`, and `/GOOD` folders in your directory.
+### Pro Features
+
+| Action | Key | Description |
+|--------|-----|-------------|
+| EXIF Overlay | `I` | Toggle ISO, aperture, shutter speed, focal length, lens, camera model |
+| Compare Mode | `C` | Side-by-side view with previous image |
+| Jump to Image | `Ctrl+G` | Type a number to jump directly |
+| Fullscreen | `F` | Toggle fullscreen mode |
+| HUD Toggle | `H` | Show/hide the controls legend |
+| Zoom In/Out | `Ctrl+` / `Ctrl-` | Smooth exponential zoom |
+| Reset Zoom | `Ctrl+0` | Fit image to window |
+| Rotate | `R` / `Shift+R` | Rotate right/left 90 degrees |
+
+### Library Management
+
+| Action | Key | Description |
+|--------|-----|-------------|
+| Pick/Flag | `Space` | Toggle gold star pick flag |
+| Star Rating | `Ctrl+1` to `Ctrl+5` | 1-5 star rating; press same number to clear |
+| Filter Unrated | `U` | Skip already-rated images during navigation |
+| Filter by rating | Dropdown | All / Unrated / Picked / BAD / OK / GOOD |
+| Text Search | Search bar | Search by filename, lens, or camera model |
+| Folder Browse | Click tree | Navigate subdirectories to filter images |
+| Date Browse | Click date | Show photos from a specific date |
+
+All ratings, picks, stars, rotations, and blur scores persist across sessions via SQLite database.
+
+### Persistence
+
+- **SQLite database** stored at `~/.photosorter/dbs/`
+- **Project index** at `~/.photosorter/projects.json`
+- **Rotating logs** at `~/.photosorter/logs/photosorter.log`
+- **Checkpoint system** (`.photosorter_checkpoint.json`) makes exports fully reversible
 
 ---
 
-## ⌨️ Keyboard Shortcuts
-
-| Key | Action | What happens |
-| :--- | :--- | :--- |
-| **1 / 2 / 3** | Rate Image | 🔴 / 🟡 / 🟢 Feedback |
-| **N / P** | Next / Previous | Switch images |
-| **R / Shift+R** | Rotate Right / Left | Fix orientation |
-| **F** | Fullscreen | Toggle view |
-| **H** | Toggle HUD | Show/Hide shortcuts |
-| **Ctrl + Scroll** | Zoom | Focus in (anchored to center) |
-| **Enter** | **Finalize** | Move the files |
-
----
-
-## 🎮 Universal Gamepad Support
-
-The app now supports Xbox, PlayStation, and generic controllers. The UI legend automatically updates to show icons for your device (e.g., `[A / ✕]`).
+## Gamepad Controls
 
 | Button | Action |
-| :--- | :--- |
-| **A / ✕** | Rate **GOOD** (Sorting) / Confirm (Menu) |
-| **X / □** | Rate **OK** |
-| **B / ○** | Rate **BAD** |
-| **LB / RB** | Next / Previous Image |
+|--------|--------|
+| **A / Cross** | Rate GOOD |
+| **X / Square** | Rate OK |
+| **B / Circle** | Rate BAD |
+| **LB / RB** | Prev / Next Image |
 | **L-Stick** | Pan Image |
 | **R-Stick** | Zoom In/Out |
-| **LT / RT** (L2 / R2) | Rotate Left / Right |
-| **R-Thumb** | Toggle Hotkey HUD |
-| **Y / △** | Reset Zoom |
+| **LT / RT** (L2/R2) | Rotate Left / Right |
 | **Start** | Finalize Export |
-| **Back/Select** | Return to Menu |
+| **Select/Back** | Return to Menu |
+| **Y / Triangle** | Reset Zoom |
+| **R-Thumb** | Toggle HUD |
 
 ---
 
-## 🛠️ Performance & Reliability
+## Build Standalone Executable
 
-- **Dedicated Engines**: The main viewer and the filmstrip use separate thread pools, so loading thumbnails never slows down your high-res sorting.
-- **RAW Extraction**: We use embedded previews for RAW files to give you near-instant viewing.
-- **Safety First**: Every session creates a `.photosorter_checkpoint.json`. If you want to undo the whole export, just use the **Restore** feature and everything will move back to its original location.
-- **Settings Persistence**: Your filmstrip window size and other preferences are saved to `settings.json`.
+```bash
+python packaging/build_windows.py
+```
 
----
-
-## 🚀 Quick Start
-
-1. **Have Python 3.9+** ready.
-2. Run **`install.bat`** (Windows) or **`install.sh`** (Linux/macOS).
-3. Run **`run.bat`** or **`run.sh`** to launch.
-
-For manual setup details, see the **[Installation Guide](docs/installation.md)**.
+The output is placed in `dist/PhotoSorter/`. Use `packaging/photo_sorter_setup.iss` with Inno Setup to create an installer.
 
 ---
 
-## 💬 Feedback
+## Development
 
-I made this to be a useful tool for my own photography work. If you find bugs or have ideas on how to make it even better while keeping it simple, please let me know.
+```bash
+pip install -e ".[dev]"
+pytest tests/        # 40+ tests
+ruff check .         # linting
+```
 
-Licensed under the [MIT License](LICENSE).
+See [docs/development.md](docs/development.md) for full details.
+
+---
+
+## License
+
+MIT. See [LICENSE](LICENSE).

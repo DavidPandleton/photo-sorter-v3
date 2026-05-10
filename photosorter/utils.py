@@ -1,10 +1,11 @@
+import hashlib
 import os
 import shutil
-import hashlib
-from collections import OrderedDict
-from PyQt6.QtGui import QImage
-from PyQt6.QtCore import Qt
 import sys
+from collections import OrderedDict
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QImage
 
 IS_MAC = sys.platform == "darwin"
 MOD_MASK = Qt.KeyboardModifier.MetaModifier if IS_MAC else Qt.KeyboardModifier.ControlModifier
@@ -31,7 +32,7 @@ except ImportError:
 
 def safe_move(src: str, dst: str) -> None:
     """
-    Safely moves a file from src to dst. 
+    Safely moves a file from src to dst.
     Handles cross-filesystem transfers by falling back to copy+delete, with size verification.
     """
     try:
@@ -42,7 +43,7 @@ def safe_move(src: str, dst: str) -> None:
         if os.path.exists(dst) and os.path.getsize(src) == os.path.getsize(dst):
             os.remove(src)
         else:
-            raise IOError(f"File copy verification failed for {src} to {dst}")
+            raise OSError(f"File copy verification failed for {src} to {dst}")
 
 
 def compute_file_metadata(path: str) -> tuple[int, str]:
@@ -66,7 +67,7 @@ def compute_file_metadata(path: str) -> tuple[int, str]:
 
 class MemoryBoundedCache:
     """
-    An LRU (Least Recently Used) cache for QImage objects, 
+    An LRU (Least Recently Used) cache for QImage objects,
     bounded by an approximate memory budget in megabytes.
     """
 
@@ -103,7 +104,8 @@ class MemoryBoundedCache:
     def evict_if_needed(self) -> None:
         """Evicts the oldest items until the memory usage is within budget."""
         while self.current_bytes > self.max_bytes and self.cache:
-            self.cache.popitem(last=False)
+            _, (_, size) = self.cache.popitem(last=False)
+            self.current_bytes -= size
 
     def clear(self) -> None:
         """Clears all items from the cache."""

@@ -1,19 +1,41 @@
+import math
 import os
 from pathlib import Path
-import math
-from PyQt6.QtWidgets import (
-    QFrame, QVBoxLayout, QWidget, QLabel, QHBoxLayout,
-    QScrollArea, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
-    QGraphicsRectItem
+
+from PyQt6.QtCore import QEvent, QRectF, Qt, QTimer, QVariantAnimation, pyqtSignal
+from PyQt6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QImage,
+    QMouseEvent,
+    QPainter,
+    QPen,
+    QPixmap,
+    QResizeEvent,
+    QWheelEvent,
 )
-from PyQt6.QtGui import QImage, QPixmap, QColor, QBrush, QPen, QWheelEvent, QMouseEvent, QResizeEvent, QPainter
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRectF, QVariantAnimation, QEvent
-from PyQt6.QtWidgets import QGestureEvent
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGestureEvent,
+    QGraphicsPixmapItem,
+    QGraphicsRectItem,
+    QGraphicsScene,
+    QGraphicsTextItem,
+    QGraphicsView,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
 from .utils import MOD_MASK
+
 
 class ThumbnailItem(QFrame):
     """
-    A single cell in the filmstrip. 
+    A single cell in the filmstrip.
     Displays the image, rating status, and handles selection.
     """
     clicked = pyqtSignal(str)
@@ -26,15 +48,15 @@ class ThumbnailItem(QFrame):
         self.setFixedHeight(target_height + 20)
         self.setObjectName("ThumbnailItem")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
+
         # Explicit State Initialization
         self.rating = None
         self.is_active = False
-        
+
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(4, 4, 4, 4)
         self.layout.setSpacing(2)
-        
+
         # Rating Ribbon (Top)
         self.ribbon = QWidget()
         self.ribbon.setFixedHeight(4)
@@ -60,19 +82,19 @@ class ThumbnailItem(QFrame):
             border: 1px solid #444;
         """)
         self.blur_label.hide()
-        
+
         self.set_active(False)
 
     def set_image(self, qimage: QImage):
         pixmap = QPixmap.fromImage(qimage)
         # Scaled smoothly for the UI cell
         scaled = pixmap.scaled(
-            self.width() - 8, self.target_height - 10, 
-            Qt.AspectRatioMode.KeepAspectRatio, 
+            self.width() - 8, self.target_height - 10,
+            Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         )
         self.img_label.setPixmap(scaled)
-        
+
         # Position blur label relative to the scaled image
         # This is a simple approximation; for perfect center it needs more math
         self.blur_label.raise_()
@@ -83,14 +105,14 @@ class ThumbnailItem(QFrame):
         if score <= 0:
             self.blur_label.hide()
             return
-            
+
         # Qualitative thresholds (empirically derived for 400px thumbnails)
         # > 1500: Tack Sharp
         # > 500: Acceptable
         # < 200: Blurry
         text = "SHARP" if score > 1000 else "SOFT" if score > 300 else "BLUR"
         color = "#4caf50" if score > 1000 else "#ff9800" if score > 300 else "#f44336"
-        
+
         self.blur_label.setText(text)
         self.blur_label.setStyleSheet(f"""
             background-color: rgba(0, 0, 0, 180);
@@ -102,7 +124,7 @@ class ThumbnailItem(QFrame):
             border: 1px solid {color}44;
         """)
         self.blur_label.show()
-        
+
         # Reposition to bottom right of the image container
         self.blur_label.adjustSize()
         self.blur_label.move(
@@ -116,7 +138,7 @@ class ThumbnailItem(QFrame):
             self.ribbon.hide()
             self.update_tooltip()
             return
-        
+
         colors = {"BAD": "#ef5350", "OK": "#ffca28", "GOOD": "#66bb6a"}
         self.ribbon.setStyleSheet(f"background-color: {colors.get(rating, 'transparent')}; border-radius: 2px;")
         self.ribbon.show()
@@ -131,23 +153,23 @@ class ThumbnailItem(QFrame):
             ext_part = Path(self.path).suffix
             if ext_part:
                 ext = ext_part[1:].upper()
-        
+
         self.setToolTip(f"<b>{name}</b><br>{rating_text}<br>Type: {ext}")
 
     def set_active(self, active: bool):
         self.is_active = active
         if active:
             self.setStyleSheet("""
-                #ThumbnailItem { 
-                    border: 2px solid #42a5f5; 
+                #ThumbnailItem {
+                    border: 2px solid #42a5f5;
                     background-color: #222;
                     border-radius: 6px;
                 }
             """)
         else:
             self.setStyleSheet("""
-                #ThumbnailItem { 
-                    border: 1px solid #252525; 
+                #ThumbnailItem {
+                    border: 1px solid #252525;
                     background-color: transparent;
                     border-radius: 6px;
                 }
@@ -172,16 +194,16 @@ class FilmstripWidget(QScrollArea):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setObjectName("Filmstrip")
-        
+
         self.container = QWidget()
         self.container.setObjectName("FilmstripContainer")
         self.strip_layout = QHBoxLayout(self.container)
         self.strip_layout.setContentsMargins(20, 10, 20, 10)
         self.strip_layout.setSpacing(10)
         self.strip_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        
+
         self.setWidget(self.container)
-        
+
         self.items = {} # path -> ThumbnailItem
         self.ordered_items = []
         self.current_path = ""
@@ -193,10 +215,10 @@ class FilmstripWidget(QScrollArea):
             item = self.strip_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        
+
         self.items.clear()
         self.ordered_items.clear()
-        
+
         for p in paths:
             item = ThumbnailItem(p)
             item.clicked.connect(self.image_selected.emit)
@@ -211,7 +233,7 @@ class FilmstripWidget(QScrollArea):
     def set_active(self, path: str):
         if self.current_path in self.items:
             self.items[self.current_path].set_active(False)
-        
+
         self.current_path = path
         if path in self.items:
             item = self.items[path]
@@ -235,8 +257,8 @@ class FilmstripWidget(QScrollArea):
 
 class ZoomController:
     """
-    Normalizes zoom interaction across standard mouse wheels, 
-    trackpads, and native pinch gestures. 
+    Normalizes zoom interaction across standard mouse wheels,
+    trackpads, and native pinch gestures.
     Uses symmetric exponential scaling for a smooth, high-end feel.
     """
 
@@ -280,13 +302,13 @@ class ZoomController:
         """Applies zoom anchored at the viewport center (global zoom)."""
         current_scale = self.viewer.transform().m11()
         fit_scale = self.viewer.get_fit_scale()
-        
+
         if factor > 1.0 and current_scale > fit_scale * self.max_scale_multiplier:
             return
         if factor < 1.0 and current_scale <= fit_scale:
             self.viewer.force_fit()
             return
-            
+
         old_anchor = self.viewer.transformationAnchor()
         self.viewer.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.viewer.scale(factor, factor)
@@ -349,13 +371,136 @@ class PhotoViewer(QGraphicsView):
         self.pixmap_item = QGraphicsPixmapItem()
         self.scene.addItem(self.pixmap_item)
 
+        self.compare_item = QGraphicsPixmapItem()
+        self.compare_item.hide()
+        self.scene.addItem(self.compare_item)
+
         self.overlay_item = QGraphicsRectItem(self.pixmap_item)
         self.overlay_item.setPen(QPen(Qt.PenStyle.NoPen))
         self.overlay_item.setZValue(1)
         self.overlay_item.setOpacity(0.0)
 
+        self.exif_item = QGraphicsTextItem()
+        self.exif_item.setDefaultTextColor(QColor(255, 255, 255))
+        self.exif_item.setZValue(2)
+        exif_font = QFont("Consolas", 12)
+        exif_font.setBold(True)
+        self.exif_item.setFont(exif_font)
+        self.exif_item.hide()
+
+        self.exif_bg = QGraphicsRectItem()
+        self.exif_bg.setBrush(QBrush(QColor(0, 0, 0, 160)))
+        self.exif_bg.setPen(QPen(Qt.PenStyle.NoPen))
+        self.exif_bg.setZValue(1)
+        self.exif_bg.hide()
+
+        self.flag_item = QGraphicsTextItem()
+        self.flag_item.setDefaultTextColor(QColor(255, 193, 7))
+        flag_font = QFont("Segoe UI", 28)
+        flag_font.setBold(True)
+        self.flag_item.setFont(flag_font)
+        self.flag_item.setPlainText("★")
+        self.flag_item.setZValue(3)
+        self.flag_item.hide()
+
+        self.star_item = QGraphicsTextItem()
+        self.star_item.setDefaultTextColor(QColor(255, 193, 7))
+        star_font = QFont("Segoe UI", 16)
+        self.star_item.setFont(star_font)
+        self.star_item.setZValue(3)
+        self.star_item.hide()
+
+        self.showing_exif = False
+        self.showing_compare = False
+        self._exif_text = ""
+        self._picked = False
+        self._stars = 0
+
         self.anim: QVariantAnimation | None = None
         self.zoom_controller = ZoomController(self)
+
+    def set_exif_text(self, text: str) -> None:
+        self._exif_text = text
+        if not text:
+            self.exif_item.hide()
+            self.exif_bg.hide()
+            return
+        self.exif_item.setPlainText(text)
+        doc = self.exif_item.document()
+        doc.setTextWidth(doc.idealWidth())
+        text_rect = self.exif_item.boundingRect()
+        margin = 8
+        self.exif_bg.setRect(
+            text_rect.x() - margin, text_rect.y() - margin,
+            text_rect.width() + margin * 2, text_rect.height() + margin * 2,
+        )
+        self.exif_item.setPos(self.viewport().width() - text_rect.width() - 20, 10)
+        self.exif_bg.setPos(self.exif_item.pos().x() - margin, self.exif_item.pos().y() - margin)
+        if self.showing_exif:
+            self.exif_item.show()
+            self.exif_bg.show()
+
+    def toggle_exif(self) -> bool:
+        self.showing_exif = not self.showing_exif
+        if self.showing_exif and self._exif_text:
+            self.set_exif_text(self._exif_text)
+        else:
+            self.exif_item.hide()
+            self.exif_bg.hide()
+        return self.showing_exif
+
+    def set_compare_image(self, qimage: QImage) -> None:
+        self.compare_item.setPixmap(QPixmap.fromImage(qimage))
+
+    def toggle_compare(self) -> bool:
+        self.showing_compare = not self.showing_compare
+        if self.showing_compare:
+            self.compare_item.show()
+            self.fit_split_view()
+        else:
+            self.compare_item.hide()
+            self.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+        return self.showing_compare
+
+    def fit_split_view(self) -> None:
+        vpw = self.viewport().width()
+        vph = self.viewport().height()
+        half = vpw // 2
+        pw = self.pixmap_item.pixmap().width()
+        ph = self.pixmap_item.pixmap().height()
+        if pw == 0 or ph == 0:
+            return
+        scale = min((half - 10) / pw, vph / ph)
+        self.pixmap_item.setPos(0, 0)
+        self.pixmap_item.setTransformOriginPoint(pw / 2, ph / 2)
+        self.pixmap_item.setScale(scale)
+        self.compare_item.setPos(half, 0)
+        cw = self.compare_item.pixmap().width()
+        ch = self.compare_item.pixmap().height()
+        if cw > 0 and ch > 0:
+            cscale = min((half - 10) / cw, vph / ch)
+            self.compare_item.setTransformOriginPoint(cw / 2, ch / 2)
+            self.compare_item.setScale(cscale)
+        self.setSceneRect(0, 0, vpw, vph)
+
+    def set_pick(self, picked: bool) -> None:
+        self._picked = picked
+        self.flag_item.setVisible(picked)
+
+    def set_stars(self, count: int) -> None:
+        self._stars = count
+        if count > 0:
+            self.star_item.setPlainText("★" * count)
+            self.star_item.show()
+        else:
+            self.star_item.hide()
+
+    def _reposition_overlays(self):
+        vpw = self.viewport().width()
+        flag_rect = self.flag_item.boundingRect()
+        self.flag_item.setPos(vpw - flag_rect.width() - 15, 10)
+        star_rect = self.star_item.boundingRect()
+        self.star_item.setPos(vpw - star_rect.width() - 15, self.flag_item.isVisible() and 55 or 10)
 
     def set_image(self, qimage: QImage, rotation: int = 0) -> None:
         """Sets the current image and fits it to the view."""
@@ -366,6 +511,7 @@ class PhotoViewer(QGraphicsView):
         self.scene.setSceneRect(rect)
         self.overlay_item.setRect(rect)
         self.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+        self._reposition_overlays()
 
     def set_rotation(self, angle: int) -> None:
         """Sets the visual rotation of the image."""

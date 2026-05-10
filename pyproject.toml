@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "photosorter"
+version = "1.0.0"
+description = "Fast, distraction-free photo culling tool"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = [
+    "PyQt6",
+    "rawpy",
+    "numpy",
+    "inputs",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-qt",
+    "ruff",
+    "pyright",
+]
+
+[tool.setuptools.packages.find]
+include = ["photosorter*"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+extend-exclude = ["build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S"]
+ignore = ["S110"]
+
+[tool.ruff.lint.per-file-ignores]
+"photosorter/main.py" = ["N802", "E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

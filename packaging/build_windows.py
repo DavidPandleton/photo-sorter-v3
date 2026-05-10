@@ -43,7 +43,7 @@ def package():
     # 3. Base PyInstaller command
     # Using --onedir for 1:1 performance parity (no unpack delay)
     # Paths relative to project root
-    script_path = "src/sorter.py"
+    script_path = "sorter.py"
     icon_path = "assets/icon.ico"
     version_path = "packaging/version_info.txt"
 
@@ -55,6 +55,7 @@ def package():
         "--name PhotoSorter",
         f"--icon {icon_path}" if sys.platform == "win32" and os.path.exists(icon_path) else "",
         f"--version-file {version_path}" if sys.platform == "win32" and os.path.exists(version_path) else "",
+        "--add-data photosorter;photosorter" if sys.platform == "win32" else "--add-data photosorter:photosorter",
         binary_args,
         script_path
     ]

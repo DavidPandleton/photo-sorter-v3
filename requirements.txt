@@ -2,3 +2,6 @@ PyQt6
 rawpy
 numpy
 inputs
+Pillow
+pytest
+ruff
