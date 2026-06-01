@@ -3,9 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use serde::{Serialize, Deserialize};
-use crate::database::{PhotoDatabase, ImageRecord};
-use crate::exif::extract_exif;
-use crate::image_loader::generate_thumbnail;
+use crate::database::PhotoDatabase;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Operation {
@@ -186,7 +184,7 @@ impl AppState {
         let filter_folder_val = self.filter_folder.read().unwrap().clone();
         let filter_mode_val = self.filter_mode.read().unwrap().clone();
         
-        let mut all_images = if !filter_date_val.is_empty() {
+        let all_images = if !filter_date_val.is_empty() {
             db.get_images_by_date(pid, &filter_date_val).unwrap_or_default()
         } else {
             db.get_images(pid).unwrap_or_default()

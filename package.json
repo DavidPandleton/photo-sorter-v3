@@ -7,10 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "node_modules/.bin/tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0-rc.0"
+    "@tauri-apps/api": "^2.0.0-rc.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0-rc.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0-rc.0",

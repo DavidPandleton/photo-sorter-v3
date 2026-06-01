@@ -1,20 +1,28 @@
-# Photo Sorter
+# Photo Sorter v3
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platforms">
-  <img src="https://img.shields.io/badge/Python-3.9%2B-teal" alt="Python Version">
+  <img src="https://img.shields.io/badge/Rust-1.96%2B-orange" alt="Rust Version">
+  <img src="https://img.shields.io/badge/Tauri-v2-teal" alt="Tauri">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/tests-54%20passing-brightgreen" alt="Tests">
 </p>
 
-<p align="center">
-  <b>Bahasa Indonesia:</b> <a href="docs/id/README.md">🇮🇩 Baca di sini</a>
-</p>
-
-A fast, keyboard-driven tool for culling and rating large photo batches.  
-This is **not** Lightroom — it's a pre-filter to quickly decide what to keep *before* you open your editor.
+A blazing-fast, keyboard-driven tool for culling and rating large photo batches — rewritten in Rust with a Tauri v2 shell.
 
 Work through hundreds of photos in minutes. Rate with a single keypress. Export sorted folders in one click.
+
+---
+
+## v3 vs v2
+
+| | v2 (Python/PySide6) | v3 (Rust/Tauri) |
+|---|---|---|
+| **Backend** | Python 3.9+ | Rust 1.96+ |
+| **UI** | PySide6 Qt widget | HTML5 Canvas + CSS |
+| **Performance** | Interpreted | Native compiled |
+| **RAM** | ~200MB+ | ~50MB |
+| **Startup** | 2-3s | < 500ms |
+| **Thumbnails** | Python Pillow/rawpy | Native `image` crate + embedded JPEG extraction |
 
 ---
 
@@ -24,17 +32,17 @@ Work through hundreds of photos in minutes. Rate with a single keypress. Export 
 - **Three-tier rating** — BAD (1), OK (2), GOOD (3) with instant color feedback
 - **Star ratings** — `Ctrl+1` through `Ctrl+5` for fine-grained quality scoring
 - **Pick flagging** — `Space` to mark favorites, shown as gold star overlay
-- **Compare mode** — `C` for side-by-side with the previous image
-- **Focus meter** — automatic blur detection on every thumbnail (no NumPy needed)
-- **EXIF extraction** — reads camera metadata from JPEG and RAW (CR2/CR3/ARW/NEF/DNG/etc.)
-- **Thumbnail cache** — SQLite-backed, loads instantly on revisit
-- **Background EXIF sync** — processes metadata in batches without blocking the UI
-- **Viewport-scaled loading** — shows a 1920px version instantly, then full resolution
-- **Undo support** — `Ctrl+Z` to revert the last rating
-- **Fullscreen mode** — `F` for distraction-free review
-- **Gamepad support** — Xbox/PlayStation controllers for ergonomic sorting
-- **SQLite persistence** — ratings survive restarts, with checkpoint/restore
-- **Cross-platform** — Windows (`.bat`), macOS (`.command`), Linux (`.sh` + native `.desktop` launcher)
+- **Compare mode** — `C` for side-by-side split-screen comparison
+- **Focus meter** — automatic Laplacian variance blur detection, cached in SQLite
+- **RAW support** — NEF, CR2, CR3, ARW, DNG, ORF, RW2, PEF with embedded preview extraction
+- **EXIF extraction** — camera model, ISO, aperture, shutter speed, focal length, lens
+- **SQLite persistence** — ratings, picks, stars, rotations survive restarts
+- **Undo support** — `Ctrl+Z` to revert last action
+- **Native trash** — deleted files go to system Recycle Bin, not permanently erased
+- **Checkpoint/restore** — `.photosorter_checkpoint.json` for full export rollback
+- **Pre-loader cache** — next 5 images loaded into RAM, instant navigation
+- **Gamepad support** — Xbox/PlayStation controllers (optional `--features gamepad`)
+- **Cross-platform** — Windows, macOS, Linux via Tauri v2
 
 ---
 
@@ -42,30 +50,34 @@ Work through hundreds of photos in minutes. Rate with a single keypress. Export 
 
 ### Prerequisites
 
-- **Python 3.9+** installed ([python.org](https://python.org))
+- **Rust** 1.96+ ([rustup.rs](https://rustup.rs))
+- **Bun** (or Node.js/npm) ([bun.sh](https://bun.sh))
+- **Windows:** Visual Studio Build Tools with C++ workload
+- **macOS:** Xcode Command Line Tools
+- **Linux:** `build-essential`, `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`
 
-### Windows
-
-```batch
-scripts\install.bat
-scripts\run.bat
-```
-
-### macOS
+### Setup
 
 ```bash
-bash scripts/install.command
-bash scripts/run.command
+bun install
 ```
 
-### Linux
+### Development
+
+```pwsh
+# Windows (PowerShell)
+$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+bun run tauri dev
+
+# macOS / Linux
+bun run tauri dev
+```
+
+### Production Build
 
 ```bash
-bash scripts/install.sh
-bash scripts/run.sh
+bun run tauri build
 ```
-
-After installation, Linux users can find **Photo Sorter** in their app launcher menu (GNOME/KDE).
 
 ---
 
@@ -85,11 +97,11 @@ After installation, Linux users can find **Photo Sorter** in their app launcher 
 ```
 
 1. Open a folder of photos
-2. Navigate with `N` / `P` (or arrow keys / gamepad)
+2. Navigate with `N` / `P` (or arrow keys)
 3. Rate each photo: `1` (BAD), `2` (OK), `3` (GOOD)
 4. Press `Enter` to export — files move into `BAD/`, `OK/`, `GOOD/` folders
 
-All ratings auto-save to a local SQLite database. Close and reopen anytime — your work is preserved.
+All ratings auto-save to SQLite. Close and reopen anytime — your work is preserved.
 
 ---
 
@@ -110,91 +122,53 @@ All ratings auto-save to a local SQLite database. Close and reopen anytime — y
 | Key | Action |
 |-----|--------|
 | `Space` | Toggle pick flag (gold star) |
-| `Ctrl+1` — `Ctrl+5` | Star rating (press same key to clear) |
+| `Ctrl+1` — `Ctrl+5` | Star rating |
 
 ### Navigation
 
 | Key | Action |
 |-----|--------|
 | `N` / `P` | Next / Previous image |
-| `Home` / `End` | First / Last image |
-| `Ctrl+G` | Jump to image number |
 | `C` | Compare side-by-side with previous |
+| `U` | Filter: hide rated images |
 
 ### Display
 
 | Key | Action |
 |-----|--------|
-| `F` | Toggle fullscreen |
-| `H` | Toggle controls HUD |
-| `I` | Toggle info panel |
-| `Ctrl+`+ / `Ctrl+-` | Zoom in / out |
-| `Ctrl+0` | Reset zoom |
-| `Double-click` | Fit to view |
-
-### Editing
-
-| Key | Action |
-|-----|--------|
-| `Del` | Permanently delete (with confirmation) |
-| `R` / `Shift+R` | Rotate CW / CCW |
-| `U` | Filter: hide rated images |
-
-### Export
-
-| Key | Action |
-|-----|--------|
-| `Enter` | Finish sorting & export to `BAD/` / `OK/` / `GOOD/` folders |
-
-Full reference: [docs/keyboard_shortcuts.md](docs/keyboard_shortcuts.md)
+| `Del` | Delete (moves to Recycle Bin) |
+| `Arrow Up` / `Arrow Down` | Rotate CW / CCW |
 
 ---
 
 ## Architecture
 
 ```
-sorter.py                 ← entry point
-  └── photosorter/
-        ├── main.py       ← window, key handlers, signal wiring
-        ├── controller.py ← business logic, signals, filters
-        ├── database.py   ← SQLite layer
-        ├── ui.py         ← PhotoViewer, Filmstrip, StatsHUD
-        ├── widgets.py    ← FolderBrowser, SearchBar, DateBrowser
-        ├── workers.py    ← ImageLoadTask, ThumbnailTask, GamepadThread
-        ├── exif.py       ← RAW + JPEG EXIF extraction
-        └── utils.py      ← cache, file ops, platform detection
+photo-sorter-v3/
+├── src-tauri/              ← Rust backend
+│   ├── src/
+│   │   ├── main.rs         ← Tauri commands, IPC bridge
+│   │   ├── lib.rs          ← Module declarations
+│   │   ├── database.rs     ← SQLite (WAL mode, thumbnail cache)
+│   │   ├── exif.rs         ← EXIF extraction (kamadak-exif)
+│   │   ├── image_loader.rs ← RAW preview, thumbnail gen, focus score
+│   │   └── state.rs        ← AppState, filters, checkpoint, undo
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── src/                    ← Vite + TypeScript frontend
+│   ├── app.ts              ← Orchestrator, keyboard, filmstrip, pre-loader
+│   ├── viewer.ts           ← HTML5 Canvas viewer (zoom/pan/compare)
+│   └── style.css           ← Glassmorphic dark theme
+├── index.html              ← Application shell
+├── vite.config.ts
+├── tsconfig.json
+└── package.json
 ```
 
-- **Signals & slots** pattern — controller emits signals, main.py wires them to UI
-- **Background loading** — image loading and thumbnail generation run in thread pools
-- **Two-pass rendering** — viewport-sized image loads first, full resolution follows
-
----
-
-## Storage
-
-| Data | Location |
-|------|----------|
-| Ratings DB | `~/.photosorter/dbs/` |
-| Project index | `~/.photosorter/projects.json` |
-| Logs | `~/.photosorter/logs/photosorter.log` |
-| Checkpoint | `.photosorter_checkpoint.json` (in project folder) |
-
----
-
-## Development
-
-```bash
-pip install -e ".[dev]"
-pytest tests/       # 54 tests
-ruff check photosorter/
-```
-
-Key principles:
-- Each module under 1000 lines
-- No NumPy dependency (pure Python blur detection)
-- No external services — fully offline
-- Cross-platform from day one
+- **Tauri v2** — native windowing, IPC, filesystem access
+- **rusqlite** — bundled SQLite with WAL mode for parallel reads
+- **Canvas 2D** — sub-pixel coordinate-anchored zoom with exponential scaling
+- **Pre-loader** — next 5 images asynchronously decoded, stored in JS `Map<path, Image>`
 
 ---
 

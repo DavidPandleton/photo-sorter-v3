@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { PhotoViewer } from './viewer';
 
 // --- Type Interfaces ---
@@ -30,6 +31,14 @@ interface DateRecord {
   day: string;
 }
 
+interface Project {
+  id: number;
+  name: string;
+  root_path: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ProjectStats {
   BAD: number;
   OK: number;
@@ -56,6 +65,7 @@ class PhotoSorterApp {
     this.viewer = new PhotoViewer('photo-canvas');
     this.initElements();
     this.initKeyboardBinds();
+    this.loadRecentProjects();
   }
 
   private initElements() {
@@ -79,22 +89,48 @@ class PhotoSorterApp {
     });
   }
 
+  private async loadRecentProjects() {
+    const listContainer = document.getElementById('recent-projects-list');
+    if (!listContainer) return;
+
+    try {
+      const projects = await invoke<Project[]>('get_recent_projects');
+      if (projects.length === 0) {
+        listContainer.innerHTML = '<p class="empty-text">No recent projects found.</p>';
+        return;
+      }
+
+      listContainer.innerHTML = '';
+      for (const proj of projects.slice(0, 5)) {
+        const btn = document.createElement('button');
+        btn.className = 'recent-btn';
+        btn.textContent = `📁 ${proj.name}`;
+        btn.title = proj.root_path;
+        btn.addEventListener('click', () => this.loadFolder(proj.root_path));
+        listContainer.appendChild(btn);
+      }
+    } catch (err) {
+      console.error('Failed to load recent projects:', err);
+    }
+  }
+
   // --- Tauri IPC Wrappers ---
   
   private async selectFolder() {
     try {
-      // Trigger Tauri's native folder selection dialog
-      const selected = await invoke<string | null>('plugin:dialog|open', {
+      const selected = await open({
         directory: true,
         multiple: false,
         title: 'Select Photo Directory'
       });
-      
       if (selected) {
         this.loadFolder(selected);
       }
     } catch (err) {
-      this.showToast('Failed to select folder: ' + err, 'BAD');
+      const path = prompt('Enter folder path:');
+      if (path) {
+        this.loadFolder(path);
+      }
     }
   }
 
@@ -421,7 +457,7 @@ class PhotoSorterApp {
       
       // If rootFolder is empty, prompt folder selection
       if (!this.rootFolder) {
-        const selected = await invoke<string | null>('plugin:dialog|open', {
+        const selected = await open({
           directory: true,
           multiple: false,
           title: 'Select Folder containing checkpoint'
@@ -500,10 +536,7 @@ class PhotoSorterApp {
   }
 
   private exitApp() {
-    const ans = confirm('Are you sure you want to close Photo Sorter?');
-    if (ans) {
-      invoke('plugin:process|exit', { code: 0 }).catch(() => window.close());
-    }
+    window.close();
   }
 
   // --- Side Panel Controls ---
@@ -1008,16 +1041,29 @@ class PhotoSorterApp {
 
   private showToast(msg: string, status: 'GOOD' | 'BAD') {
     console.log(`[Toast ${status}]`, msg);
-    // Simple custom alert or toast
+    // Show brief alert for debugging
+    if (status === 'BAD') {
+      console.error(msg);
+    }
   }
 }
 
 // --- App Initialization ---
 window.addEventListener('DOMContentLoaded', () => {
-  const app = new PhotoSorterApp();
-  // @ts-ignore
-  window.photoSorterApp = app;
-  
-  // Set default controls labels
-  app['updateHUDControls']();
+  try {
+    const app = new PhotoSorterApp();
+    // @ts-ignore
+    window.photoSorterApp = app;
+    app['updateHUDControls']();
+    console.log('Photo Sorter v3 initialized successfully');
+  } catch (err) {
+    console.error('Failed to initialize Photo Sorter:', err);
+    alert('App failed to initialize. Check console for details.\n\n' + err);
+  }
+});
+
+// Global error handler
+window.addEventListener('error', (e) => {
+  console.error('Unhandled error:', e.error || e.message);
+  alert('Runtime error: ' + (e.error?.message || e.message));
 });

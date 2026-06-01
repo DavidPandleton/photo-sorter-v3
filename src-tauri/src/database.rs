@@ -204,8 +204,8 @@ impl PhotoDatabase {
         let now = chrono::Local::now().to_rfc3339();
         
         // Find existing paths in project
-        let mut stmt = tx.prepare("SELECT path FROM images WHERE project_id = ?")?;
-        let existing_paths: std::collections::HashSet<String> = stmt
+        let existing_paths: std::collections::HashSet<String> = tx
+            .prepare("SELECT path FROM images WHERE project_id = ?")?
             .query_map(params![project_id], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
             .collect();
@@ -223,18 +223,20 @@ impl PhotoDatabase {
         }
         
         // Insert new ones
-        let mut insert_stmt = tx.prepare(
-            "INSERT OR IGNORE INTO images (project_id, path, filename, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
-        )?;
-        
-        for p in paths {
-            if !existing_paths.contains(p) {
-                let filename = Path::new(p)
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
-                insert_stmt.execute(params![project_id, p, filename, now, now])?;
+        {
+            let mut insert_stmt = tx.prepare(
+                "INSERT OR IGNORE INTO images (project_id, path, filename, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+            )?;
+            
+            for p in paths {
+                if !existing_paths.contains(p) {
+                    let filename = Path::new(p)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_string();
+                    insert_stmt.execute(params![project_id, p, filename, now, now])?;
+                }
             }
         }
         
@@ -524,3 +526,123 @@ impl PhotoDatabase {
         Ok(blob)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup_db() -> (PhotoDatabase, std::path::PathBuf) {
+        let temp_dir = std::env::temp_dir();
+        let db_path = temp_dir.join(format!("test_photosorter_{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&db_path);
+        let db = PhotoDatabase::new(&db_path).unwrap();
+        (db, db_path)
+    }
+
+    fn seed_image(db: &PhotoDatabase, pid: i64, path: &str) -> ImageRecord {
+        db.sync_images(pid, &[path.to_string()]).unwrap();
+        db.get_image_by_path(pid, path).unwrap().unwrap()
+    }
+
+    #[test]
+    fn test_create_project() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test/photos").unwrap();
+        assert!(pid > 0);
+        let projects = db.get_recent_projects().unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].id, pid);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_sync_images() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test/photos").unwrap();
+        let paths = vec!["/test/photos/a.jpg".to_string(), "/test/photos/b.jpg".to_string()];
+        db.sync_images(pid, &paths).unwrap();
+        let images = db.get_images(pid).unwrap();
+        assert_eq!(images.len(), 2);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_sync_removes_deleted() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test/photos").unwrap();
+        db.sync_images(pid, &["/test/photos/a.jpg".to_string(), "/test/photos/b.jpg".to_string()]).unwrap();
+        db.sync_images(pid, &["/test/photos/a.jpg".to_string()]).unwrap();
+        assert_eq!(db.get_images(pid).unwrap().len(), 1);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_set_rating() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_rating(img.id, Some("GOOD")).unwrap();
+        let updated = db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap();
+        assert_eq!(updated.rating.as_deref(), Some("GOOD"));
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_unrate() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_rating(img.id, Some("GOOD")).unwrap();
+        db.set_rating(img.id, None).unwrap();
+        let updated = db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap();
+        assert_eq!(updated.rating, None);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_pick_flag() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_pick(img.id, true).unwrap();
+        assert_eq!(db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap().pick, 1);
+        db.set_pick(img.id, false).unwrap();
+        assert_eq!(db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap().pick, 0);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_star_rating() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_star_rating(img.id, 3).unwrap();
+        let updated = db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap();
+        assert_eq!(updated.star_rating, 3);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_clear_ratings() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_rating(img.id, Some("GOOD")).unwrap();
+        db.clear_ratings(pid).unwrap();
+        let updated = db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap();
+        assert_eq!(updated.rating, None);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_picked_images() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_pick(img.id, true).unwrap();
+        let picked = db.get_picked_images(pid).unwrap();
+        assert_eq!(picked.len(), 1);
+        let _ = std::fs::remove_file(&db_path);
+    }
+}
+

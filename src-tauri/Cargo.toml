@@ -10,10 +10,10 @@ name = "photo_sorter_v3"
 path = "src/lib.rs"
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-rc.0" }
+tauri-build = { version = "2.0.0-rc.0", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0-rc.0", features = ["image-ico", "protocol-asset"] }
+tauri = { version = "2.0.0-rc.0", features = ["image-ico"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rusqlite = { version = "0.31.0", features = ["bundled"] }
@@ -23,6 +23,8 @@ rayon = "1.10.0"
 trash = "5.1.1"
 gilrs = { version = "0.10.2", optional = true }
 chrono = "0.4"
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
 
 [features]
 default = []

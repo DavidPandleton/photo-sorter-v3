@@ -90,12 +90,24 @@ CLAUDE.md
 LAPORAN_*.md
 NOTE_*.md
 
+# Python v2 files (kept for reference, not part of v3)
+docs/
+photosorter/
+tests/
+packaging/
+scripts/
+pyproject.toml
+requirements.txt
+settings.json
+sorter.py
+
 # Node modules (don't track)
 node_modules/
 
 # Rust build output
 target/
 src-tauri/target/
+src-tauri/gen/
 
 # Tauri build
 dist/

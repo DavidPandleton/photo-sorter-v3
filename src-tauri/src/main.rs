@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{State, Manager};
-use photo_sorter_v3::state::{AppState, Operation};
+use photo_sorter_v3::state::AppState;
 use photo_sorter_v3::database::{ImageRecord, DateRecord};
 use photo_sorter_v3::image_loader::{load_and_scale_image, generate_thumbnail};
 use photo_sorter_v3::exif::extract_exif;
@@ -65,7 +65,7 @@ fn restore_checkpoint(state: State<'_, AppState>) -> Result<i32, String> {
 }
 
 #[tauri::command]
-fn get_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
+fn get_image_data(_state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
     // Quality-focused culling viewport dimensions
     let decoded = load_and_scale_image(&path, 1920)
         .ok_or_else(|| "Failed to load image data.".to_string())?;
@@ -236,6 +236,8 @@ fn get_recent_projects(app: tauri::AppHandle) -> Result<Vec<photo_sorter_v3::dat
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             open_folder,
@@ -256,7 +258,8 @@ fn main() {
             get_current_index,
             set_current_index,
             get_image_metadata_info,
-            toggle_filter_mode
+            toggle_filter_mode,
+            get_recent_projects
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

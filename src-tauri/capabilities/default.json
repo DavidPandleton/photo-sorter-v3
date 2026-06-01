@@ -5,9 +5,9 @@
   "windows": ["*"],
   "permissions": [
     "core:default",
-    "core:path:allow-all",
-    "core:event:allow-all",
-    "core:window:allow-all",
+    "core:window:default",
+    "core:event:default",
+    "core:path:default",
     "dialog:default"
   ]
 }
