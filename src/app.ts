@@ -386,7 +386,11 @@ class PhotoSorterApp {
     if (this.currentIndex < 0) return;
     
     // Custom Confirmation Dialog
-    const confirmDelete = confirm('Permanently move this photo to the system Trash?');
+    const confirmDelete = await this.showCustomDialog(
+      'Move to Trash',
+      'Permanently move this photo to the system Trash?',
+      true
+    );
     if (!confirmDelete) return;
     
     try {
@@ -441,7 +445,7 @@ class PhotoSorterApp {
       const [movedCount, summary] = await invoke<[number, Record<string, number>]>('finish_sorting');
       
       const msg = `Export finished!\nMoved: ${movedCount} photos.\nBAD: ${summary.BAD} | OK: ${summary.OK} | GOOD: ${summary.GOOD}`;
-      alert(msg);
+      await this.showCustomDialog('Export Complete', msg, false);
       
       this.returnToMenu();
     } catch (err) {
@@ -518,8 +522,12 @@ class PhotoSorterApp {
 
   // --- Screen Switching Logic ---
 
-  private confirmReturnToMenu() {
-    const ans = confirm('Are you sure you want to exit to the main menu? Your temporary culling states will remain cached.');
+  private async confirmReturnToMenu() {
+    const ans = await this.showCustomDialog(
+      'Exit Workspace',
+      'Are you sure you want to exit to the main menu? Your temporary culling states will remain cached.',
+      true
+    );
     if (ans) {
       this.returnToMenu();
     }
@@ -1045,6 +1053,46 @@ class PhotoSorterApp {
     if (status === 'BAD') {
       console.error(msg);
     }
+  }
+
+  private showCustomDialog(title: string, message: string, showCancel = false): Promise<boolean> {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('dialog-overlay');
+      const titleEl = document.getElementById('dialog-title');
+      const msgEl = document.getElementById('dialog-message');
+      const okBtn = document.getElementById('btn-dialog-ok');
+      const cancelBtn = document.getElementById('btn-dialog-cancel');
+      
+      if (!overlay || !titleEl || !msgEl || !okBtn || !cancelBtn) {
+        // Fallback to standard if DOM not found
+        if (showCancel) {
+          resolve(confirm(message));
+        } else {
+          alert(message);
+          resolve(true);
+        }
+        return;
+      }
+      
+      titleEl.textContent = title;
+      msgEl.innerHTML = message.replace(/\n/g, '<br>');
+      
+      cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
+      overlay.classList.add('active');
+      
+      const cleanUp = (result: boolean) => {
+        overlay.classList.remove('active');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        resolve(result);
+      };
+      
+      function onOk() { cleanUp(true); }
+      function onCancel() { cleanUp(false); }
+      
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+    });
   }
 }
 
