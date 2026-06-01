@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Sorter</title>
+  <link rel="stylesheet" href="/src/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- MAIN APP CONTAINER (SWITCHABLE SCREENS) -->
+  <main id="app-container">
+    
+    <!-- SCREEN 1: WELCOME MENU SCREEN -->
+    <section id="menu-screen" class="screen active">
+      <div class="radial-bg"></div>
+      <div class="menu-content">
+        <header class="menu-header">
+          <h1 class="glow-text">PHOTO SORTER</h1>
+          <p class="subtitle">Blazing fast, distraction-free photo culling & sorting in Rust</p>
+        </header>
+
+        <div class="cards-grid">
+          <div class="menu-card" id="btn-start-culling">
+            <span class="card-icon">📁</span>
+            <h2>Start Culling</h2>
+            <p>Choose a directory and organize your photos.</p>
+          </div>
+          <div class="menu-card" id="btn-restore-checkpoint">
+            <span class="card-icon">🔄</span>
+            <h2>Restore Checkpoint</h2>
+            <p>Recover your previous sorting checkpoint.</p>
+          </div>
+          <div class="menu-card" id="btn-exit-app">
+            <span class="card-icon">❌</span>
+            <h2>Exit Program</h2>
+            <p>Close the Photo Sorter application.</p>
+          </div>
+        </div>
+
+        <section class="recent-projects-panel" id="recent-projects-section">
+          <h3>RECENT PROJECTS</h3>
+          <div class="recent-list" id="recent-projects-list">
+            <!-- Populated dynamically -->
+            <p class="empty-text">No recent projects found.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: MAIN CULLING WORKSPACE -->
+    <section id="workspace-screen" class="screen">
+      <!-- TOP NAVIGATION BAR -->
+      <header id="top-bar">
+        <div class="brand">
+          <h1 class="brand-title">PHOTO SORTER</h1>
+        </div>
+        <div class="top-bar-actions">
+          <button id="btn-back" class="btn">Back to Menu</button>
+          <button id="btn-toggle-browser" class="btn active">Browser</button>
+          <button id="btn-toggle-side" class="btn icon-btn" title="Move sidebar to left/right">▶</button>
+          <button id="btn-top-restore" class="btn">Restore Checkpoint</button>
+          <button id="btn-finish-export" class="btn action-btn">Finish Export</button>
+        </div>
+      </header>
+
+      <!-- EXPORT PROGRESS INDICATOR -->
+      <div id="progress-bar-container">
+        <div id="progress-bar-fill"></div>
+      </div>
+
+      <!-- MAIN APP WORKSPACE (SIDEBAR + VIEWER) -->
+      <div id="workspace-body">
+        
+        <!-- SIDEBAR PANEL -->
+        <aside id="side-panel" class="side-panel-left">
+          
+          <!-- Search Widget -->
+          <div class="sidebar-widget">
+            <h4 class="widget-title">SEARCH</h4>
+            <input type="text" id="search-input" placeholder="Search filename...">
+          </div>
+
+          <!-- Folders Browser Widget -->
+          <div class="sidebar-widget">
+            <h4 class="widget-title">FOLDERS</h4>
+            <div class="tree-container" id="folder-tree">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Date Browser Widget -->
+          <div class="sidebar-widget" id="date-widget" style="display: none;">
+            <h4 class="widget-title">BY DATE</h4>
+            <div class="tree-container" id="date-tree">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Image Info Card -->
+          <div class="sidebar-widget info-widget">
+            <h4 class="widget-title">IMAGE INFO</h4>
+            <div class="info-content">
+              <span id="info-progress" class="info-large">0 / 0</span>
+              <span id="info-filename" class="info-medium">-</span>
+              <span id="info-type" class="info-badge">-</span>
+              <span id="info-exif" class="info-small">-</span>
+            </div>
+          </div>
+
+          <!-- Keyboard / Gamepad Bindings HUD -->
+          <div class="sidebar-widget hud-widget" id="hud-container">
+            <h4 class="widget-title">CONTROLS</h4>
+            <div id="hud-label" class="hud-content">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </aside>
+
+        <!-- PHOTO VIEWER VIEWPORT -->
+        <section id="viewer-container">
+          <canvas id="photo-canvas"></canvas>
+          
+          <!-- Rating Notification Flash Overlay -->
+          <div id="flash-overlay"></div>
+
+          <!-- Absolute Floating Stats HUD -->
+          <div id="stats-hud" style="display: none;">
+            <div class="stats-row highlight">
+              <span class="stats-star">★</span>
+              <span class="stats-value" id="stats-val-picked">0</span>
+              <span class="stats-label">PICKED</span>
+            </div>
+            <div class="stats-divider"></div>
+            <div class="stats-row">
+              <span class="stats-dot dot-bad">●</span>
+              <span class="stats-value" id="stats-val-bad">0</span>
+              <span class="stats-label">BAD</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-dot dot-ok">●</span>
+              <span class="stats-value" id="stats-val-ok">0</span>
+              <span class="stats-label">OK</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-dot dot-good">●</span>
+              <span class="stats-value" id="stats-val-good">0</span>
+              <span class="stats-label">GOOD</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- BOTTOM FILMSTRIP -->
+      <footer id="filmstrip-panel">
+        <div id="filmstrip-scroll">
+          <div id="filmstrip-container">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <!-- JS CONTROLLERS -->
+  <script type="module" src="/src/app.ts"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "photo-sorter-v3-frontend",
+  "private": true,
+  "version": "3.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0-rc.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0-rc.0",
+    "typescript": "^5.0.2",
+    "vite": "^4.4.5"
+  }
+}

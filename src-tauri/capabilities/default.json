@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/capability-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for Photo Sorter",
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+    "core:path:allow-all",
+    "core:event:allow-all",
+    "core:window:allow-all",
+    "dialog:default"
+  ]
+}
