@@ -557,11 +557,13 @@ impl AppState {
         // Save checkpoint
         self.create_checkpoint(newly_created, operations)?;
         
-        // Clear ratings in SQLite
-        let db_opt = self.db.read().unwrap();
-        let pid_opt = self.project_id.read().unwrap();
-        if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-            db.clear_ratings(*pid).unwrap_or(());
+        // Clear ratings in SQLite (block scope to drop locks before reset)
+        {
+            let db_opt = self.db.read().unwrap();
+            let pid_opt = self.project_id.read().unwrap();
+            if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
+                db.clear_ratings(*pid).unwrap_or(());
+            }
         }
         
         self.reset();

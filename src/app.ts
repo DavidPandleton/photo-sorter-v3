@@ -162,6 +162,9 @@ class PhotoSorterApp {
       // Display first image
       await this.navigateImage(0);
       
+      // Build filmstrip
+      this.rebuildFilmstrip();
+      
       this.showToast(`Loaded ${count} images successfully!`, 'GOOD');
     } catch (err) {
       this.showToast('Error loading folder: ' + err, 'BAD');
@@ -1064,13 +1067,9 @@ class PhotoSorterApp {
       const cancelBtn = document.getElementById('btn-dialog-cancel');
       
       if (!overlay || !titleEl || !msgEl || !okBtn || !cancelBtn) {
-        // Fallback to standard if DOM not found
-        if (showCancel) {
-          resolve(confirm(message));
-        } else {
-          alert(message);
-          resolve(true);
-        }
+        console.error('[Dialog] DOM elements missing, using console fallback');
+        console.log(`[Dialog] ${title}: ${message}`);
+        resolve(true);
         return;
       }
       
