@@ -213,3 +213,19 @@ Priority fix utk Blanc/Violet:
 5. Home/End, Escape, Enter, Ctrl+G — pure event listener, no backend needed
 6. EXIF orientation rotation — image crate bisa baca orientation
 7. Safe cross-filesystem move — ganti fs::rename dengan copy+delete pattern
+
+---
+
+## 11. CI/CD — ⚠️ CRITICAL
+
+**Current `.github/workflows/ci.yml` masih v2 Python!**
+
+| CI Job | v2 (current) | Should be v3 |
+|---|---|---|
+| Lint | `ruff check photosorter/ tests/` | `cargo clippy` + `tsc --noEmit` |
+| Test | 54 pytest × 12 matrix jobs (3 OS × 4 Python) | `cargo test` (Rust) + maybe vitest |
+| Build | PyInstaller (Python exe) | `tauri build` (Rust binary) |
+| OS | ubuntu, windows, macos | All three still valid |
+| Artifacts | `dist/` Python wheel | `src-tauri/target/release/*.exe` / `.msi` / `.dmg` |
+
+**Impact:** CI bakal **FAIL** setiap push karena `ruff`/`pytest` cari file Python yg udah di-`.gitignore`-in. Pipeline harus ditulis ulang dari nol buat Rust + Tauri. Estimasi: ~2 jam kerja.
