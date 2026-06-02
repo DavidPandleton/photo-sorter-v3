@@ -81,7 +81,22 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Photo Sorter ${{ github.ref_name }}"
-          releaseBody: "Automated release build of Photo Sorter v3"
+          releaseBody: |
+            **Ini Bukan Photoshop.** Keyboard-driven photo culling tool. Rate 1/2/3, export, selesai.
+            
+            ### Downloads
+            | Platform | File |
+            |----------|------|
+            | Windows | `.msi` (installer) or `.exe` (portable) |
+            | macOS | `.dmg` |
+            | Linux | `.AppImage` or `.deb` |
+            
+            ### Cara Pake
+            1. Buka folder foto
+            2. Tekan `1` (BAD), `2` (OK), `3` (GOOD) tiap foto
+            3. `Enter` untuk export — foto ke-sort ke folder BAD/OK/GOOD
+            
+            Lihat [README](https://github.com/${{ github.repository }}/blob/main/README.md) untuk shortcut lengkap.
           releaseDraft: true
           prerelease: false
           args: ""
