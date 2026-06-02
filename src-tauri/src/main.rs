@@ -60,7 +60,10 @@ fn finish_sorting(state: State<'_, AppState>) -> Result<(usize, HashMap<String, 
 }
 
 #[tauri::command]
-fn restore_checkpoint(state: State<'_, AppState>) -> Result<i32, String> {
+fn restore_checkpoint(state: State<'_, AppState>, root: Option<String>) -> Result<i32, String> {
+    if let Some(ref p) = root {
+        *state.root_folder.write().unwrap() = p.clone();
+    }
     state.restore_checkpoint()
 }
 

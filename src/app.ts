@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { PhotoViewer } from './viewer';
 
 // --- Type Interfaces ---
@@ -610,7 +611,7 @@ class PhotoSorterApp {
       }
       
       // Restore files
-      const count = await invoke<number>('restore_checkpoint');
+      const count = await invoke<number>('restore_checkpoint', { root: this.rootFolder });
       if (count >= 0) {
         this.showToast(`Restored ${count} photos from checkpoint successfully!`, 'GOOD');
         this.loadFolder(this.rootFolder);
@@ -761,7 +762,7 @@ class PhotoSorterApp {
   }
 
   private exitApp() {
-    window.close();
+    getCurrentWindow().close();
   }
 
   // --- Side Panel Controls ---
