@@ -135,6 +135,24 @@ photo-sorter-v3/
 
 ---
 
+## Honest Comparison: v2 vs v3
+
+Photo Sorter v2 (Python/PySide6) is still **significantly faster for RAW-heavy workflows** — it uses LibRaw C library directly, has zero IPC overhead, and the thumbnail pipeline is more mature. Benchmarks on 100 NEF files:
+
+| Scenario | v2 (Python) | v3 (Rust) |
+|----------|-------------|-----------|
+| Open folder + render filmstrip | ~2-3s | ~3-5s |
+| Hold N (rapid navigate) | Butter smooth | Can lag with large RAWs |
+| CPU usage during culling | Moderate | Higher (IPC overhead) |
+
+**v3 wins on:** modern UI, cross-platform (Windows/macOS/Linux), customizable keybindings, gamepad support, compare mode, settings persistence, native trash integration.
+
+**v2 wins on:** raw speed, mature codebase, lower resource usage, filmstrip smoothness.
+
+Both projects are maintained. Use v3 for its features; use v2 if your priority is maximum speed with RAW files.
+
+---
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
