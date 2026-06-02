@@ -2,10 +2,35 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ImageRecord } from './app';
 
 export class FilmstripBuilder {
+  private queue: Array<() => Promise<void>> = [];
+  private activeWorkers = 0;
+  private maxWorkers = 3;
+
+  private pushQueue(task: () => Promise<void>) {
+    this.queue.push(task);
+    this.processQueue();
+  }
+
+  private processQueue() {
+    while (this.activeWorkers < this.maxWorkers && this.queue.length > 0) {
+      const task = this.queue.shift();
+      if (task) {
+        this.activeWorkers++;
+        task().finally(() => {
+          this.activeWorkers--;
+          this.processQueue();
+        });
+      }
+    }
+  }
+
   rebuild(imagePaths: string[], onNavigate: (idx: number) => void) {
     const container = document.getElementById('filmstrip-container');
     if (!container) return;
     container.innerHTML = '';
+    
+    // Clear any pending queue tasks
+    this.queue = [];
 
     for (let i = 0; i < imagePaths.length; i++) {
       const path = imagePaths[i];
@@ -47,7 +72,10 @@ export class FilmstripBuilder {
 
       container.appendChild(item);
       item.addEventListener('click', () => onNavigate(i));
-      this.loadThumbnail(path, wrapper, starBadge, focusFill, focusBar, pickBadge, item);
+      
+      this.pushQueue(() => {
+        return this.loadThumbnail(path, wrapper, starBadge, focusFill, focusBar, pickBadge, item);
+      });
     }
   }
 
@@ -55,8 +83,8 @@ export class FilmstripBuilder {
     path: string, wrapper: HTMLElement, starBadge: HTMLElement,
     focusFill: HTMLElement, focusBar: HTMLElement,
     pickBadge: HTMLElement, thumbItem: HTMLElement
-  ) {
-    invoke<[number[], number]>('get_thumbnail_data', { path })
+  ): Promise<void> {
+    const p1 = invoke<[number[], number]>('get_thumbnail_data', { path })
       .then(([bytes, blurScore]) => {
         const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
@@ -82,7 +110,7 @@ export class FilmstripBuilder {
       })
       .catch((err) => console.error(err));
 
-    invoke<ImageRecord | null>('get_image_metadata_info', { path })
+    const p2 = invoke<ImageRecord | null>('get_image_metadata_info', { path })
       .then((meta) => {
         if (!meta) return;
         if (meta.pick === 1) {
@@ -99,6 +127,8 @@ export class FilmstripBuilder {
         }
       })
       .catch(() => {});
+
+    return Promise.all([p1, p2]).then(() => {});
   }
 
   updateActiveItem(path: string) {

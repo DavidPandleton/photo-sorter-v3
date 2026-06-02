@@ -182,76 +182,81 @@ impl PhotoDatabase {
             )
             .unwrap_or(0);
             
-        if current_ver < SCHEMA_VERSION {
-            if current_ver < 3 {
-                // Seed default categories
-                let default_cats = vec![
-                    ("bad", "Bad", "BAD", "1", "rgba(239, 68, 68, 0.4)", 1),
-                    ("ok", "Ok", "OK", "2", "rgba(245, 158, 11, 0.4)", 2),
-                    ("good", "Good", "GOOD", "3", "rgba(16, 185, 129, 0.4)", 3),
-                ];
-                for (key, label, folder, shortcut, flash, sort_order) in default_cats {
-                    conn.execute(
-                        "INSERT OR IGNORE INTO categories (key_name, label, folder_name, shortcut_key, flash_color, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
-                        params![key, label, folder, shortcut, flash, sort_order],
-                    )?;
-                }
-
-                // Seed default keybindings
-                let default_binds = vec![
-                    ("prev_image", "P"),
-                    ("next_image", "N"),
-                    ("toggle_pick", " "),
-                    ("undo", "Ctrl+Z"),
-                    ("unrate", "0"),
-                    ("rot_cw", "ArrowUp"),
-                    ("rot_ccw", "ArrowDown"),
-                    ("compare", "C"),
-                    ("fullscreen", "F"),
-                    ("hud", "H"),
-                    ("info", "I"),
-                    ("toast", "T"),
-                    ("filter", "U"),
-                    ("home", "Home"),
-                    ("end", "End"),
-                    ("jump", "Ctrl+G"),
-                    ("menu", "Escape"),
-                    ("export", "Enter"),
-                    ("delete", "Delete"),
-                ];
-                for (action, shortcut) in default_binds {
-                    conn.execute(
-                        "INSERT OR IGNORE INTO keybindings (action_name, shortcut_key) VALUES (?, ?)",
-                        params![action, shortcut],
-                    )?;
-                }
-
-                // Seed default hud items
-                let default_hud = vec![
-                    ("prev_image", 1, 1, "Navigation"),
-                    ("next_image", 1, 2, "Navigation"),
-                    ("toggle_pick", 1, 3, "Actions"),
-                    ("undo", 1, 4, "Actions"),
-                    ("unrate", 1, 5, "Actions"),
-                    ("rot_cw", 1, 6, "Transforms"),
-                    ("rot_ccw", 1, 7, "Transforms"),
-                    ("compare", 1, 8, "Modes"),
-                    ("fullscreen", 1, 9, "Modes"),
-                    ("hud", 1, 10, "Interface"),
-                    ("info", 1, 11, "Interface"),
-                    ("toast", 1, 12, "Interface"),
-                    ("filter", 1, 13, "Interface"),
-                    ("export", 1, 14, "System"),
-                    ("delete", 1, 15, "System"),
-                ];
-                for (action, visible, order, group) in default_hud {
-                    conn.execute(
-                        "INSERT OR IGNORE INTO hud_items (action_name, visible, sort_order, group_name) VALUES (?, ?, ?, ?)",
-                        params![action, visible, order, group],
-                    )?;
-                }
+        // Proactive self-healing: seed default tables if they are empty
+        let cat_count: i64 = conn.query_row("SELECT COUNT(*) FROM categories", [], |r| r.get(0)).unwrap_or(0);
+        if cat_count == 0 {
+            let default_cats = vec![
+                ("bad", "Bad", "BAD", "1", "rgba(239, 68, 68, 0.4)", 1),
+                ("ok", "Ok", "OK", "2", "rgba(245, 158, 11, 0.4)", 2),
+                ("good", "Good", "GOOD", "3", "rgba(16, 185, 129, 0.4)", 3),
+            ];
+            for (key, label, folder, shortcut, flash, sort_order) in default_cats {
+                conn.execute(
+                    "INSERT OR IGNORE INTO categories (key_name, label, folder_name, shortcut_key, flash_color, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+                    params![key, label, folder, shortcut, flash, sort_order],
+                )?;
             }
+        }
 
+        let bind_count: i64 = conn.query_row("SELECT COUNT(*) FROM keybindings", [], |r| r.get(0)).unwrap_or(0);
+        if bind_count == 0 {
+            let default_binds = vec![
+                ("prev_image", "P"),
+                ("next_image", "N"),
+                ("toggle_pick", " "),
+                ("undo", "Ctrl+Z"),
+                ("unrate", "0"),
+                ("rot_cw", "ArrowUp"),
+                ("rot_ccw", "ArrowDown"),
+                ("compare", "C"),
+                ("fullscreen", "F"),
+                ("hud", "H"),
+                ("info", "I"),
+                ("toast", "T"),
+                ("filter", "U"),
+                ("home", "Home"),
+                ("end", "End"),
+                ("jump", "Ctrl+G"),
+                ("menu", "Escape"),
+                ("export", "Enter"),
+                ("delete", "Delete"),
+            ];
+            for (action, shortcut) in default_binds {
+                conn.execute(
+                    "INSERT OR IGNORE INTO keybindings (action_name, shortcut_key) VALUES (?, ?)",
+                    params![action, shortcut],
+                )?;
+            }
+        }
+
+        let hud_count: i64 = conn.query_row("SELECT COUNT(*) FROM hud_items", [], |r| r.get(0)).unwrap_or(0);
+        if hud_count == 0 {
+            let default_hud = vec![
+                ("prev_image", 1, 1, "Navigation"),
+                ("next_image", 1, 2, "Navigation"),
+                ("toggle_pick", 1, 3, "Actions"),
+                ("undo", 1, 4, "Actions"),
+                ("unrate", 1, 5, "Actions"),
+                ("rot_cw", 1, 6, "Transforms"),
+                ("rot_ccw", 1, 7, "Transforms"),
+                ("compare", 1, 8, "Modes"),
+                ("fullscreen", 1, 9, "Modes"),
+                ("hud", 1, 10, "Interface"),
+                ("info", 1, 11, "Interface"),
+                ("toast", 1, 12, "Interface"),
+                ("filter", 1, 13, "Interface"),
+                ("export", 1, 14, "System"),
+                ("delete", 1, 15, "System"),
+            ];
+            for (action, visible, order, group) in default_hud {
+                conn.execute(
+                    "INSERT OR IGNORE INTO hud_items (action_name, visible, sort_order, group_name) VALUES (?, ?, ?, ?)",
+                    params![action, visible, order, group],
+                )?;
+            }
+        }
+
+        if current_ver < SCHEMA_VERSION {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
                 params![SCHEMA_VERSION],
