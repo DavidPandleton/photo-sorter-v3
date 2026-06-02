@@ -17,6 +17,7 @@ package-lock.json
 *.exe
 *.dll
 *.pdb
+Photo-Sorter-*.zip
 bin/
 build/
 
