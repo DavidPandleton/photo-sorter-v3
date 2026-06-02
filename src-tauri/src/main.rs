@@ -246,6 +246,13 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .manage(AppState::new())
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                photo_sorter_v3::gamepad::start_gamepad_loop(app_handle);
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             open_folder,
             rate_image,

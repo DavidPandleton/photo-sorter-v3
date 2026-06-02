@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
 import { PhotoViewer } from './viewer';
 
 // --- Type Interfaces ---
@@ -60,6 +61,8 @@ class PhotoSorterApp {
   private ratedPaths: Set<string> = new Set();
   private filterMode: string = 'all';
   private compareIndex: number = -1;
+  private gamepadMode: boolean = false;
+  private gamepadAxes = { lx: 0, ly: 0, rx: 0, ry: 0 };
   
   // In-memory Image Cache (Pre-loaders)
   private imageCache: Map<string, HTMLImageElement> = new Map();
@@ -71,6 +74,8 @@ class PhotoSorterApp {
     this.initElements();
     this.initKeyboardBinds();
     this.loadRecentProjects();
+    this.initGamepadEvents();
+    this.initGamepadLoop();
   }
 
   private initElements() {
@@ -1188,17 +1193,31 @@ class PhotoSorterApp {
     const hud = document.getElementById('hud-label');
     if (!hud) return;
     
-    const bindings = [
-      `<span class="hud-key hud-bad">[1]</span> BAD`,
-      `<span class="hud-key hud-ok">[2]</span> OK`,
-      `<span class="hud-key hud-good">[3]</span> GOOD`,
-      `<span class="hud-key">[0]</span> Unrate | <span class="hud-key">[DEL]</span> Delete`,
-      `<span class="hud-key">[SPACE]</span> Flag/Pick`,
-      `<span class="hud-key">[N/P]</span> Prev/Next | <span class="hud-key">[U]</span> Filter Unrated`,
-      `<span class="hud-key">[UP/DOWN]</span> Rotate | <span class="hud-key">[CTRL+Z]</span> Undo`,
-      `<span class="hud-key">[CTRL+1-5]</span> Rating Stars`
-    ];
-    hud.innerHTML = bindings.join('<br>');
+    if (this.gamepadMode) {
+      const bindings = [
+        `<span class="hud-key hud-good">[A]</span> GOOD`,
+        `<span class="hud-key hud-bad">[B]</span> BAD`,
+        `<span class="hud-key hud-ok">[X]</span> OK`,
+        `<span class="hud-key">[LB/RB]</span> Prev/Next`,
+        `<span class="hud-key">[LT/RT]</span> Rotate`,
+        `<span class="hud-key">[L-STICK]</span> Pan | <span class="hud-key">[R-STICK]</span> Zoom`,
+        `<span class="hud-key">[START]</span> Export | <span class="hud-key">[SELECT]</span> Menu`,
+        `<span class="hud-key">[Y]</span> Reset Zoom`
+      ];
+      hud.innerHTML = bindings.join('<br>');
+    } else {
+      const bindings = [
+        `<span class="hud-key hud-bad">[1]</span> BAD`,
+        `<span class="hud-key hud-ok">[2]</span> OK`,
+        `<span class="hud-key hud-good">[3]</span> GOOD`,
+        `<span class="hud-key">[0]</span> Unrate | <span class="hud-key">[DEL]</span> Delete`,
+        `<span class="hud-key">[SPACE]</span> Flag/Pick`,
+        `<span class="hud-key">[N/P]</span> Prev/Next | <span class="hud-key">[U]</span> Filter Unrated`,
+        `<span class="hud-key">[UP/DOWN]</span> Rotate | <span class="hud-key">[CTRL+Z]</span> Undo`,
+        `<span class="hud-key">[CTRL+1-5]</span> Rating Stars`
+      ];
+      hud.innerHTML = bindings.join('<br>');
+    }
   }
 
   // --- Visual Utilities ---
@@ -1304,6 +1323,134 @@ class PhotoSorterApp {
       } else {
         await this.showCustomDialog('Invalid Number', `Please enter a number between 1 and ${this.imagePaths.length}.`, false);
       }
+    }
+  }
+
+  private async initGamepadEvents() {
+    try {
+      await listen<{ code: string; state: boolean }>('gamepad-button', (event) => {
+        if (!this.gamepadMode) {
+          this.gamepadMode = true;
+          this.updateHUDControls();
+        }
+        this.handleGamepadInput(event.payload.code, event.payload.state);
+      });
+
+      await listen<{ axis: string; value: number }>('gamepad-axis', (event) => {
+        if (!this.gamepadMode) {
+          this.gamepadMode = true;
+          this.updateHUDControls();
+        }
+        const { axis, value } = event.payload;
+        if (axis === 'ABS_X') this.gamepadAxes.lx = value;
+        else if (axis === 'ABS_Y') this.gamepadAxes.ly = value;
+        else if (axis === 'ABS_RX') this.gamepadAxes.rx = value;
+        else if (axis === 'ABS_RY') this.gamepadAxes.ry = value;
+      });
+
+      await listen<boolean>('gamepad-connection', (event) => {
+        const connected = event.payload;
+        if (!connected && this.gamepadMode) {
+          this.gamepadMode = false;
+          this.updateHUDControls();
+          this.showToast('Gamepad disconnected. HUD reverted to keyboard.', 'BAD');
+        } else if (connected) {
+          this.showToast('Gamepad connected.', 'GOOD');
+        }
+      });
+
+      await listen<string>('gamepad-device', (event) => {
+        this.showToast(`Gamepad Connected: ${event.payload}`, 'GOOD');
+      });
+    } catch (err) {
+      console.error('Failed to subscribe to gamepad events:', err);
+    }
+  }
+
+  private initGamepadLoop() {
+    const deadzone = 0.25;
+    const panSpeed = 10; 
+    const zoomSpeed = 0.02; 
+
+    const tick = () => {
+      const isWorkspace = document.getElementById('workspace-screen')?.classList.contains('active');
+      if (isWorkspace && this.currentIndex >= 0) {
+        let dx = 0;
+        let dy = 0;
+        
+        if (Math.abs(this.gamepadAxes.lx) > deadzone) {
+          dx = -this.gamepadAxes.lx * panSpeed;
+        }
+        if (Math.abs(this.gamepadAxes.ly) > deadzone) {
+          dy = this.gamepadAxes.ly * panSpeed; 
+        }
+
+        if (dx !== 0 || dy !== 0) {
+          this.viewer.panBy(dx, dy);
+        }
+
+        if (Math.abs(this.gamepadAxes.ry) > deadzone) {
+          const factor = 1.0 + this.gamepadAxes.ry * zoomSpeed;
+          this.viewer.zoomBy(factor);
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  private handleGamepadInput(code: string, state: boolean) {
+    if (!state) return; 
+
+    const isConfirm = ['BTN_A', 'BTN_SOUTH'].includes(code);
+    const isBack = ['BTN_B', 'BTN_EAST'].includes(code);
+    const isOk = ['BTN_X', 'BTN_WEST'].includes(code);
+    const isReset = ['BTN_Y', 'BTN_NORTH'].includes(code);
+
+    const overlay = document.getElementById('dialog-overlay');
+    if (overlay && overlay.classList.contains('active')) {
+      if (isConfirm) {
+        const okBtn = document.getElementById('btn-dialog-ok');
+        if (okBtn) okBtn.click();
+      } else if (isBack) {
+        const cancelBtn = document.getElementById('btn-dialog-cancel');
+        if (cancelBtn) cancelBtn.click();
+      }
+      return;
+    }
+
+    const isWorkspace = document.getElementById('workspace-screen')?.classList.contains('active');
+    if (!isWorkspace || this.currentIndex < 0) {
+      if (!isWorkspace) {
+        if (isConfirm) {
+          this.selectFolder();
+        }
+      }
+      return;
+    }
+
+    if (isConfirm) {
+      this.rateCurrent('GOOD', 'rgba(16, 185, 129, 0.4)');
+    } else if (isBack) {
+      this.rateCurrent('BAD', 'rgba(239, 68, 68, 0.4)');
+    } else if (isOk) {
+      this.rateCurrent('OK', 'rgba(245, 158, 11, 0.4)');
+    } else if (code === 'DPAD_RIGHT' || code === 'BTN_TR') {
+      this.navigateNext();
+    } else if (code === 'DPAD_LEFT' || code === 'BTN_TL') {
+      this.navigatePrev();
+    } else if (code === 'TRIGGER_LEFT' || code === 'BTN_TL2') {
+      this.rotateCurrent(-1);
+    } else if (code === 'TRIGGER_RIGHT' || code === 'BTN_TR2') {
+      this.rotateCurrent(1);
+    } else if (isReset) {
+      this.viewer.resetZoom();
+    } else if (code === 'BTN_SELECT') {
+      this.confirmReturnToMenu();
+    } else if (code === 'BTN_START') {
+      this.finishSorting();
+    } else if (code === 'BTN_THUMBR') {
+      this.toggleHUD();
     }
   }
 }

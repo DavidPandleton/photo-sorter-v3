@@ -151,6 +151,26 @@ export class PhotoViewer {
     this.draw();
   }
 
+  public panBy(dx: number, dy: number) {
+    if (!this.currentImage) return;
+    this.offsetX += dx;
+    this.offsetY += dy;
+    this.draw();
+  }
+
+  public zoomBy(factor: number) {
+    if (!this.currentImage || this.showingCompare) return;
+    const nextScale = this.scale * factor;
+    if (nextScale < 0.05 || nextScale > 25.0) return;
+
+    const cx = this.canvas.width / 2;
+    const cy = this.canvas.height / 2;
+    this.offsetX = cx - (cx - this.offsetX) * factor;
+    this.offsetY = cy - (cy - this.offsetY) * factor;
+    this.scale = nextScale;
+    this.draw();
+  }
+
   // --- Transform Helpers ---
   private onMouseDown(e: MouseEvent) {
     if (e.button === 0) { // Left click
