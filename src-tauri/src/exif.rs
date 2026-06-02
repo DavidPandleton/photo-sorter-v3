@@ -12,6 +12,7 @@ pub struct ExifMetadata {
     pub lens: Option<String>,
     pub camera_model: Option<String>,
     pub date_taken: Option<String>,
+    pub orientation: Option<i32>,
 }
 
 pub fn extract_exif<P: AsRef<Path>>(file_path: P) -> Option<ExifMetadata> {
@@ -91,6 +92,24 @@ pub fn extract_exif<P: AsRef<Path>>(file_path: P) -> Option<ExifMetadata> {
             }
         } else {
             meta.date_taken = Some(raw_date);
+        }
+    }
+    
+    // Orientation
+    if let Some(field) = exif.get_field(Tag::Orientation, In::PRIMARY) {
+        let val = match field.value {
+            Value::Short(ref v) if !v.is_empty() => Some(v[0] as i32),
+            Value::Long(ref v) if !v.is_empty() => Some(v[0] as i32),
+            Value::Byte(ref v) if !v.is_empty() => Some(v[0] as i32),
+            _ => None,
+        };
+        if let Some(o) = val {
+            meta.orientation = Some(match o {
+                3 | 4 => 180,
+                6 | 7 => 90,
+                8 | 5 => 270,
+                _ => 0,
+            });
         }
     }
     

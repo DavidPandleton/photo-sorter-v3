@@ -69,8 +69,103 @@ class PhotoSorterApp {
   private fullResCache: Map<string, HTMLImageElement> = new Map();
   private activePreloadRequests: Set<string> = new Set();
 
+  private getFromCache(path: string): HTMLImageElement | undefined {
+    if (this.imageCache.has(path)) {
+      const img = this.imageCache.get(path)!;
+      this.imageCache.delete(path);
+      this.imageCache.set(path, img);
+      return img;
+    }
+    return undefined;
+  }
+
+  private getFromFullResCache(path: string): HTMLImageElement | undefined {
+    if (this.fullResCache.has(path)) {
+      const img = this.fullResCache.get(path)!;
+      this.fullResCache.delete(path);
+      this.fullResCache.set(path, img);
+      return img;
+    }
+    return undefined;
+  }
+
+  private addToCache(path: string, img: HTMLImageElement) {
+    this.imageCache.delete(path);
+    this.imageCache.set(path, img);
+    this.evictCacheIfNeeded();
+  }
+
+  private addToFullResCache(path: string, img: HTMLImageElement) {
+    this.fullResCache.delete(path);
+    this.fullResCache.set(path, img);
+    this.evictFullResCacheIfNeeded();
+  }
+
+  private evictCacheIfNeeded() {
+    const limit = 15;
+    if (this.imageCache.size <= limit) return;
+
+    const protectedPaths = new Set<string>();
+    if (this.currentIndex >= 0 && this.currentIndex < this.imagePaths.length) {
+      protectedPaths.add(this.imagePaths[this.currentIndex]);
+    }
+    if (this.isCompareMode && this.compareIndex >= 0 && this.compareIndex < this.imagePaths.length) {
+      protectedPaths.add(this.imagePaths[this.compareIndex]);
+    }
+    
+    // Add preload targets (next 5)
+    const preloadWindowSize = 5;
+    for (let i = 1; i <= preloadWindowSize; i++) {
+      if (this.currentIndex + i < this.imagePaths.length) {
+        protectedPaths.add(this.imagePaths[this.currentIndex + i]);
+      }
+    }
+
+    for (const key of this.imageCache.keys()) {
+      if (this.imageCache.size <= limit) break;
+      if (!protectedPaths.has(key)) {
+        this.imageCache.delete(key);
+        this.fullResCache.delete(key);
+      }
+    }
+  }
+
+  private evictFullResCacheIfNeeded() {
+    const limit = 5;
+    if (this.fullResCache.size <= limit) return;
+
+    const protectedPaths = new Set<string>();
+    if (this.currentIndex >= 0 && this.currentIndex < this.imagePaths.length) {
+      protectedPaths.add(this.imagePaths[this.currentIndex]);
+    }
+    if (this.isCompareMode && this.compareIndex >= 0 && this.compareIndex < this.imagePaths.length) {
+      protectedPaths.add(this.imagePaths[this.compareIndex]);
+    }
+
+    for (const key of this.fullResCache.keys()) {
+      if (this.fullResCache.size <= limit) break;
+      if (!protectedPaths.has(key)) {
+        this.fullResCache.delete(key);
+      }
+    }
+  }
+
+  private checkAndSwapFullRes() {
+    if (this.currentIndex < 0 || this.imagePaths.length === 0) return;
+    const path = this.imagePaths[this.currentIndex];
+    if (this.viewer.getScale() > 1.5) {
+      const fullResImg = this.getFromFullResCache(path);
+      if (fullResImg) {
+        this.viewer.setImage(fullResImg);
+      } else {
+        this.loadFullResolution(path);
+      }
+    }
+  }
+
   constructor() {
     this.viewer = new PhotoViewer('photo-canvas');
+    this.viewer.setOnZoom(() => this.checkAndSwapFullRes());
     this.initElements();
     this.initKeyboardBinds();
     this.loadRecentProjects();
@@ -216,10 +311,12 @@ class PhotoSorterApp {
   private async displayMainImage(path: string) {
     try {
       // Check in-memory cache first
-      if (this.imageCache.has(path)) {
-        const cachedImg = this.imageCache.get(path)!;
+      const cachedImg = this.getFromCache(path);
+      if (cachedImg) {
         const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
-        this.viewer.setImage(cachedImg, meta?.rotation || 0);
+        const fullResImg = this.getFromFullResCache(path);
+        const imgToDisplay = (this.viewer.getScale() > 1.5 && fullResImg) ? fullResImg : cachedImg;
+        this.viewer.setImage(imgToDisplay, meta?.rotation || 0);
         this.viewer.setOverlays((meta?.pick || 0) === 1, meta?.star_rating || 0);
         return;
       }
@@ -231,9 +328,11 @@ class PhotoSorterApp {
       
       const img = new Image();
       img.onload = async () => {
-        this.imageCache.set(path, img);
+        this.addToCache(path, img);
         const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
-        this.viewer.setImage(img, meta?.rotation || 0);
+        const fullResImg = this.getFromFullResCache(path);
+        const imgToDisplay = (this.viewer.getScale() > 1.5 && fullResImg) ? fullResImg : img;
+        this.viewer.setImage(imgToDisplay, meta?.rotation || 0);
         this.viewer.setOverlays((meta?.pick || 0) === 1, meta?.star_rating || 0);
         URL.revokeObjectURL(url);
         
@@ -247,7 +346,7 @@ class PhotoSorterApp {
   }
   
   private async loadFullResolution(path: string) {
-    if (this.fullResCache.has(path)) return;
+    if (this.getFromFullResCache(path)) return;
     
     try {
       const bytes = await invoke<number[]>('get_full_image_data', { path });
@@ -256,7 +355,7 @@ class PhotoSorterApp {
       
       const img = new Image();
       img.onload = () => {
-        this.fullResCache.set(path, img);
+        this.addToFullResCache(path, img);
         URL.revokeObjectURL(url);
         
         // If this is the currently displayed image, request viewer to swap
@@ -284,16 +383,7 @@ class PhotoSorterApp {
     }
     
     // Evict old cache items to keep memory bounded
-    if (this.imageCache.size > 15) {
-      const keys = Array.from(this.imageCache.keys());
-      const keepPaths = new Set([this.imagePaths[idx], ...targets]);
-      for (const key of keys) {
-        if (!keepPaths.has(key)) {
-          this.imageCache.delete(key);
-          this.fullResCache.delete(key);
-        }
-      }
-    }
+    this.evictCacheIfNeeded();
 
     // Load target images into cache asynchronously
     for (const path of targets) {
@@ -309,7 +399,7 @@ class PhotoSorterApp {
           const url = URL.createObjectURL(blob);
           const img = new Image();
           img.onload = () => {
-            this.imageCache.set(path, img);
+            this.addToCache(path, img);
             this.activePreloadRequests.delete(path);
             URL.revokeObjectURL(url);
           };
@@ -417,8 +507,9 @@ class PhotoSorterApp {
       const newAngle = await invoke<number>('set_rotation', { path, direction });
       
       // Apply rotation to canvas viewer
-      if (this.imageCache.has(path)) {
-        this.viewer.setImage(this.imageCache.get(path)!, newAngle);
+      const cachedImg = this.getFromCache(path);
+      if (cachedImg) {
+        this.viewer.setImage(cachedImg, newAngle);
       } else {
         await this.navigateImage(this.currentIndex);
       }
@@ -606,8 +697,8 @@ class PhotoSorterApp {
 
   private async displayCompareImage(path: string) {
     try {
-      if (this.imageCache.has(path)) {
-        const cachedImg = this.imageCache.get(path)!;
+      const cachedImg = this.getFromCache(path);
+      if (cachedImg) {
         this.viewer.setCompareImage(cachedImg);
         return;
       }
@@ -618,7 +709,7 @@ class PhotoSorterApp {
       
       const img = new Image();
       img.onload = () => {
-        this.imageCache.set(path, img);
+        this.addToCache(path, img);
         this.viewer.setCompareImage(img);
         URL.revokeObjectURL(url);
       };

@@ -283,13 +283,14 @@ impl AppState {
         if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
             let record = db.get_image_by_path(*pid, path)
                 .map_err(|e| e.to_string())?
-                .ok_or_else(|| "Image not found.".to_string())?;
+                .ok_or_else(|| "Image not found in database.".to_string())?;
                 
-            let current_rot = self.rotations.read().unwrap().get(path).cloned().unwrap_or(0);
+            let mut rotations_map = self.rotations.write().unwrap();
+            let current_rot = rotations_map.get(path).cloned().unwrap_or(record.rotation);
             let new_rot = (current_rot + (direction * 90)).rem_euclid(360);
             
             db.set_rotation(record.id, new_rot).map_err(|e| e.to_string())?;
-            self.rotations.write().unwrap().insert(path.to_string(), new_rot);
+            rotations_map.insert(path.to_string(), new_rot);
             Ok(new_rot)
         } else {
             Err("No active database connection.".to_string())

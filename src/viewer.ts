@@ -29,6 +29,12 @@ export class PhotoViewer {
   private flagOverlay: boolean = false;
   private starsCount: number = 0;
 
+  private onZoomCallback: (() => void) | null = null;
+
+  public setOnZoom(callback: () => void) {
+    this.onZoomCallback = callback;
+  }
+
   constructor(canvasId: string) {
     this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d')!;
@@ -135,6 +141,7 @@ export class PhotoViewer {
     this.offsetY = cy - (cy - this.offsetY) * factor;
     this.scale = nextScale;
     this.draw();
+    this.onZoomCallback?.();
   }
 
   public zoomOut() {
@@ -149,6 +156,7 @@ export class PhotoViewer {
     this.offsetY = cy - (cy - this.offsetY) * factor;
     this.scale = nextScale;
     this.draw();
+    this.onZoomCallback?.();
   }
 
   public panBy(dx: number, dy: number) {
@@ -169,6 +177,7 @@ export class PhotoViewer {
     this.offsetY = cy - (cy - this.offsetY) * factor;
     this.scale = nextScale;
     this.draw();
+    this.onZoomCallback?.();
   }
 
   // --- Transform Helpers ---
@@ -221,6 +230,7 @@ export class PhotoViewer {
     this.scale = nextScale;
     
     this.draw();
+    this.onZoomCallback?.();
   }
 
   // --- Rendering ---

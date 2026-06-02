@@ -375,21 +375,37 @@ impl PhotoDatabase {
         lens: Option<&str>,
         camera_model: Option<&str>,
         date_taken: Option<&str>,
+        rotation: Option<i32>,
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Local::now().to_rfc3339();
-        conn.execute(
-            "UPDATE images SET 
-                iso = ?, aperture = ?, shutter_speed = ?,
-                focal_length = ?, lens = ?, camera_model = ?,
-                date_taken = ?, updated_at = ?
-            WHERE id = ?",
-            params![
-                iso, aperture, shutter_speed,
-                focal_length, lens, camera_model,
-                date_taken, now, image_id
-            ],
-        )?;
+        if let Some(rot) = rotation {
+            conn.execute(
+                "UPDATE images SET 
+                    iso = ?, aperture = ?, shutter_speed = ?,
+                    focal_length = ?, lens = ?, camera_model = ?,
+                    date_taken = ?, rotation = ?, updated_at = ?
+                WHERE id = ?",
+                params![
+                    iso, aperture, shutter_speed,
+                    focal_length, lens, camera_model,
+                    date_taken, rot, now, image_id
+                ],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE images SET 
+                    iso = ?, aperture = ?, shutter_speed = ?,
+                    focal_length = ?, lens = ?, camera_model = ?,
+                    date_taken = ?, updated_at = ?
+                WHERE id = ?",
+                params![
+                    iso, aperture, shutter_speed,
+                    focal_length, lens, camera_model,
+                    date_taken, now, image_id
+                ],
+            )?;
+        }
         Ok(())
     }
 

@@ -201,6 +201,7 @@ fn set_current_index(state: State<'_, AppState>, index: i32) -> Result<(), Strin
                                 meta.lens.as_deref(),
                                 meta.camera_model.as_deref(),
                                 meta.date_taken.as_deref(),
+                                meta.orientation,
                             ).unwrap_or(());
                         }
                     });
@@ -219,7 +220,41 @@ fn get_image_metadata_info(state: State<'_, AppState>, path: String) -> Result<O
     let pid_opt = state.project_id.read().unwrap();
     
     if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-        db.get_image_by_path(*pid, &path).map_err(|e| e.to_string())
+        let mut record = db.get_image_by_path(*pid, &path).map_err(|e| e.to_string())?;
+        if let Some(ref mut rec) = record {
+            if rec.camera_model.is_none() {
+                if let Some(meta) = extract_exif(&path) {
+                    let rot_val = meta.orientation.unwrap_or(0);
+                    db.set_exif_data(
+                        rec.id,
+                        meta.iso,
+                        meta.aperture.as_deref(),
+                        meta.shutter_speed.as_deref(),
+                        meta.focal_length.as_deref(),
+                        meta.lens.as_deref(),
+                        meta.camera_model.as_deref(),
+                        meta.date_taken.as_deref(),
+                        Some(rot_val),
+                    ).unwrap_or(());
+                    
+                    // Update returned record fields
+                    rec.iso = meta.iso;
+                    rec.aperture = meta.aperture.clone();
+                    rec.shutter_speed = meta.shutter_speed.clone();
+                    rec.focal_length = meta.focal_length.clone();
+                    rec.lens = meta.lens.clone();
+                    rec.camera_model = meta.camera_model.clone();
+                    rec.date_taken = meta.date_taken.clone();
+                    rec.rotation = rot_val;
+                    
+                    // Update the in-memory AppState.rotations map if rotation is non-zero
+                    if rot_val != 0 {
+                        state.rotations.write().unwrap().insert(path.clone(), rot_val);
+                    }
+                }
+            }
+        }
+        Ok(record)
     } else {
         Ok(None)
     }
