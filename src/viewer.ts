@@ -327,7 +327,7 @@ export class PhotoViewer {
 
     // Draw gold stars under flag if present
     if (this.starsCount > 0) {
-      this.ctx.fillStyle = '#ffab40';
+      this.ctx.fillStyle = '#2dd4bf';
       this.ctx.font = '22px "Segoe UI", sans-serif';
       this.ctx.textAlign = 'right';
       this.ctx.textBaseline = 'top';

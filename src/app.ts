@@ -1017,6 +1017,13 @@ class PhotoSorterApp {
       starBadge.style.display = 'none';
       wrapper.appendChild(starBadge);
 
+      // Pick Badge (gold star at bottom-left)
+      const pickBadge = document.createElement('span');
+      pickBadge.className = 'thumb-pick-badge';
+      pickBadge.style.display = 'none';
+      pickBadge.textContent = '★';
+      item.appendChild(pickBadge);
+
       // Focus Score Bar
       const focusBar = document.createElement('div');
       focusBar.className = 'thumb-focus-bar';
@@ -1032,7 +1039,7 @@ class PhotoSorterApp {
       item.addEventListener('click', () => this.navigateImage(i));
       
       // Asynchronously fetch thumbnail bytes from Rust DB cache
-      this.loadThumbnail(path, wrapper, starBadge, focusFill, focusBar);
+      this.loadThumbnail(path, wrapper, starBadge, focusFill, focusBar, pickBadge, item);
     }
   }
 
@@ -1041,7 +1048,9 @@ class PhotoSorterApp {
     wrapper: HTMLElement, 
     starBadge: HTMLElement, 
     focusFill: HTMLElement,
-    focusBar: HTMLElement
+    focusBar: HTMLElement,
+    pickBadge: HTMLElement,
+    thumbItem: HTMLElement
   ) {
     invoke<[number[], number]>('get_thumbnail_data', { path })
       .then(([bytes, blurScore]) => {
@@ -1074,6 +1083,25 @@ class PhotoSorterApp {
         }
       })
       .catch((err) => console.error(err));
+    
+    // Fetch pick and star metadata
+    invoke<ImageRecord | null>('get_image_metadata_info', { path })
+      .then((meta) => {
+        if (!meta) return;
+        
+        // Pick badge
+        if (meta.pick === 1) {
+          pickBadge.style.display = 'block';
+          thumbItem.classList.add('thumb-picked');
+        }
+        
+        // Star rating badge
+        if (meta.star_rating > 0) {
+          starBadge.textContent = '★'.repeat(meta.star_rating);
+          starBadge.style.display = 'block';
+        }
+      })
+      .catch(() => {});
   }
 
   private updateActiveFilmstripItem(path: string) {

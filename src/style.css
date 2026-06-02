@@ -353,12 +353,12 @@ input, button {
 
 #side-panel.side-panel-left {
   border-right: 1px solid var(--border-glass);
-  order: 1;
+  order: -1;
 }
 
 #side-panel.side-panel-right {
   border-left: 1px solid var(--border-glass);
-  order: 2;
+  order: 1;
 }
 
 /* Sidebar Widgets */
@@ -754,6 +754,25 @@ input, button {
 .focus-high { background-color: var(--color-good); }
 .focus-medium { background-color: var(--color-ok); }
 .focus-low { background-color: var(--color-bad); }
+
+/* Pick Badge on Thumbnail (gold star at bottom-left of item) */
+.thumb-pick-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  color: var(--color-gold);
+  font-size: 18px;
+  font-weight: 900;
+  text-shadow: 0 0 8px rgba(255, 171, 64, 0.6), 0 1px 3px rgba(0,0,0,0.8);
+  z-index: 5;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Picked thumbnail gets a subtle gold border */
+.thumbnail-item.thumb-picked {
+  border-color: rgba(255, 171, 64, 0.3);
+}
 
 /* ==========================================================================
    GLASSMORPHIC CUSTOM DIALOG MODAL SYSTEM

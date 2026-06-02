@@ -155,10 +155,12 @@ fn set_filters(
     date: String,
     mode: String,
 ) -> Result<(), String> {
-    *state.filter_text.write().unwrap() = text;
-    *state.filter_folder.write().unwrap() = folder;
-    *state.filter_date.write().unwrap() = date;
-    *state.filter_mode.write().unwrap() = mode;
+    {
+        *state.filter_text.write().unwrap() = text;
+        *state.filter_folder.write().unwrap() = folder;
+        *state.filter_date.write().unwrap() = date;
+        *state.filter_mode.write().unwrap() = mode;
+    }
     state.apply_filters();
     Ok(())
 }
@@ -262,9 +264,12 @@ fn get_image_metadata_info(state: State<'_, AppState>, path: String) -> Result<O
 
 #[tauri::command]
 fn toggle_filter_mode(state: State<'_, AppState>) -> Result<String, String> {
-    let mut mode = state.filter_mode.write().unwrap();
-    let new_mode = if mode.as_str() == "unrated" { "all".to_string() } else { "unrated".to_string() };
-    *mode = new_mode.clone();
+    let new_mode = {
+        let mut mode = state.filter_mode.write().unwrap();
+        let new = if mode.as_str() == "unrated" { "all".to_string() } else { "unrated".to_string() };
+        *mode = new.clone();
+        new
+    };
     state.apply_filters();
     Ok(new_mode)
 }
