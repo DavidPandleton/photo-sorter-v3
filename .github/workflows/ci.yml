@@ -43,14 +43,10 @@ jobs:
       - name: Rust Unit Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
-  build:
+  build-windows:
     needs: lint-and-test
     if: startsWith(github.ref, 'refs/tags/v')
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -65,17 +61,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install system dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-
       - name: Install dependencies
         run: bun install
 
       - name: Build Tauri App
-        uses: tauri-apps/tauri-action@v2
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -83,19 +73,16 @@ jobs:
           releaseName: "Photo Sorter ${{ github.ref_name }}"
           releaseBody: |
             **Ini Bukan Photoshop.** Keyboard-driven photo culling tool. Rate 1/2/3, export, selesai.
-            
-            ### Downloads
-            | Platform | File |
-            |----------|------|
-            | Windows | `.msi` (installer) or `.exe` (portable) |
-            | macOS | `.dmg` |
-            | Linux | `.AppImage` or `.deb` |
-            
+
+            ### Downloads (Windows)
+            - `Photo-Sorter_3.0.0_x64_en-US.msi` — MSI installer
+            - `Photo-Sorter_3.0.0_x64-setup.exe` — NSIS portable installer
+
             ### Cara Pake
             1. Buka folder foto
             2. Tekan `1` (BAD), `2` (OK), `3` (GOOD) tiap foto
             3. `Enter` untuk export — foto ke-sort ke folder BAD/OK/GOOD
-            
+
             Lihat [README](https://github.com/${{ github.repository }}/blob/main/README.md) untuk shortcut lengkap.
           releaseDraft: true
           prerelease: false
