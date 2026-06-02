@@ -57,7 +57,7 @@ impl AppState {
     pub fn load_images(&self, db_path: PathBuf, root: &str) -> Result<usize, String> {
         self.reset();
         let path = PathBuf::from(root);
-        let root_abs = path.canonicalize().map_err(|e| e.to_string())?.to_string_lossy().into_owned();
+        let root_abs = path.canonicalize().map_err(|e| e.to_string())?.to_string_lossy().into_owned().replace('\\', "/");
         *self.root_folder.write().unwrap() = root_abs.clone();
 
         let mut paths = Vec::new();
@@ -79,6 +79,7 @@ impl AppState {
         walk_dir(Path::new(&root_abs), Path::new(&root_abs), &mut paths, &exts);
         if paths.is_empty() { return Err("No supported images found in directory.".to_string()); }
         paths.sort();
+        for p in &mut paths { *p = p.replace('\\', "/"); }
 
         let database = PhotoDatabase::new(db_path).map_err(|e| e.to_string())?;
         let db_arc = Arc::new(database);

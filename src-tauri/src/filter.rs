@@ -11,7 +11,7 @@ impl AppState {
 
         let filter_date_val = self.filter_date.read().unwrap().clone();
         let filter_text_val = self.filter_text.read().unwrap().clone();
-        let filter_folder_val = self.filter_folder.read().unwrap().clone();
+        let filter_folder_val = self.filter_folder.read().unwrap().clone().replace('\\', "/");
         let filter_mode_val = self.filter_mode.read().unwrap().clone();
 
         let all_images = if !filter_date_val.is_empty() {
