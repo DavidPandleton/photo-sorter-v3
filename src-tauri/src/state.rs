@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::sync::{Arc, RwLock};
 use crate::database::PhotoDatabase;
+use crate::constants;
 
 pub struct AppState {
     pub db: RwLock<Option<Arc<PhotoDatabase>>>,
@@ -19,6 +20,7 @@ pub struct AppState {
     pub filter_date: RwLock<String>,
 
     pub project_id: RwLock<Option<i64>>,
+    pub startup_folder: RwLock<Option<String>>,
 }
 
 impl AppState {
@@ -36,6 +38,7 @@ impl AppState {
             filter_text: RwLock::new(String::new()),
             filter_date: RwLock::new(String::new()),
             project_id: RwLock::new(None),
+            startup_folder: RwLock::new(None),
         }
     }
 
@@ -61,14 +64,17 @@ impl AppState {
         *self.root_folder.write().unwrap() = root_abs.clone();
 
         let mut paths = Vec::new();
-        let exts = ["jpg","jpeg","png","webp","nef","cr2","arw","dng","cr3","orf","rw2","pef"];
+        let exts = constants::SUPPORTED_EXTENSIONS;
 
         fn walk_dir(dir: &Path, root_path: &Path, paths: &mut Vec<String>, exts: &[&str]) {
             if let Ok(entries) = fs::read_dir(dir) {
                 for entry in entries.flatten() {
                     let p = entry.path();
                     let rel = p.strip_prefix(root_path).unwrap();
-                    if rel.components().any(|c| matches!(c.as_os_str().to_string_lossy().to_uppercase().as_str(), "BAD"|"OK"|"GOOD")) { continue; }
+                    if rel.components().any(|c| {
+                        let rel_upper = c.as_os_str().to_string_lossy().to_uppercase();
+                        constants::CATEGORIES.iter().any(|&cat| cat == rel_upper.as_str())
+                    }) { continue; }
                     if p.is_dir() { walk_dir(&p, root_path, paths, exts); }
                     else if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
                         if exts.contains(&ext.to_lowercase().as_str()) { paths.push(p.to_string_lossy().into_owned()); }

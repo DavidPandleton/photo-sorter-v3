@@ -1,4 +1,5 @@
 import { listen } from '@tauri-apps/api/event';
+import { GAMEPAD_DEADZONE, GAMEPAD_PAN_SPEED, GAMEPAD_ZOOM_SPEED } from './constants';
 
 export interface GamepadActions {
   rateGood: () => void;
@@ -22,9 +23,9 @@ export interface GamepadActions {
 export class GamepadHandler {
   private actions: GamepadActions;
   private axes = { lx: 0, ly: 0, rx: 0, ry: 0 };
-  private deadzone = 0.25;
-  private panSpeed = 10;
-  private zoomSpeed = 0.02;
+  private deadzone = GAMEPAD_DEADZONE;
+  private panSpeed = GAMEPAD_PAN_SPEED;
+  private zoomSpeed = GAMEPAD_ZOOM_SPEED;
   private _active = false;
 
   get active() { return this._active; }

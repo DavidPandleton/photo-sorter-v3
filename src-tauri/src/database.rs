@@ -547,9 +547,12 @@ impl PhotoDatabase {
 mod tests {
     use super::*;
 
+    static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
     fn setup_db() -> (PhotoDatabase, std::path::PathBuf) {
         let temp_dir = std::env::temp_dir();
-        let db_path = temp_dir.join(format!("test_photosorter_{}.db", std::process::id()));
+        let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let db_path = temp_dir.join(format!("test_photosorter_{}_{}.db", std::process::id(), count));
         let _ = std::fs::remove_file(&db_path);
         let db = PhotoDatabase::new(&db_path).unwrap();
         (db, db_path)

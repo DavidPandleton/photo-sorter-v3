@@ -2,7 +2,10 @@
 use gilrs::{Gilrs, Event, EventType, Button, Axis};
 #[cfg(feature = "gamepad")]
 use serde::Serialize;
+#[cfg(feature = "gamepad")]
 use tauri::Emitter;
+#[cfg(feature = "gamepad")]
+use crate::constants;
 
 #[cfg(feature = "gamepad")]
 #[derive(Clone, Serialize)]
@@ -72,13 +75,13 @@ pub fn start_gamepad_loop(app_handle: tauri::AppHandle) {
                         Axis::RightStickY => Some("ABS_RY"),
                         // Threshold detection for triggers
                         Axis::LeftZ => {
-                            if val > 0.5 && !lt_pressed {
+                            if val > constants::GAMEPAD_TRIGGER_PRESS_THRESHOLD && !lt_pressed {
                                 lt_pressed = true;
                                 let _ = app_handle.emit("gamepad-button", GamepadButtonPayload {
                                     code: "TRIGGER_LEFT".to_string(),
                                     state: true,
                                 });
-                            } else if val < 0.1 && lt_pressed {
+                            } else if val < constants::GAMEPAD_TRIGGER_RELEASE_THRESHOLD && lt_pressed {
                                 lt_pressed = false;
                                 let _ = app_handle.emit("gamepad-button", GamepadButtonPayload {
                                     code: "TRIGGER_LEFT".to_string(),
@@ -88,13 +91,13 @@ pub fn start_gamepad_loop(app_handle: tauri::AppHandle) {
                             None
                         }
                         Axis::RightZ => {
-                            if val > 0.5 && !rt_pressed {
+                            if val > constants::GAMEPAD_TRIGGER_PRESS_THRESHOLD && !rt_pressed {
                                 rt_pressed = true;
                                 let _ = app_handle.emit("gamepad-button", GamepadButtonPayload {
                                     code: "TRIGGER_RIGHT".to_string(),
                                     state: true,
                                 });
-                            } else if val < 0.1 && rt_pressed {
+                            } else if val < constants::GAMEPAD_TRIGGER_RELEASE_THRESHOLD && rt_pressed {
                                 rt_pressed = false;
                                 let _ = app_handle.emit("gamepad-button", GamepadButtonPayload {
                                     code: "TRIGGER_RIGHT".to_string(),
@@ -118,7 +121,7 @@ pub fn start_gamepad_loop(app_handle: tauri::AppHandle) {
         }
 
         // Sleep briefly to avoid high CPU usage
-        std::thread::sleep(std::time::Duration::from_millis(8));
+        std::thread::sleep(std::time::Duration::from_millis(constants::GAMEPAD_POLL_INTERVAL_MS));
     }
 }
 

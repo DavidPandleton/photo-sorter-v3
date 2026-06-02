@@ -5,6 +5,11 @@ import { PhotoViewer } from './viewer';
 import { ImageCacheManager } from './cache';
 import { FilmstripBuilder } from './filmstrip';
 import { GamepadHandler } from './gamepad';
+import {
+  CATEGORY_BAD, CATEGORY_OK, CATEGORY_GOOD,
+  COLOR_BAD_FLASH, COLOR_OK_FLASH, COLOR_GOOD_FLASH, COLOR_UNRATE_FLASH,
+  RAW_EXTENSIONS
+} from './constants';
 
 export interface ImageRecord {
   id: number; project_id: number; path: string; filename: string;
@@ -40,9 +45,9 @@ class PhotoSorterApp {
     this.cache = new ImageCacheManager();
     this.filmstrip = new FilmstripBuilder();
     this.gamepad = new GamepadHandler({
-      rateGood: () => this.rateCurrent('GOOD', 'rgba(16, 185, 129, 0.4)'),
-      rateBad: () => this.rateCurrent('BAD', 'rgba(239, 68, 68, 0.4)'),
-      rateOk: () => this.rateCurrent('OK', 'rgba(245, 158, 11, 0.4)'),
+      rateGood: () => this.rateCurrent(CATEGORY_GOOD, COLOR_GOOD_FLASH),
+      rateBad: () => this.rateCurrent(CATEGORY_BAD, COLOR_BAD_FLASH),
+      rateOk: () => this.rateCurrent(CATEGORY_OK, COLOR_OK_FLASH),
       navigateNext: () => this.navigateNext(),
       navigatePrev: () => this.navigatePrev(),
       rotateCW: () => this.rotateCurrent(1),
@@ -62,6 +67,9 @@ class PhotoSorterApp {
     this.initKeyboardBinds();
     this.loadRecentProjects();
     this.gamepad.init();
+    this.initToastPosition();
+    this.checkForStartupFolder();
+    this.viewer.setOnZoom(() => this.handleZoomChanged());
   }
 
   private gamepadActive: boolean = false;
@@ -95,6 +103,51 @@ class PhotoSorterApp {
         listContainer.appendChild(btn);
       }
     } catch (err) { console.error('Failed to load recent projects:', err); }
+  }
+
+  private initToastPosition() {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const saved = localStorage.getItem('toast-position');
+    if (saved === 'top') {
+      container.classList.add('toast-top');
+    }
+  }
+
+  private toggleToastPosition() {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const isTop = container.classList.toggle('toast-top');
+    localStorage.setItem('toast-position', isTop ? 'top' : 'bottom');
+    this.showToast(isTop ? 'Toasts moved to TOP' : 'Toasts moved to BOTTOM', 'GOOD');
+  }
+
+  private async checkForStartupFolder() {
+    try {
+      const startupFolder = await invoke<string | null>('get_startup_folder');
+      if (startupFolder) {
+        console.log('CLI auto-load folder detected:', startupFolder);
+        await this.loadFolder(startupFolder);
+      }
+    } catch (err) {
+      console.error('Failed to get CLI startup folder:', err);
+    }
+  }
+
+  private handleZoomChanged() {
+    if (this.currentIndex < 0) return;
+    const path = this.imagePaths[this.currentIndex];
+    if (this.viewer.getScale() > 1.5) {
+      const fullResImg = this.cache.getFromFullResCache(path);
+      if (fullResImg && this.viewer.getCurrentImage() !== fullResImg) {
+        this.viewer.swapCurrentImage(fullResImg);
+      }
+    } else {
+      const lowResImg = this.cache.getFromCache(path);
+      if (lowResImg && this.viewer.getCurrentImage() !== lowResImg) {
+        this.viewer.swapCurrentImage(lowResImg);
+      }
+    }
   }
 
   private async selectFolder() {
@@ -176,7 +229,7 @@ class PhotoSorterApp {
       this.filmstrip.updateRating(path, category);
       this.triggerFlashNotification(flashColor);
       setTimeout(async () => { await this.navigateNext(); this.isProcessingRating = false; }, 100);
-    } catch (err) { this.showToast('Rating failed: ' + err, 'BAD'); this.isProcessingRating = false; }
+    } catch (err) { this.showToast('Rating failed: ' + err, CATEGORY_BAD); this.isProcessingRating = false; }
   }
 
   private async unrateCurrent() {
@@ -186,9 +239,9 @@ class PhotoSorterApp {
       await invoke('rate_image', { path, category: null });
       this.ratedPaths.delete(path);
       this.filmstrip.updateRating(path, null);
-      this.triggerFlashNotification('rgba(100, 100, 100, 0.4)');
+      this.triggerFlashNotification(COLOR_UNRATE_FLASH);
       this.updateStatsHUD();
-    } catch (err) { this.showToast('Unrating failed: ' + err, 'BAD'); }
+    } catch (err) { this.showToast('Unrating failed: ' + err, CATEGORY_BAD); }
   }
 
   private async togglePickCurrent() {
@@ -327,7 +380,9 @@ class PhotoSorterApp {
       const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
       const url = URL.createObjectURL(blob);
       const img = new Image();
-      img.onload = () => { this.viewer.setCompareImage(img); URL.revokeObjectURL(url); };
+      const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
+      const rot = meta?.rotation || 0;
+      img.onload = () => { this.viewer.setCompareImage(img, rot); URL.revokeObjectURL(url); };
       img.src = url;
     } catch (err) { console.error(err); }
   }
@@ -514,9 +569,9 @@ class PhotoSorterApp {
         case 'END': this.navigateImage(this.imagePaths.length - 1); break;
         case 'ESCAPE': this.confirmReturnToMenu(); break;
         case 'ENTER': this.finishSorting(); break;
-        case '1': this.rateCurrent('BAD', 'rgba(239, 68, 68, 0.4)'); break;
-        case '2': this.rateCurrent('OK', 'rgba(245, 158, 11, 0.4)'); break;
-        case '3': this.rateCurrent('GOOD', 'rgba(16, 185, 129, 0.4)'); break;
+        case '1': this.rateCurrent(CATEGORY_BAD, COLOR_BAD_FLASH); break;
+        case '2': this.rateCurrent(CATEGORY_OK, COLOR_OK_FLASH); break;
+        case '3': this.rateCurrent(CATEGORY_GOOD, COLOR_GOOD_FLASH); break;
         case '0': this.unrateCurrent(); break;
         case ' ': e.preventDefault(); this.togglePickCurrent(); break;
         case 'DELETE': this.deleteCurrent(); break;
@@ -524,6 +579,7 @@ class PhotoSorterApp {
         case 'F': this.toggleFullscreen(); break;
         case 'H': this.toggleHUD(); break;
         case 'I': this.toggleInfoPanel(); break;
+        case 'T': this.toggleToastPosition(); break;
         case 'U': this.toggleFilterMode(); break;
         case 'ARROWUP': this.rotateCurrent(1); break;
         case 'ARROWDOWN': this.rotateCurrent(-1); break;
@@ -604,7 +660,7 @@ class PhotoSorterApp {
       document.getElementById('info-progress')!.textContent = `${this.currentIndex + 1} / ${this.imagePaths.length}`;
       document.getElementById('info-filename')!.textContent = img.filename;
       const ext = img.filename.split('.').pop()?.toUpperCase() || 'UNKNOWN';
-      const isRaw = ['NEF','CR2','ARW','DNG','CR3','ORF','RW2','PEF'].includes(ext);
+      const isRaw = RAW_EXTENSIONS.includes(ext);
       document.getElementById('info-type')!.textContent = `${ext} ${isRaw ? '(RAW)' : ''}`;
       const exifLabel = document.getElementById('info-exif')!;
       if (img.camera_model) {

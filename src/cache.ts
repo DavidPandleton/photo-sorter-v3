@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { PhotoViewer } from './viewer';
+import { CACHE_LIMIT_PREVIEW, CACHE_LIMIT_FULL_RES, PRELOAD_WINDOW_SIZE } from './constants';
 
 export class ImageCacheManager {
   private imageCache: Map<string, HTMLImageElement> = new Map();
@@ -28,12 +29,12 @@ export class ImageCacheManager {
   }
 
   evictIfNeeded(currentIdx: number, imagePaths: string[]) {
-    const preloadWindowSize = 5;
+    const preloadWindowSize = PRELOAD_WINDOW_SIZE;
     const targets = [];
     for (let i = 1; i <= preloadWindowSize; i++) {
       if (currentIdx + i < imagePaths.length) targets.push(imagePaths[currentIdx + i]);
     }
-    if (this.imageCache.size > 15) {
+    if (this.imageCache.size > CACHE_LIMIT_PREVIEW) {
       const keep = new Set([imagePaths[currentIdx], ...targets]);
       for (const key of this.imageCache.keys()) {
         if (!keep.has(key)) {
@@ -42,7 +43,7 @@ export class ImageCacheManager {
         }
       }
     }
-    if (this.fullResCache.size > 5) {
+    if (this.fullResCache.size > CACHE_LIMIT_FULL_RES) {
       const keep = new Set([imagePaths[currentIdx], ...targets]);
       for (const key of this.fullResCache.keys()) {
         if (!keep.has(key)) this.fullResCache.delete(key);
@@ -51,7 +52,7 @@ export class ImageCacheManager {
   }
 
   triggerPreloaders(idx: number, imagePaths: string[]) {
-    const preloadWindowSize = 5;
+    const preloadWindowSize = PRELOAD_WINDOW_SIZE;
     const targets = [];
     for (let i = 1; i <= preloadWindowSize; i++) {
       if (idx + i < imagePaths.length) targets.push(imagePaths[idx + i]);
@@ -88,7 +89,7 @@ export class ImageCacheManager {
         this.fullResCache.set(path, img);
         URL.revokeObjectURL(url);
         if (imagePaths[currentIdx] === path && viewer.getScale() > 1.5) {
-          viewer.setImage(img);
+          viewer.swapCurrentImage(img);
         }
       };
       img.src = url;

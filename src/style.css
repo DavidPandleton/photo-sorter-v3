@@ -853,6 +853,11 @@ input, button {
   pointer-events: none;
 }
 
+#toast-container.toast-top {
+  bottom: auto;
+  top: 80px;
+}
+
 .toast {
   background: rgba(13, 13, 17, 0.92);
   border: 1px solid var(--border-glass);

@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use serde::{Serialize, Deserialize};
 use crate::state::AppState;
+use crate::constants;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Operation {
@@ -109,7 +110,9 @@ impl AppState {
         let mut newly_created = Vec::new();
         let mut operations = Vec::new();
         let mut summary = HashMap::new();
-        summary.insert("BAD".to_string(), 0); summary.insert("OK".to_string(), 0); summary.insert("GOOD".to_string(), 0);
+        for &cat in &constants::CATEGORIES {
+            summary.insert(cat.to_string(), 0);
+        }
         for (path_str, category) in results_map {
             let path = Path::new(&path_str);
             if !path.exists() { continue; }

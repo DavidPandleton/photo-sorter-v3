@@ -4,6 +4,8 @@
  * Handles zooming, panning, rotation, and split-screen compare modes.
  */
 
+import { ZOOM_MIN, ZOOM_MAX, ZOOM_FACTOR } from './constants';
+
 export class PhotoViewer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -18,6 +20,7 @@ export class PhotoViewer {
   private offsetX: number = 0.0;
   private offsetY: number = 0.0;
   private rotation: number = 0; // 0, 90, 180, 270 degrees
+  private compareRotation: number = 0;
   
   // Flags
   private showingCompare: boolean = false;
@@ -74,12 +77,22 @@ export class PhotoViewer {
     this.resetView();
   }
 
+  public getCurrentImage(): HTMLImageElement | null {
+    return this.currentImage;
+  }
+
+  public swapCurrentImage(img: HTMLImageElement) {
+    this.currentImage = img;
+    this.draw();
+  }
+
   public getScale(): number {
     return this.scale;
   }
 
-  public setCompareImage(img: HTMLImageElement | null) {
+  public setCompareImage(img: HTMLImageElement | null, rotation: number = 0) {
     this.compareImage = img;
+    this.compareRotation = rotation;
     this.draw();
   }
 
@@ -130,13 +143,19 @@ export class PhotoViewer {
   }
 
   public zoomIn() {
-    if (!this.currentImage || this.showingCompare) return;
-    const factor = 1.1;
+    if (!this.currentImage) return;
+    const factor = ZOOM_FACTOR;
     const nextScale = this.scale * factor;
-    if (nextScale > 25.0) return;
+    if (nextScale > ZOOM_MAX) return;
 
-    const cx = this.canvas.width / 2;
-    const cy = this.canvas.height / 2;
+    let cx = this.canvas.width / 2;
+    let cy = this.canvas.height / 2;
+
+    if (this.showingCompare && this.compareImage) {
+      cx = 0;
+      cy = 0;
+    }
+
     this.offsetX = cx - (cx - this.offsetX) * factor;
     this.offsetY = cy - (cy - this.offsetY) * factor;
     this.scale = nextScale;
@@ -145,13 +164,19 @@ export class PhotoViewer {
   }
 
   public zoomOut() {
-    if (!this.currentImage || this.showingCompare) return;
-    const factor = 1.0 / 1.1;
+    if (!this.currentImage) return;
+    const factor = 1.0 / ZOOM_FACTOR;
     const nextScale = this.scale * factor;
-    if (nextScale < 0.05) return;
+    if (nextScale < ZOOM_MIN) return;
 
-    const cx = this.canvas.width / 2;
-    const cy = this.canvas.height / 2;
+    let cx = this.canvas.width / 2;
+    let cy = this.canvas.height / 2;
+
+    if (this.showingCompare && this.compareImage) {
+      cx = 0;
+      cy = 0;
+    }
+
     this.offsetX = cx - (cx - this.offsetX) * factor;
     this.offsetY = cy - (cy - this.offsetY) * factor;
     this.scale = nextScale;
@@ -167,12 +192,18 @@ export class PhotoViewer {
   }
 
   public zoomBy(factor: number) {
-    if (!this.currentImage || this.showingCompare) return;
+    if (!this.currentImage) return;
     const nextScale = this.scale * factor;
-    if (nextScale < 0.05 || nextScale > 25.0) return;
+    if (nextScale < ZOOM_MIN || nextScale > ZOOM_MAX) return;
 
-    const cx = this.canvas.width / 2;
-    const cy = this.canvas.height / 2;
+    let cx = this.canvas.width / 2;
+    let cy = this.canvas.height / 2;
+
+    if (this.showingCompare && this.compareImage) {
+      cx = 0;
+      cy = 0;
+    }
+
     this.offsetX = cx - (cx - this.offsetX) * factor;
     this.offsetY = cy - (cy - this.offsetY) * factor;
     this.scale = nextScale;
@@ -205,9 +236,9 @@ export class PhotoViewer {
 
   private onWheel(e: WheelEvent) {
     e.preventDefault();
-    if (!this.currentImage || this.showingCompare) return;
+    if (!this.currentImage) return;
 
-    const zoomFactor = 1.1;
+    const zoomFactor = ZOOM_FACTOR;
     let factor = e.deltaY < 0 ? zoomFactor : 1.0 / zoomFactor;
     
     // Pinch-to-zoom support (e.ctrlKey is true when trackpad pinching)
@@ -215,18 +246,32 @@ export class PhotoViewer {
       factor = 1.0 - e.deltaY * 0.01;
     }
     
-    // Absolute zoom caps: 5% to 2500%
+    // Absolute zoom caps: ZOOM_MIN to ZOOM_MAX
     const nextScale = this.scale * factor;
-    if (nextScale < 0.05 || nextScale > 25.0) return;
+    if (nextScale < ZOOM_MIN || nextScale > ZOOM_MAX) return;
 
     // Get mouse position relative to canvas
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
+    let anchorX = mouseX;
+    let anchorY = mouseY;
+
+    if (this.showingCompare && this.compareImage) {
+      const halfW = this.canvas.width / 2;
+      const centerH = this.canvas.height / 2;
+      if (mouseX < halfW) {
+        anchorX = mouseX - halfW / 2;
+      } else {
+        anchorX = mouseX - halfW * 1.5;
+      }
+      anchorY = mouseY - centerH;
+    }
+
     // Zoom anchored under the cursor!
-    this.offsetX = mouseX - (mouseX - this.offsetX) * factor;
-    this.offsetY = mouseY - (mouseY - this.offsetY) * factor;
+    this.offsetX = anchorX - (anchorX - this.offsetX) * factor;
+    this.offsetY = anchorY - (anchorY - this.offsetY) * factor;
     this.scale = nextScale;
     
     this.draw();
@@ -284,10 +329,17 @@ export class PhotoViewer {
     this.ctx.rect(0, 0, halfW - 2, ch);
     this.ctx.clip();
     
-    // Fit Image A centered inside left half
-    let scaleA = Math.min((halfW - 20) / imgA.width, (ch - 20) / imgA.height);
+    // Fit Image A centered inside left half, respecting rotation
+    let imgAW = imgA.width;
+    let imgAH = imgA.height;
+    if (this.rotation === 90 || this.rotation === 270) {
+      imgAW = imgA.height;
+      imgAH = imgA.width;
+    }
+    let scaleA = Math.min((halfW - 20) / imgAW, (ch - 20) / imgAH);
     this.ctx.translate(halfW / 2 + this.offsetX, ch / 2 + this.offsetY);
     this.ctx.scale(scaleA * this.scale, scaleA * this.scale);
+    this.ctx.rotate((this.rotation * Math.PI) / 180);
     this.ctx.drawImage(imgA, -imgA.width / 2, -imgA.height / 2);
     this.ctx.restore();
 
@@ -297,10 +349,17 @@ export class PhotoViewer {
     this.ctx.rect(halfW + 2, 0, halfW - 2, ch);
     this.ctx.clip();
     
-    // Fit Image B centered inside right half
-    let scaleB = Math.min((halfW - 20) / imgB.width, (ch - 20) / imgB.height);
+    // Fit Image B centered inside right half, respecting rotation
+    let imgBW = imgB.width;
+    let imgBH = imgB.height;
+    if (this.compareRotation === 90 || this.compareRotation === 270) {
+      imgBW = imgB.height;
+      imgBH = imgB.width;
+    }
+    let scaleB = Math.min((halfW - 20) / imgBW, (ch - 20) / imgBH);
     this.ctx.translate(halfW * 1.5 + this.offsetX, ch / 2 + this.offsetY);
     this.ctx.scale(scaleB * this.scale, scaleB * this.scale);
+    this.ctx.rotate((this.compareRotation * Math.PI) / 180);
     this.ctx.drawImage(imgB, -imgB.width / 2, -imgB.height / 2);
     this.ctx.restore();
 

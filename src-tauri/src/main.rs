@@ -8,6 +8,7 @@ use photo_sorter_v3::state::AppState;
 use photo_sorter_v3::database::{ImageRecord, DateRecord};
 use photo_sorter_v3::image_loader::{load_and_scale_image, load_image_unscaled, generate_thumbnail};
 use photo_sorter_v3::exif::extract_exif;
+use photo_sorter_v3::constants;
 
 // --- Helper path to local AppData DB ---
 fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
@@ -114,9 +115,9 @@ fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<(Vec<u
 fn get_project_stats(state: State<'_, AppState>) -> Result<HashMap<String, usize>, String> {
     let results_map = state.results.read().unwrap();
     let mut stats = HashMap::new();
-    stats.insert("BAD".to_string(), 0);
-    stats.insert("OK".to_string(), 0);
-    stats.insert("GOOD".to_string(), 0);
+    for &cat in &constants::CATEGORIES {
+        stats.insert(cat.to_string(), 0);
+    }
     
     for val in results_map.values() {
         if stats.contains_key(val) {
@@ -284,11 +285,37 @@ fn get_recent_projects(app: tauri::AppHandle) -> Result<Vec<photo_sorter_v3::dat
     db.get_recent_projects().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn get_startup_folder(state: State<'_, AppState>) -> Option<String> {
+    state.startup_folder.read().unwrap().clone()
+}
+
 fn main() {
+    let mut startup_folder = None;
+    let args: Vec<String> = std::env::args().collect();
+    let mut i = 1;
+    while i < args.len() {
+        if (args[i] == "--folder" || args[i] == "-f") && i + 1 < args.len() {
+            startup_folder = Some(args[i + 1].clone());
+            i += 2;
+        } else {
+            let path = PathBuf::from(&args[i]);
+            if path.is_dir() {
+                startup_folder = Some(args[i].clone());
+            }
+            i += 1;
+        }
+    }
+
+    let state = AppState::new();
+    if let Some(folder) = startup_folder {
+        *state.startup_folder.write().unwrap() = Some(folder);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
-        .manage(AppState::new())
+        .manage(state)
         .setup(|app| {
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -317,7 +344,8 @@ fn main() {
             set_current_index,
             get_image_metadata_info,
             toggle_filter_mode,
-            get_recent_projects
+            get_recent_projects,
+            get_startup_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
