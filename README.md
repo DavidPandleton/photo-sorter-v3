@@ -5,170 +5,133 @@
   <img src="https://img.shields.io/badge/Rust-1.96%2B-orange" alt="Rust Version">
   <img src="https://img.shields.io/badge/Tauri-v2-teal" alt="Tauri">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/github/v/release/DavidPandleton/photo-sorter-v3" alt="Latest Release">
 </p>
 
-A blazing-fast, keyboard-driven tool for culling and rating large photo batches — rewritten in Rust with a Tauri v2 shell.
+<p align="center">
+  <b>Ini Bukan Photoshop.</b><br>
+  Ini alat buat milah-milih foto. Tekan 1 (BAD), 2 (OK), 3 (GOOD). Export. Selesai.<br>
+  Gak ada slider, gak ada layer, gak ada curve tool. Cuma culling. Cepet.
+</p>
 
-Work through hundreds of photos in minutes. Rate with a single keypress. Export sorted folders in one click.
-
----
-
-## v3 vs v2
-
-| | v2 (Python/PySide6) | v3 (Rust/Tauri) |
-|---|---|---|
-| **Backend** | Python 3.9+ | Rust 1.96+ |
-| **UI** | PySide6 Qt widget | HTML5 Canvas + CSS |
-| **Performance** | Interpreted | Native compiled |
-| **RAM** | ~200MB+ | ~50MB |
-| **Startup** | 2-3s | < 500ms |
-| **Thumbnails** | Python Pillow/rawpy | Native `image` crate + embedded JPEG extraction |
+<p align="center">
+  <img src="docs/demo.gif" alt="Demo" width="720">
+</p>
 
 ---
 
-## Features
+## Download
 
-- **Keyboard-first workflow** — rate, navigate, zoom, delete, pick — all without touching the mouse
-- **Three-tier rating** — BAD (1), OK (2), GOOD (3) with instant color feedback
-- **Star ratings** — `Ctrl+1` through `Ctrl+5` for fine-grained quality scoring
-- **Pick flagging** — `Space` to mark favorites, shown as gold star overlay
-- **Compare mode** — `C` for side-by-side split-screen comparison
-- **Focus meter** — automatic Laplacian variance blur detection, cached in SQLite
-- **RAW support** — NEF, CR2, CR3, ARW, DNG, ORF, RW2, PEF with embedded preview extraction
-- **EXIF extraction** — camera model, ISO, aperture, shutter speed, focal length, lens
-- **SQLite persistence** — ratings, picks, stars, rotations survive restarts
-- **Undo support** — `Ctrl+Z` to revert last action
-- **Native trash** — deleted files go to system Recycle Bin, not permanently erased
-- **Checkpoint/restore** — `.photosorter_checkpoint.json` for full export rollback
-- **Pre-loader cache** — next 5 images loaded into RAM, instant navigation
-- **Gamepad support** — Xbox/PlayStation controllers (optional `--features gamepad`)
-- **Cross-platform** — Windows, macOS, Linux via Tauri v2
+Gak perlu install Rust atau npm. Tinggal download installer, jalanin.
+
+| Platform | Download |
+|----------|----------|
+| Windows | [`Photo-Sorter-Setup.exe` (NSIS)](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) or [`Photo-Sorter.msi`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) |
+| macOS | [`Photo-Sorter.dmg`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) |
+| Linux | [`Photo-Sorter.AppImage`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) or `.deb` |
+
+Atau kalo mau compile sendiri, liat [Build dari Source](#build-dari-source).
 
 ---
 
-## Quick Start
+## Cara Pake
+
+```
+Buka folder foto  →  Tekan 1/2/3 tiap foto  →  Enter (export)
+```
+
+| Tombol | Action |
+|--------|--------|
+| `1` | BAD (blur, salah posisi, etc — bakal ke folder BAD) |
+| `2` | OK (maybe, bingung) |
+| `3` | GOOD (mantap, keep) |
+| `Space` | Tandai favorit (gold star) |
+| `Ctrl+1` - `Ctrl+5` | Rating bintang |
+| `N` / `P` | Next / Previous foto |
+| `C` | Compare mode (split-screen sama foto sebelumnya) |
+| `Del` | Hapus (masuk Recycle Bin, bukan permanen) |
+| `Ctrl+Z` | Undo rating terakhir |
+| `U` | Filter: sembunyiin foto yang udah di-rate |
+| `F` | Fullscreen |
+| `H` | Sembunyiin HUD |
+
+**Export:** pas pencet Enter, foto lo bakal ke-sort ke folder:
+```
+📁 project-folder/
+├── 📁 BAD/     ← foto yang lo kasih rating 1
+├── 📁 OK/      ← rating 2
+└── 📁 GOOD/    ← rating 3
+```
+
+---
+
+## Fitur
+
+- **Keyboard-first** — gak perlu sentuh mouse sama sekali
+- **RAW support** — NEF, CR2, CR3, ARW, DNG, ORF, RW2, PEF. Pake embedded JPEG preview, cepet
+- **EXIF otomatis** — ISO, aperture, shutter speed, lens, camera model — tinggal liat
+- **Compare mode** — liat 2 foto bersebelahan buat milih mana yang lebih tajam
+- **Focus meter** — deteksi blur otomatis pake Laplace variance, disimpen di DB
+- **Checkpoint** — kalo export error atau salah folder, tinggal restore
+- **Gamepad** — dukung Xbox/PlayStation controller (optional)
+- **SQLite** — rating, star, rotation, pick — semua survive restart. Gak perlu save manual
+- **Cross-platform** — Windows, macOS, Linux
+
+---
+
+## Build dari Source
+
+Buat yang mau compile sendiri atau contribute:
 
 ### Prerequisites
 
-- **Rust** 1.96+ ([rustup.rs](https://rustup.rs))
-- **Bun** (or Node.js/npm) ([bun.sh](https://bun.sh))
-- **Windows:** Visual Studio Build Tools with C++ workload
-- **macOS:** Xcode Command Line Tools
-- **Linux:** `build-essential`, `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`
+| Platform | Dependency |
+|----------|------------|
+| **Semua** | [Rust](https://rustup.rs) 1.96+, [Bun](https://bun.sh) (atau npm) |
+| **Windows** | Visual Studio Build Tools (C++ workload) |
+| **macOS** | Xcode Command Line Tools: `xcode-select --install` |
+| **Linux** | `sudo apt install build-essential libwebkit2gtk-4.1-dev libgtk-3-dev` |
 
-### Setup
+### Compile
 
 ```bash
+git clone https://github.com/DavidPandleton/photo-sorter-v3.git
+cd photo-sorter-v3
 bun install
-```
-
-### Development
-
-```pwsh
-# Windows (PowerShell)
-$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-bun run tauri dev
-
-# macOS / Linux
-bun run tauri dev
-```
-
-### Production Build
-
-```bash
 bun run tauri build
 ```
 
----
+Binary output: `src-tauri/target/release/photo-sorter-v3.exe`
 
-## How It Works
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Open       │ ──> │  Rate with   │ ──> │  Export     │
-│  folder     │     │  1 / 2 / 3   │     │  (Enter)    │
-└─────────────┘     └──────────────┘     └─────────────┘
-                          │
-                     ┌────┴────┐
-                     │  BAD (1) │ → blurry, deleted later
-                     │  OK  (2) │ → maybe
-                     │ GOOD (3) │ → keeper
-                     └─────────┘
-```
-
-1. Open a folder of photos
-2. Navigate with `N` / `P` (or arrow keys)
-3. Rate each photo: `1` (BAD), `2` (OK), `3` (GOOD)
-4. Press `Enter` to export — files move into `BAD/`, `OK/`, `GOOD/` folders
-
-All ratings auto-save to SQLite. Close and reopen anytime — your work is preserved.
+Opsional: `bun run tauri build --features gamepad` kalo mau dukung controller.
 
 ---
 
-## Keyboard Shortcuts
-
-### Rating
-
-| Key | Action |
-|-----|--------|
-| `1` | BAD |
-| `2` | OK |
-| `3` | GOOD |
-| `0` | Remove rating |
-| `Ctrl+Z` | Undo last rating |
-
-### Picks & Stars
-
-| Key | Action |
-|-----|--------|
-| `Space` | Toggle pick flag (gold star) |
-| `Ctrl+1` — `Ctrl+5` | Star rating |
-
-### Navigation
-
-| Key | Action |
-|-----|--------|
-| `N` / `P` | Next / Previous image |
-| `C` | Compare side-by-side with previous |
-| `U` | Filter: hide rated images |
-
-### Display
-
-| Key | Action |
-|-----|--------|
-| `Del` | Delete (moves to Recycle Bin) |
-| `Arrow Up` / `Arrow Down` | Rotate CW / CCW |
-
----
-
-## Architecture
+## Arsitektur (buat yang mau ngoprek)
 
 ```
 photo-sorter-v3/
 ├── src-tauri/              ← Rust backend
 │   ├── src/
-│   │   ├── main.rs         ← Tauri commands, IPC bridge
-│   │   ├── lib.rs          ← Module declarations
-│   │   ├── database.rs     ← SQLite (WAL mode, thumbnail cache)
-│   │   ├── exif.rs         ← EXIF extraction (kamadak-exif)
-│   │   ├── image_loader.rs ← RAW preview, thumbnail gen, focus score
-│   │   └── state.rs        ← AppState, filters, checkpoint, undo
+│   │   ├── main.rs         ← Tauri IPC commands
+│   │   ├── database.rs     ← SQLite + thumbnail cache
+│   │   ├── image_loader.rs ← RAW decode + resize + blur score
+│   │   ├── exif.rs         ← EXIF extraction
+│   │   └── state.rs        ← AppState, ImageCache (LRU), filter, export
 │   ├── Cargo.toml
 │   └── tauri.conf.json
-├── src/                    ← Vite + TypeScript frontend
-│   ├── app.ts              ← Orchestrator, keyboard, filmstrip, pre-loader
-│   ├── viewer.ts           ← HTML5 Canvas viewer (zoom/pan/compare)
-│   └── style.css           ← Glassmorphic dark theme
-├── index.html              ← Application shell
-├── vite.config.ts
-├── tsconfig.json
-└── package.json
+├── src/                    ← TypeScript frontend
+│   ├── app.ts              ← Main logic, keyboard, filmstrip, settings
+│   ├── viewer.ts           ← Canvas 2D renderer (zoom/pan/compare)
+│   ├── filmstrip.ts        ← Virtual-scrolling thumbnail bar
+│   ├── cache.ts            ← Frontend LRU image cache
+│   └── style.css           ← Dark glassmorphic theme
+├── index.html
+├── package.json
+└── vite.config.ts
 ```
 
-- **Tauri v2** — native windowing, IPC, filesystem access
-- **rusqlite** — bundled SQLite with WAL mode for parallel reads
-- **Canvas 2D** — sub-pixel coordinate-anchored zoom with exponential scaling
-- **Pre-loader** — next 5 images asynchronously decoded, stored in JS `Map<path, Image>`
+**Stack:** Tauri v2 + Rust + Vite + TypeScript + SQLite (rusqlite) + HTML5 Canvas.
 
 ---
 
