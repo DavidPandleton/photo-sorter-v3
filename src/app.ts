@@ -6,8 +6,7 @@ import { ImageCacheManager } from './cache';
 import { FilmstripBuilder } from './filmstrip';
 import { GamepadHandler } from './gamepad';
 import {
-  CATEGORY_BAD, CATEGORY_OK, CATEGORY_GOOD,
-  COLOR_BAD_FLASH, COLOR_OK_FLASH, COLOR_GOOD_FLASH, COLOR_UNRATE_FLASH,
+  COLOR_UNRATE_FLASH,
   RAW_EXTENSIONS
 } from './constants';
 
@@ -22,7 +21,51 @@ export interface ImageRecord {
 
 interface DateRecord { year: string; month: string; day: string; }
 interface Project { id: number; name: string; root_path: string; created_at: string; updated_at: string; }
-interface ProjectStats { BAD: number; OK: number; GOOD: number; PICKED: number; }
+interface ProjectStats { [key: string]: number; PICKED: number; }
+
+interface CategoryRecord {
+  id: number;
+  key_name: string;
+  label: string;
+  folder_name: string;
+  shortcut_key: string | null;
+  flash_color: string;
+  sort_order: number;
+}
+
+interface KeybindingRecord {
+  action_name: string;
+  shortcut_key: string;
+}
+
+interface HudItemRecord {
+  action_name: string;
+  visible: number;
+  sort_order: number;
+  group_name: string | null;
+}
+
+const ACTION_DISPLAY_NAMES: Record<string, string> = {
+  prev_image: 'Previous Image',
+  next_image: 'Next Image',
+  toggle_pick: 'Flag/Pick Image',
+  undo: 'Undo Last Rating',
+  unrate: 'Unrate Image',
+  rot_cw: 'Rotate Clockwise',
+  rot_ccw: 'Rotate Counter-Clockwise',
+  compare: 'Compare Mode',
+  fullscreen: 'Toggle Fullscreen',
+  hud: 'Toggle HUD Overlay',
+  info: 'Toggle Info Panel',
+  toast: 'Toggle Toast Position',
+  filter: 'Filter Unrated Only',
+  home: 'Go to First Image',
+  end: 'Go to Last Image',
+  jump: 'Jump to Image Number',
+  menu: 'Return to Main Menu',
+  export: 'Finish & Export',
+  delete: 'Delete Image',
+};
 
 class PhotoSorterApp {
   private viewer: PhotoViewer;
@@ -40,14 +83,34 @@ class PhotoSorterApp {
   private filterMode: string = 'all';
   private compareIndex: number = -1;
 
+  private categories: CategoryRecord[] = [];
+  private keybindings: Map<string, string> = new Map();
+  private hudItems: HudItemRecord[] = [];
+  private isRecordingAction: string | null = null;
+  private tempCategories: CategoryRecord[] = [];
+  private tempKeybindings: Map<string, string> = new Map();
+  private tempHudItems: HudItemRecord[] = [];
+
   constructor() {
     this.viewer = new PhotoViewer('photo-canvas');
     this.cache = new ImageCacheManager();
     this.filmstrip = new FilmstripBuilder();
     this.gamepad = new GamepadHandler({
-      rateGood: () => this.rateCurrent(CATEGORY_GOOD, COLOR_GOOD_FLASH),
-      rateBad: () => this.rateCurrent(CATEGORY_BAD, COLOR_BAD_FLASH),
-      rateOk: () => this.rateCurrent(CATEGORY_OK, COLOR_OK_FLASH),
+      rateGood: () => {
+        const goodCat = this.categories.find(c => c.key_name === 'good');
+        if (goodCat) this.rateCurrent(goodCat.key_name, goodCat.flash_color);
+        else this.rateCurrent('good', 'rgba(16, 185, 129, 0.4)');
+      },
+      rateBad: () => {
+        const badCat = this.categories.find(c => c.key_name === 'bad');
+        if (badCat) this.rateCurrent(badCat.key_name, badCat.flash_color);
+        else this.rateCurrent('bad', 'rgba(239, 68, 68, 0.4)');
+      },
+      rateOk: () => {
+        const okCat = this.categories.find(c => c.key_name === 'ok');
+        if (okCat) this.rateCurrent(okCat.key_name, okCat.flash_color);
+        else this.rateCurrent('ok', 'rgba(245, 158, 11, 0.4)');
+      },
       navigateNext: () => this.navigateNext(),
       navigatePrev: () => this.navigatePrev(),
       rotateCW: () => this.rotateCurrent(1),
@@ -63,13 +126,8 @@ class PhotoSorterApp {
       showToast: (m, s) => this.showToast(m, s),
     });
     this.gamepad.startLoop();
-    this.initElements();
-    this.initKeyboardBinds();
-    this.loadRecentProjects();
     this.gamepad.init();
-    this.initToastPosition();
-    this.checkForStartupFolder();
-    this.viewer.setOnZoom(() => this.handleZoomChanged());
+    this.init();
   }
 
   private gamepadActive: boolean = false;
@@ -229,7 +287,7 @@ class PhotoSorterApp {
       this.filmstrip.updateRating(path, category);
       this.triggerFlashNotification(flashColor);
       setTimeout(async () => { await this.navigateNext(); this.isProcessingRating = false; }, 100);
-    } catch (err) { this.showToast('Rating failed: ' + err, CATEGORY_BAD); this.isProcessingRating = false; }
+    } catch (err) { this.showToast('Rating failed: ' + err, 'BAD'); this.isProcessingRating = false; }
   }
 
   private async unrateCurrent() {
@@ -241,7 +299,7 @@ class PhotoSorterApp {
       this.filmstrip.updateRating(path, null);
       this.triggerFlashNotification(COLOR_UNRATE_FLASH);
       this.updateStatsHUD();
-    } catch (err) { this.showToast('Unrating failed: ' + err, CATEGORY_BAD); }
+    } catch (err) { this.showToast('Unrating failed: ' + err, 'BAD'); }
   }
 
   private async togglePickCurrent() {
@@ -312,7 +370,8 @@ class PhotoSorterApp {
     try {
       this.showProgressIndicator(true);
       const [movedCount, summary] = await invoke<[number, Record<string, number>]>('finish_sorting');
-      const msg = `Export finished!\nMoved: ${movedCount} photos.\nBAD: ${summary.BAD} | OK: ${summary.OK} | GOOD: ${summary.GOOD}`;
+      const summaryParts = Object.entries(summary).map(([folder, count]) => `${folder}: ${count}`);
+      const msg = `Export finished!\nMoved: ${movedCount} photos.\n\n${summaryParts.join(' | ')}`;
       await this.showCustomDialog('Export Complete', msg, false);
       this.returnToMenu();
     } catch (err) { this.showToast('Export failed: ' + err, 'BAD'); }
@@ -553,38 +612,96 @@ class PhotoSorterApp {
 
   private initKeyboardBinds() {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (this.currentIndex < 0) return;
-      const key = e.key.toUpperCase();
       if (document.activeElement?.tagName === 'INPUT') return;
-      if (e.ctrlKey && key === 'Z') { e.preventDefault(); this.undoLastRating(); return; }
-      if (e.ctrlKey && ['1','2','3','4','5'].includes(e.key)) { e.preventDefault(); this.setStarsCurrent(parseInt(e.key)); return; }
+      
+      let combo = '';
+      if (e.ctrlKey) combo += 'Ctrl+';
+      if (e.altKey) combo += 'Alt+';
+      if (e.shiftKey) combo += 'Shift+';
+      
+      let key = e.key;
+      if (key === ' ') key = 'Space';
+      if (key.length === 1) key = key.toUpperCase();
+      combo += key;
+      
+      // If settings remapper is recording a key binding:
+      if (this.isRecordingAction) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.recordKeybinding(this.isRecordingAction, combo);
+        return;
+      }
+
+      // Check standard Ctrl + , shortcut for Settings
+      if (combo === 'Ctrl+,' || combo === 'Ctrl+<' || combo === 'Ctrl+m') {
+        if (combo === 'Ctrl+,' || combo === 'Ctrl+<') {
+          e.preventDefault();
+          this.toggleSettingsModal();
+          return;
+        }
+      }
+
+      // Standard Ctrl + zoom shortcuts
       if (e.ctrlKey && (e.key === '=' || e.key === '+')) { e.preventDefault(); this.viewer.zoomIn(); return; }
       if (e.ctrlKey && e.key === '-') { e.preventDefault(); this.viewer.zoomOut(); return; }
       if (e.ctrlKey && e.key === '0') { e.preventDefault(); this.viewer.resetZoom(); return; }
-      if (e.ctrlKey && key === 'G') { e.preventDefault(); this.jumpToImageNumber(); return; }
-      switch (key) {
-        case 'N': case 'ARROWRIGHT': this.navigateNext(); break;
-        case 'P': case 'ARROWLEFT': this.navigatePrev(); break;
-        case 'HOME': this.navigateImage(0); break;
-        case 'END': this.navigateImage(this.imagePaths.length - 1); break;
-        case 'ESCAPE': this.confirmReturnToMenu(); break;
-        case 'ENTER': this.finishSorting(); break;
-        case '1': this.rateCurrent(CATEGORY_BAD, COLOR_BAD_FLASH); break;
-        case '2': this.rateCurrent(CATEGORY_OK, COLOR_OK_FLASH); break;
-        case '3': this.rateCurrent(CATEGORY_GOOD, COLOR_GOOD_FLASH); break;
-        case '0': this.unrateCurrent(); break;
-        case ' ': e.preventDefault(); this.togglePickCurrent(); break;
-        case 'DELETE': this.deleteCurrent(); break;
-        case 'C': this.toggleCompareMode(); break;
-        case 'F': this.toggleFullscreen(); break;
-        case 'H': this.toggleHUD(); break;
-        case 'I': this.toggleInfoPanel(); break;
-        case 'T': this.toggleToastPosition(); break;
-        case 'U': this.toggleFilterMode(); break;
-        case 'ARROWUP': this.rotateCurrent(1); break;
-        case 'ARROWDOWN': this.rotateCurrent(-1); break;
+
+      // Star rating binds (Ctrl+1-5) are global and non-customizable
+      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+        e.preventDefault();
+        this.setStarsCurrent(parseInt(e.key));
+        return;
+      }
+      
+      // Check dynamic categories shortcut key bindings
+      for (const cat of this.categories) {
+        if (cat.shortcut_key && cat.shortcut_key.toUpperCase() === combo.toUpperCase()) {
+          e.preventDefault();
+          this.rateCurrent(cat.key_name, cat.flash_color);
+          return;
+        }
+      }
+      
+      // Lookup remapped actions in keybindings
+      const action = this.getActionFromCombo(combo);
+      if (action) {
+        if (action === 'toggle_pick') e.preventDefault(); // prevent scrolling spacebar
+        this.executeAction(action);
       }
     });
+  }
+
+  private getActionFromCombo(combo: string): string | null {
+    for (const [action, shortcut] of this.keybindings.entries()) {
+      if (shortcut.toUpperCase() === combo.toUpperCase()) {
+        return action;
+      }
+    }
+    return null;
+  }
+
+  private executeAction(action: string) {
+    switch (action) {
+      case 'prev_image': this.navigatePrev(); break;
+      case 'next_image': this.navigateNext(); break;
+      case 'toggle_pick': this.togglePickCurrent(); break;
+      case 'undo': this.undoLastRating(); break;
+      case 'unrate': this.unrateCurrent(); break;
+      case 'rot_cw': this.rotateCurrent(1); break;
+      case 'rot_ccw': this.rotateCurrent(-1); break;
+      case 'compare': this.toggleCompareMode(); break;
+      case 'fullscreen': this.toggleFullscreen(); break;
+      case 'hud': this.toggleHUD(); break;
+      case 'info': this.toggleInfoPanel(); break;
+      case 'toast': this.toggleToastPosition(); break;
+      case 'filter': this.toggleFilterMode(); break;
+      case 'home': this.navigateImage(0); break;
+      case 'end': this.navigateImage(this.imagePaths.length - 1); break;
+      case 'jump': this.jumpToImageNumber(); break;
+      case 'menu': this.confirmReturnToMenu(); break;
+      case 'export': this.finishSorting(); break;
+      case 'delete': this.deleteCurrent(); break;
+    }
   }
 
   private toggleFullscreen() {
@@ -612,6 +729,9 @@ class PhotoSorterApp {
   private updateHUDControls() {
     const hud = document.getElementById('hud-label');
     if (!hud) return;
+    
+    const sortedHUD = [...this.hudItems].sort((a, b) => a.sort_order - b.sort_order);
+    
     if (this.gamepadActive) {
       hud.innerHTML = [
         '<span class="hud-key hud-good">[A]</span> GOOD',
@@ -624,32 +744,62 @@ class PhotoSorterApp {
         '<span class="hud-key">[Y]</span> Reset Zoom'
       ].join('<br>');
     } else {
-      hud.innerHTML = [
-        '<span class="hud-key hud-bad">[1]</span> BAD',
-        '<span class="hud-key hud-ok">[2]</span> OK',
-        '<span class="hud-key hud-good">[3]</span> GOOD',
-        '<span class="hud-key">[0]</span> Unrate | <span class="hud-key">[DEL]</span> Delete',
-        '<span class="hud-key">[SPACE]</span> Flag/Pick',
-        '<span class="hud-key">[N/P]</span> Prev/Next | <span class="hud-key">[U]</span> Filter Unrated',
-        '<span class="hud-key">[UP/DOWN]</span> Rotate | <span class="hud-key">[CTRL+Z]</span> Undo',
-        '<span class="hud-key">[CTRL+1-5]</span> Rating Stars'
-      ].join('<br>');
+      const rows: string[] = [];
+      
+      const activeHUD = sortedHUD.filter(h => h.visible === 1);
+      
+      activeHUD.forEach(h => {
+        const actionLabel = ACTION_DISPLAY_NAMES[h.action_name] || h.action_name;
+        const shortcut = this.keybindings.get(h.action_name) || 'None';
+        rows.push(`<span class="hud-key">[${shortcut}]</span> ${actionLabel}`);
+      });
+      
+      this.categories.forEach(cat => {
+        if (cat.shortcut_key) {
+          const color = cat.flash_color.replace('0.4', '1.0');
+          rows.push(`<span class="hud-key" style="color: ${color}">[${cat.shortcut_key}]</span> Rate ${cat.label}`);
+        }
+      });
+      
+      hud.innerHTML = rows.join('<br>');
     }
   }
 
   private async updateStatsHUD() {
     try {
       const stats = await invoke<ProjectStats>('get_project_stats');
-      document.getElementById('stats-val-picked')!.textContent = String(stats.PICKED);
-      document.getElementById('stats-val-bad')!.textContent = String(stats.BAD);
-      document.getElementById('stats-val-ok')!.textContent = String(stats.OK);
-      document.getElementById('stats-val-good')!.textContent = String(stats.GOOD);
+      const container = document.getElementById('stats-hud');
+      if (!container) return;
+      
+      let html = `
+        <div class="stats-row highlight">
+          <span class="stats-star">★</span>
+          <span class="stats-value" id="stats-val-picked">${stats.PICKED || 0}</span>
+          <span class="stats-label">PICKED</span>
+        </div>
+        <div class="stats-divider"></div>
+      `;
+      
+      this.categories.forEach((cat) => {
+        const count = stats[cat.key_name] || 0;
+        const color = cat.flash_color.replace('0.4', '1.0');
+        html += `
+          <div class="stats-row">
+            <span class="stats-dot" style="color: ${color}">●</span>
+            <span class="stats-value">${count}</span>
+            <span class="stats-label">${cat.label.toUpperCase()}</span>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+      container.style.display = 'flex';
+      
       if (this.imagePaths.length > 0) {
         const pct = Math.floor(((this.currentIndex + 1) / this.imagePaths.length) * 100);
         const fill = document.getElementById('progress-bar-fill');
         if (fill) fill.style.width = `${pct}%`;
       }
-      document.getElementById('stats-hud')!.style.display = 'flex';
     } catch (err) { console.error(err); }
   }
 
@@ -728,13 +878,370 @@ class PhotoSorterApp {
       cancelBtn.addEventListener('click', onCancel);
     });
   }
+
+  public async init() {
+    this.initElements();
+    await this.loadConfigFromDB();
+    this.initKeyboardBinds();
+    this.initSettingsUI();
+    await this.loadRecentProjects();
+    this.initToastPosition();
+    await this.checkForStartupFolder();
+    this.viewer.setOnZoom(() => this.handleZoomChanged());
+    this.updateHUDControls();
+  }
+
+  private async loadConfigFromDB() {
+    try {
+      this.categories = await invoke<CategoryRecord[]>('get_categories');
+      const binds = await invoke<KeybindingRecord[]>('get_keybindings');
+      this.keybindings = new Map(binds.map(b => [b.action_name, b.shortcut_key]));
+      this.hudItems = await invoke<HudItemRecord[]>('get_hud_items');
+    } catch (err) {
+      console.error('Failed to load configuration from DB:', err);
+    }
+  }
+
+  private initSettingsUI() {
+    document.getElementById('btn-settings-menu')?.addEventListener('click', () => this.toggleSettingsModal());
+    document.getElementById('btn-settings-workspace')?.addEventListener('click', () => this.toggleSettingsModal());
+    document.getElementById('btn-settings-close')?.addEventListener('click', () => this.toggleSettingsModal());
+    
+    document.getElementById('settings-overlay')?.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) {
+        this.toggleSettingsModal();
+      }
+    });
+    
+    const tabBtns = document.querySelectorAll('.settings-tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetTab = btn.getAttribute('data-tab');
+        if (!targetTab) return;
+        
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+          if (pane.id === targetTab) {
+            pane.classList.add('active');
+          } else {
+            pane.classList.remove('active');
+          }
+        });
+      });
+    });
+    
+    document.getElementById('btn-add-category')?.addEventListener('click', () => {
+      const usedShortcuts = new Set(this.tempCategories.map(c => c.shortcut_key?.toUpperCase()).filter(Boolean));
+      let nextShortcut = '';
+      for (let i = 4; i <= 9; i++) {
+        if (!usedShortcuts.has(String(i))) {
+          nextShortcut = String(i);
+          break;
+        }
+      }
+      
+      const newCat: CategoryRecord = {
+        id: 0,
+        key_name: 'newcategory',
+        label: 'New Category',
+        folder_name: 'NEW_CATEGORY',
+        shortcut_key: nextShortcut || null,
+        flash_color: 'rgba(45, 212, 191, 0.4)',
+        sort_order: this.tempCategories.length + 1
+      };
+      
+      this.tempCategories.push(newCat);
+      this.renderSettingsCategories();
+    });
+    
+    document.getElementById('btn-settings-save')?.addEventListener('click', () => this.saveSettings());
+  }
+
+  private toggleSettingsModal() {
+    const modal = document.getElementById('settings-overlay');
+    if (!modal) return;
+    if (modal.style.display === 'none') {
+      this.tempCategories = JSON.parse(JSON.stringify(this.categories));
+      this.tempKeybindings = new Map(this.keybindings);
+      this.tempHudItems = JSON.parse(JSON.stringify(this.hudItems));
+      
+      this.isRecordingAction = null;
+      
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === 'categories-tab') btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        if (pane.id === 'categories-tab') pane.classList.add('active');
+        else pane.classList.remove('active');
+      });
+      
+      this.renderSettingsCategories();
+      this.renderSettingsKeybindings();
+      this.renderSettingsHUD();
+      
+      modal.style.display = 'flex';
+    } else {
+      modal.style.display = 'none';
+      this.isRecordingAction = null;
+    }
+  }
+
+  private renderSettingsCategories() {
+    const container = document.getElementById('categories-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    this.tempCategories.forEach((cat, index) => {
+      const row = document.createElement('div');
+      row.className = 'category-row';
+      row.innerHTML = `
+        <input type="text" class="cat-label" value="${cat.label}" placeholder="Category Name">
+        <input type="text" class="cat-folder" value="${cat.folder_name}" placeholder="Folder Name">
+        <button class="keybinding-btn cat-shortcut">${cat.shortcut_key || 'None'}</button>
+        <input type="color" class="cat-color" value="${this.rgbaToHex(cat.flash_color)}">
+        <button class="btn-delete-cat" title="Delete Category">&times;</button>
+      `;
+      
+      const labelInput = row.querySelector('.cat-label') as HTMLInputElement;
+      labelInput.addEventListener('input', (e) => {
+        this.tempCategories[index].label = (e.target as HTMLInputElement).value;
+        if (!this.tempCategories[index].id) {
+          this.tempCategories[index].key_name = (e.target as HTMLInputElement).value.toLowerCase().replace(/[^a-z0-9]/g, '');
+        }
+      });
+      
+      const folderInput = row.querySelector('.cat-folder') as HTMLInputElement;
+      folderInput.addEventListener('input', (e) => {
+        this.tempCategories[index].folder_name = (e.target as HTMLInputElement).value;
+      });
+      
+      const shortcutBtn = row.querySelector('.cat-shortcut') as HTMLButtonElement;
+      shortcutBtn.addEventListener('click', () => {
+        document.querySelectorAll('.keybinding-btn').forEach(btn => btn.classList.remove('recording'));
+        shortcutBtn.classList.add('recording');
+        this.isRecordingAction = `category:${index}`;
+      });
+      
+      const colorInput = row.querySelector('.cat-color') as HTMLInputElement;
+      colorInput.addEventListener('input', (e) => {
+        const hex = (e.target as HTMLInputElement).value;
+        this.tempCategories[index].flash_color = this.hexToRgba(hex, 0.4);
+      });
+      
+      const deleteBtn = row.querySelector('.btn-delete-cat') as HTMLButtonElement;
+      deleteBtn.addEventListener('click', () => {
+        if (confirm(`Are you sure you want to delete category "${cat.label}"? All images rated with this category will be reset to unrated.`)) {
+          this.tempCategories.splice(index, 1);
+          this.renderSettingsCategories();
+        }
+      });
+      
+      container.appendChild(row);
+    });
+  }
+
+  private renderSettingsKeybindings() {
+    const container = document.getElementById('keybindings-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    for (const actionName of Object.keys(ACTION_DISPLAY_NAMES)) {
+      const row = document.createElement('div');
+      row.className = 'keybinding-row';
+      const label = ACTION_DISPLAY_NAMES[actionName] || actionName;
+      const shortcut = this.tempKeybindings.get(actionName) || 'None';
+      
+      row.innerHTML = `
+        <span class="keybinding-label">${label}</span>
+        <button class="keybinding-btn bind-btn" data-action="${actionName}">${shortcut}</button>
+      `;
+      
+      const bindBtn = row.querySelector('.bind-btn') as HTMLButtonElement;
+      bindBtn.addEventListener('click', () => {
+        document.querySelectorAll('.keybinding-btn').forEach(btn => btn.classList.remove('recording'));
+        bindBtn.classList.add('recording');
+        this.isRecordingAction = actionName;
+      });
+      
+      container.appendChild(row);
+    }
+  }
+
+  private renderSettingsHUD() {
+    const container = document.getElementById('hud-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    this.tempHudItems.sort((a, b) => a.sort_order - b.sort_order);
+    
+    this.tempHudItems.forEach((item, index) => {
+      const row = document.createElement('div');
+      row.className = 'hud-item';
+      row.draggable = true;
+      row.setAttribute('data-index', String(index));
+      
+      const actionLabel = ACTION_DISPLAY_NAMES[item.action_name] || item.action_name;
+      const checked = item.visible === 1 ? 'checked' : '';
+      const groupText = item.group_name ? `<span class="hud-item-group">${item.group_name}</span>` : '';
+      
+      row.innerHTML = `
+        <span class="hud-drag-handle">☰</span>
+        <input type="checkbox" class="hud-item-checkbox" ${checked}>
+        <span class="hud-item-label">${actionLabel}</span>
+        ${groupText}
+      `;
+      
+      const checkbox = row.querySelector('.hud-item-checkbox') as HTMLInputElement;
+      checkbox.addEventListener('change', (e) => {
+        this.tempHudItems[index].visible = (e.target as HTMLInputElement).checked ? 1 : 0;
+      });
+      
+      row.addEventListener('dragstart', (e) => {
+        row.classList.add('dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.setData('text/plain', String(index));
+          e.dataTransfer.effectAllowed = 'move';
+        }
+      });
+      
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+      });
+      
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'move';
+        }
+        
+        const dragging = container.querySelector('.dragging') as HTMLElement;
+        if (dragging && dragging !== row) {
+          const bounding = row.getBoundingClientRect();
+          const offset = e.clientY - bounding.top - bounding.height / 2;
+          if (offset > 0) {
+            row.after(dragging);
+          } else {
+            row.before(dragging);
+          }
+        }
+      });
+      
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const sourceIndex = parseInt(e.dataTransfer?.getData('text/plain') || '-1');
+        if (sourceIndex === -1 || sourceIndex === index) return;
+        
+        const currentElements = Array.from(container.children);
+        const newHudItems: HudItemRecord[] = [];
+        currentElements.forEach((el, newIdx) => {
+          const origIdx = parseInt(el.getAttribute('data-index') || '-1');
+          if (origIdx !== -1 && this.tempHudItems[origIdx]) {
+            const itemCopy = { ...this.tempHudItems[origIdx] };
+            itemCopy.sort_order = newIdx + 1;
+            newHudItems.push(itemCopy);
+          }
+        });
+        
+        this.tempHudItems = newHudItems;
+        this.renderSettingsHUD();
+      });
+      
+      container.appendChild(row);
+    });
+  }
+
+  private recordKeybinding(actionSpec: string, combo: string) {
+    if (actionSpec.startsWith('category:')) {
+      const idx = parseInt(actionSpec.substring(9));
+      if (!isNaN(idx) && this.tempCategories[idx]) {
+        this.tempCategories[idx].shortcut_key = combo;
+      }
+      this.isRecordingAction = null;
+      this.renderSettingsCategories();
+    } else {
+      this.tempKeybindings.set(actionSpec, combo);
+      this.isRecordingAction = null;
+      this.renderSettingsKeybindings();
+    }
+  }
+
+  private async saveSettings() {
+    try {
+      this.showProgressIndicator(true);
+      
+      const originalKeys = new Set(this.categories.map(c => c.key_name));
+      const tempKeys = new Set(this.tempCategories.map(c => c.key_name));
+      
+      const deletedKeys: string[] = [];
+      for (const k of originalKeys) {
+        if (!tempKeys.has(k)) {
+          deletedKeys.push(k);
+        }
+      }
+      
+      for (const k of deletedKeys) {
+        await invoke('delete_category', { keyName: k });
+      }
+      
+      this.tempCategories.forEach((cat, idx) => {
+        cat.sort_order = idx + 1;
+      });
+      for (const cat of this.tempCategories) {
+        await invoke('save_category', { cat });
+      }
+      
+      for (const [actionName, shortcut] of this.tempKeybindings.entries()) {
+        await invoke('save_keybinding', { bind: { action_name: actionName, shortcut_key: shortcut } });
+      }
+      
+      await invoke('save_hud_items', { items: this.tempHudItems });
+      
+      await this.loadConfigFromDB();
+      await this.syncImagePaths();
+      this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
+      
+      if (this.currentIndex >= 0) {
+        await this.navigateImage(this.currentIndex);
+      }
+      
+      this.updateStatsHUD();
+      this.updateHUDControls();
+      
+      this.toggleSettingsModal();
+      this.showToast('Settings saved successfully!', 'GOOD');
+      
+    } catch (err) {
+      this.showToast('Failed to save settings: ' + err, 'BAD');
+    } finally {
+      this.showProgressIndicator(false);
+    }
+  }
+
+  private rgbaToHex(rgba: string): string {
+    if (rgba.startsWith('#')) return rgba.substring(0, 7);
+    const match = rgba.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
+    if (!match) return '#ffffff';
+    const r = parseInt(match[1]);
+    const g = parseInt(match[2]);
+    const b = parseInt(match[3]);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  private hexToRgba(hex: string, alpha: number): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   try {
     const app = new PhotoSorterApp();
     (window as any).photoSorterApp = app;
-    app['updateHUDControls']();
     console.log('Photo Sorter v3 initialized successfully');
   } catch (err) {
     console.error('Failed to initialize Photo Sorter:', err);

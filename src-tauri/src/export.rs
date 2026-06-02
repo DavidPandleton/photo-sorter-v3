@@ -110,14 +110,22 @@ impl AppState {
         let mut newly_created = Vec::new();
         let mut operations = Vec::new();
         let mut summary = HashMap::new();
-        for &cat in &constants::CATEGORIES {
-            summary.insert(cat.to_string(), 0);
+        let cats = self.get_categories().unwrap_or_default();
+        let cat_folder_map: HashMap<String, String> = cats.iter().map(|c| (c.key_name.clone(), c.folder_name.clone())).collect();
+        for cat in &cats {
+            summary.insert(cat.folder_name.clone(), 0);
+        }
+        if summary.is_empty() {
+            for &cat in &constants::CATEGORIES {
+                summary.insert(cat.to_string(), 0);
+            }
         }
         for (path_str, category) in results_map {
             let path = Path::new(&path_str);
             if !path.exists() { continue; }
             let rel_path = match path.strip_prefix(root) { Ok(r) => r, Err(_) => continue };
-            let target_path = root.join(&category).join(rel_path);
+            let folder_name = cat_folder_map.get(&category).cloned().unwrap_or_else(|| category.to_uppercase());
+            let target_path = root.join(&folder_name).join(rel_path);
             let target_dir = target_path.parent().unwrap();
             if !target_dir.exists() {
                 fs::create_dir_all(target_dir).map_err(|e| e.to_string())?;
@@ -135,11 +143,11 @@ impl AppState {
             if !move_ok { let _ = fs::remove_file(&target_path); }
             if move_ok {
                 moved_count += 1;
-                *summary.entry(category.clone()).or_insert(0) += 1;
+                *summary.entry(folder_name.clone()).or_insert(0) += 1;
                 operations.push(Operation {
                     original_path: path_str.clone(),
                     exported_path: target_path.to_string_lossy().into_owned(),
-                    category,
+                    category: folder_name,
                     status: "completed".to_string(),
                     size,
                     sha1: String::new(),

@@ -178,4 +178,66 @@ impl AppState {
         if *idx_lock >= paths.len() as i32 { *idx_lock = (paths.len() as i32 - 1).max(0); }
         Ok(Some(path_str))
     }
+
+    pub fn get_categories(&self) -> Result<Vec<crate::database::CategoryRecord>, String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.get_categories().map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn save_category(&self, cat: crate::database::CategoryRecord) -> Result<(), String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.save_category(cat).map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn delete_category(&self, key_name: &str) -> Result<(), String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.delete_category(key_name).map_err(|e| e.to_string())?;
+            // Reload results in-memory from DB since ratings might have been reset
+            let pid_opt = self.project_id.read().unwrap();
+            if let Some(pid) = pid_opt.as_ref() {
+                let images = db.get_images(*pid).map_err(|e| e.to_string())?;
+                let mut results_map = self.results.write().unwrap();
+                results_map.clear();
+                for img in images {
+                    if let Some(r) = img.rating {
+                        results_map.insert(img.path, r);
+                    }
+                }
+            }
+            Ok(())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn get_keybindings(&self) -> Result<Vec<crate::database::KeybindingRecord>, String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.get_keybindings().map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn save_keybinding(&self, bind: crate::database::KeybindingRecord) -> Result<(), String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.save_keybinding(bind).map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn get_hud_items(&self) -> Result<Vec<crate::database::HudItemRecord>, String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.get_hud_items().map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn save_hud_items(&self, items: Vec<crate::database::HudItemRecord>) -> Result<(), String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.save_hud_items(items).map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
 }

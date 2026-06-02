@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
 
-const SCHEMA_VERSION: i32 = 2;
+const SCHEMA_VERSION: i32 = 3;
 
 const SCHEMA_SQL: &str = "
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -49,6 +49,28 @@ CREATE TABLE IF NOT EXISTS thumbnail_cache (
     image_id INTEGER PRIMARY KEY,
     jpeg_blob BLOB NOT NULL,
     FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key_name TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL,
+    folder_name TEXT NOT NULL,
+    shortcut_key TEXT,
+    flash_color TEXT NOT NULL,
+    sort_order INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS keybindings (
+    action_name TEXT PRIMARY KEY,
+    shortcut_key TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS hud_items (
+    action_name TEXT PRIMARY KEY,
+    visible INTEGER DEFAULT 1,
+    sort_order INTEGER NOT NULL,
+    group_name TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_images_project ON images(project_id);
@@ -99,6 +121,31 @@ pub struct DateRecord {
     pub day: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CategoryRecord {
+    pub id: i64,
+    pub key_name: String,
+    pub label: String,
+    pub folder_name: String,
+    pub shortcut_key: Option<String>,
+    pub flash_color: String,
+    pub sort_order: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KeybindingRecord {
+    pub action_name: String,
+    pub shortcut_key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HudItemRecord {
+    pub action_name: String,
+    pub visible: i32,
+    pub sort_order: i32,
+    pub group_name: Option<String>,
+}
+
 pub struct PhotoDatabase {
     conn: Mutex<Connection>,
 }
@@ -136,6 +183,75 @@ impl PhotoDatabase {
             .unwrap_or(0);
             
         if current_ver < SCHEMA_VERSION {
+            if current_ver < 3 {
+                // Seed default categories
+                let default_cats = vec![
+                    ("bad", "Bad", "BAD", "1", "rgba(239, 68, 68, 0.4)", 1),
+                    ("ok", "Ok", "OK", "2", "rgba(245, 158, 11, 0.4)", 2),
+                    ("good", "Good", "GOOD", "3", "rgba(16, 185, 129, 0.4)", 3),
+                ];
+                for (key, label, folder, shortcut, flash, sort_order) in default_cats {
+                    conn.execute(
+                        "INSERT OR IGNORE INTO categories (key_name, label, folder_name, shortcut_key, flash_color, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+                        params![key, label, folder, shortcut, flash, sort_order],
+                    )?;
+                }
+
+                // Seed default keybindings
+                let default_binds = vec![
+                    ("prev_image", "P"),
+                    ("next_image", "N"),
+                    ("toggle_pick", " "),
+                    ("undo", "Ctrl+Z"),
+                    ("unrate", "0"),
+                    ("rot_cw", "ArrowUp"),
+                    ("rot_ccw", "ArrowDown"),
+                    ("compare", "C"),
+                    ("fullscreen", "F"),
+                    ("hud", "H"),
+                    ("info", "I"),
+                    ("toast", "T"),
+                    ("filter", "U"),
+                    ("home", "Home"),
+                    ("end", "End"),
+                    ("jump", "Ctrl+G"),
+                    ("menu", "Escape"),
+                    ("export", "Enter"),
+                    ("delete", "Delete"),
+                ];
+                for (action, shortcut) in default_binds {
+                    conn.execute(
+                        "INSERT OR IGNORE INTO keybindings (action_name, shortcut_key) VALUES (?, ?)",
+                        params![action, shortcut],
+                    )?;
+                }
+
+                // Seed default hud items
+                let default_hud = vec![
+                    ("prev_image", 1, 1, "Navigation"),
+                    ("next_image", 1, 2, "Navigation"),
+                    ("toggle_pick", 1, 3, "Actions"),
+                    ("undo", 1, 4, "Actions"),
+                    ("unrate", 1, 5, "Actions"),
+                    ("rot_cw", 1, 6, "Transforms"),
+                    ("rot_ccw", 1, 7, "Transforms"),
+                    ("compare", 1, 8, "Modes"),
+                    ("fullscreen", 1, 9, "Modes"),
+                    ("hud", 1, 10, "Interface"),
+                    ("info", 1, 11, "Interface"),
+                    ("toast", 1, 12, "Interface"),
+                    ("filter", 1, 13, "Interface"),
+                    ("export", 1, 14, "System"),
+                    ("delete", 1, 15, "System"),
+                ];
+                for (action, visible, order, group) in default_hud {
+                    conn.execute(
+                        "INSERT OR IGNORE INTO hud_items (action_name, visible, sort_order, group_name) VALUES (?, ?, ?, ?)",
+                        params![action, visible, order, group],
+                    )?;
+                }
+            }
+
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
                 params![SCHEMA_VERSION],
@@ -540,6 +656,115 @@ impl PhotoDatabase {
             )
             .ok();
         Ok(blob)
+    }
+
+    // --- Categories ---
+    pub fn get_categories(&self) -> Result<Vec<CategoryRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, key_name, label, folder_name, shortcut_key, flash_color, sort_order FROM categories ORDER BY sort_order")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(CategoryRecord {
+                id: row.get(0)?,
+                key_name: row.get(1)?,
+                label: row.get(2)?,
+                folder_name: row.get(3)?,
+                shortcut_key: row.get(4)?,
+                flash_color: row.get(5)?,
+                sort_order: row.get(6)?,
+            })
+        })?;
+        
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn save_category(&self, cat: CategoryRecord) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        if cat.id > 0 {
+            conn.execute(
+                "UPDATE categories SET key_name = ?, label = ?, folder_name = ?, shortcut_key = ?, flash_color = ?, sort_order = ? WHERE id = ?",
+                params![cat.key_name, cat.label, cat.folder_name, cat.shortcut_key, cat.flash_color, cat.sort_order, cat.id],
+            )?;
+        } else {
+            conn.execute(
+                "INSERT INTO categories (key_name, label, folder_name, shortcut_key, flash_color, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+                params![cat.key_name, cat.label, cat.folder_name, cat.shortcut_key, cat.flash_color, cat.sort_order],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn delete_category(&self, key_name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM categories WHERE key_name = ?", params![key_name])?;
+        // Reset image ratings rated with this key to NULL
+        let now = chrono::Local::now().to_rfc3339();
+        conn.execute("UPDATE images SET rating = NULL, updated_at = ? WHERE rating = ?", params![now, key_name])?;
+        Ok(())
+    }
+
+    // --- Keybindings ---
+    pub fn get_keybindings(&self) -> Result<Vec<KeybindingRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT action_name, shortcut_key FROM keybindings")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(KeybindingRecord {
+                action_name: row.get(0)?,
+                shortcut_key: row.get(1)?,
+            })
+        })?;
+        
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn save_keybinding(&self, bind: KeybindingRecord) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO keybindings (action_name, shortcut_key) VALUES (?, ?)",
+            params![bind.action_name, bind.shortcut_key],
+        )?;
+        Ok(())
+    }
+
+    // --- HUD Items ---
+    pub fn get_hud_items(&self) -> Result<Vec<HudItemRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT action_name, visible, sort_order, group_name FROM hud_items ORDER BY sort_order")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(HudItemRecord {
+                action_name: row.get(0)?,
+                visible: row.get(1)?,
+                sort_order: row.get(2)?,
+                group_name: row.get(3)?,
+            })
+        })?;
+        
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn save_hud_items(&self, items: Vec<HudItemRecord>) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute("DELETE FROM hud_items", [])?;
+        for item in items {
+            tx.execute(
+                "INSERT INTO hud_items (action_name, visible, sort_order, group_name) VALUES (?, ?, ?, ?)",
+                params![item.action_name, item.visible, item.sort_order, item.group_name],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
     }
 }
 

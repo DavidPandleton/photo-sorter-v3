@@ -115,13 +115,23 @@ fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<(Vec<u
 fn get_project_stats(state: State<'_, AppState>) -> Result<HashMap<String, usize>, String> {
     let results_map = state.results.read().unwrap();
     let mut stats = HashMap::new();
-    for &cat in &constants::CATEGORIES {
-        stats.insert(cat.to_string(), 0);
+    
+    let cats = state.get_categories().unwrap_or_default();
+    for cat in &cats {
+        stats.insert(cat.key_name.clone(), 0);
+    }
+    if stats.is_empty() {
+        for &cat in &constants::CATEGORIES {
+            stats.insert(cat.to_string().to_lowercase(), 0);
+        }
     }
     
     for val in results_map.values() {
-        if stats.contains_key(val) {
-            *stats.get_mut(val).unwrap() += 1;
+        let val_lower = val.to_lowercase();
+        if stats.contains_key(&val_lower) {
+            *stats.get_mut(&val_lower).unwrap() += 1;
+        } else {
+            *stats.entry(val_lower).or_insert(0) += 1;
         }
     }
     
@@ -290,6 +300,41 @@ fn get_startup_folder(state: State<'_, AppState>) -> Option<String> {
     state.startup_folder.read().unwrap().clone()
 }
 
+#[tauri::command]
+fn get_categories(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::CategoryRecord>, String> {
+    state.get_categories()
+}
+
+#[tauri::command]
+fn save_category(state: State<'_, AppState>, cat: photo_sorter_v3::database::CategoryRecord) -> Result<(), String> {
+    state.save_category(cat)
+}
+
+#[tauri::command]
+fn delete_category(state: State<'_, AppState>, key_name: String) -> Result<(), String> {
+    state.delete_category(&key_name)
+}
+
+#[tauri::command]
+fn get_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::KeybindingRecord>, String> {
+    state.get_keybindings()
+}
+
+#[tauri::command]
+fn save_keybinding(state: State<'_, AppState>, bind: photo_sorter_v3::database::KeybindingRecord) -> Result<(), String> {
+    state.save_keybinding(bind)
+}
+
+#[tauri::command]
+fn get_hud_items(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::HudItemRecord>, String> {
+    state.get_hud_items()
+}
+
+#[tauri::command]
+fn save_hud_items(state: State<'_, AppState>, items: Vec<photo_sorter_v3::database::HudItemRecord>) -> Result<(), String> {
+    state.save_hud_items(items)
+}
+
 fn main() {
     let mut startup_folder = None;
     let args: Vec<String> = std::env::args().collect();
@@ -345,7 +390,14 @@ fn main() {
             get_image_metadata_info,
             toggle_filter_mode,
             get_recent_projects,
-            get_startup_folder
+            get_startup_folder,
+            get_categories,
+            save_category,
+            delete_category,
+            get_keybindings,
+            save_keybinding,
+            get_hud_items,
+            save_hud_items
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
