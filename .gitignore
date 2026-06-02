@@ -91,7 +91,6 @@ LAPORAN_*.md
 NOTE_*.md
 
 # Python v2 files (kept for reference, not part of v3)
-docs/
 photosorter/
 tests/
 packaging/
