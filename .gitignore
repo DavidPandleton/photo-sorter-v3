@@ -1,96 +1,58 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-*.pyd
+# --- Rust / Tauri ---
+target/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/resources/
 
-# C extensions
+# --- Node / Vite ---
+node_modules/
+dist/
+*.tsbuildinfo
+package-lock.json
+
+# --- Build artifacts ---
+*.o
 *.so
-
-# Distribution / packaging
+*.dylib
+*.exe
+*.dll
+*.pdb
 bin/
 build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-*.spec
 
-# PyInstaller
-#  Often people debug with a local .spec file, so it's ignored by default.
-#  If you want to version your spec, remove this line.
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-pytestdebuglog.txt
-
-# Environments
+# --- Env files ---
 .env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+.env.local
+.env.*.local
 
-# IDEs
+# --- OS files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- IDE / Editor ---
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
-# macOS
-.DS_Store
-
-# Project Specific
-.photosorter_checkpoint.json
-*.tmp
-pyright_output.txt
-logs/
-private/
-
-# Agent / IDE config (not part of the project)
+# --- Agent configs (personal, not project) ---
 .agent/
 .claude/
 .cursor/
 .wolf/
 AGENTS.md
 CLAUDE.md
-*.md.old
 
-# Temp files
-LAPORAN_*.md
-NOTE_*.md
+# --- Temp / Logs ---
+*.log
+*.tmp
+logs/
+private/
+pyright_output.txt
 
-# Python v2 files (kept for reference, not part of v3)
+# --- Python v2 artifacts (kept for reference) ---
 photosorter/
 tests/
 packaging/
@@ -99,14 +61,11 @@ pyproject.toml
 requirements.txt
 settings.json
 sorter.py
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
 
-# Node modules (don't track)
-node_modules/
-
-# Rust build output
-target/
-src-tauri/target/
-src-tauri/gen/
-
-# Tauri build
-dist/
+# --- Project specific ---
+.photosorter_checkpoint.json

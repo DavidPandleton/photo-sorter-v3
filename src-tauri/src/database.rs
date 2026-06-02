@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
 
-const SCHEMA_VERSION: i32 = 3;
+const SCHEMA_VERSION: i32 = 4;
 
 const SCHEMA_SQL: &str = "
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -71,6 +71,15 @@ CREATE TABLE IF NOT EXISTS hud_items (
     visible INTEGER DEFAULT 1,
     sort_order INTEGER NOT NULL,
     group_name TEXT
+);
+
+CREATE TABLE IF NOT EXISTS hud_widgets (
+    name TEXT PRIMARY KEY,
+    visible INTEGER DEFAULT 1,
+    pos_x REAL NOT NULL,
+    pos_y REAL NOT NULL,
+    scale REAL DEFAULT 1.0,
+    opacity REAL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_images_project ON images(project_id);
@@ -144,6 +153,16 @@ pub struct HudItemRecord {
     pub visible: i32,
     pub sort_order: i32,
     pub group_name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HudWidgetRecord {
+    pub name: String,
+    pub visible: i32,
+    pub pos_x: f64,
+    pub pos_y: f64,
+    pub scale: f64,
+    pub opacity: f64,
 }
 
 pub struct PhotoDatabase {
@@ -252,6 +271,21 @@ impl PhotoDatabase {
                 conn.execute(
                     "INSERT OR IGNORE INTO hud_items (action_name, visible, sort_order, group_name) VALUES (?, ?, ?, ?)",
                     params![action, visible, order, group],
+                )?;
+            }
+        }
+
+        let widget_count: i64 = conn.query_row("SELECT COUNT(*) FROM hud_widgets", [], |r| r.get(0)).unwrap_or(0);
+        if widget_count == 0 {
+            let default_widgets = vec![
+                ("controls_hud", 1, 2.0, 50.0, 1.0, 0.95),
+                ("info_hud", 1, 75.0, 10.0, 1.0, 0.95),
+                ("stats_hud", 1, 40.0, 85.0, 1.0, 0.95),
+            ];
+            for (name, visible, pos_x, pos_y, scale, opacity) in default_widgets {
+                conn.execute(
+                    "INSERT OR IGNORE INTO hud_widgets (name, visible, pos_x, pos_y, scale, opacity) VALUES (?, ?, ?, ?, ?, ?)",
+                    params![name, visible, pos_x, pos_y, scale, opacity],
                 )?;
             }
         }
@@ -769,6 +803,75 @@ impl PhotoDatabase {
             )?;
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    // --- HUD Widgets ---
+    pub fn get_hud_widgets(&self) -> Result<Vec<HudWidgetRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT name, visible, pos_x, pos_y, scale, opacity FROM hud_widgets")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(HudWidgetRecord {
+                name: row.get(0)?,
+                visible: row.get(1)?,
+                pos_x: row.get(2)?,
+                pos_y: row.get(3)?,
+                scale: row.get(4)?,
+                opacity: row.get(5)?,
+            })
+        })?;
+        
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn save_hud_widgets(&self, widgets: Vec<HudWidgetRecord>) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        for widget in widgets {
+            tx.execute(
+                "INSERT OR REPLACE INTO hud_widgets (name, visible, pos_x, pos_y, scale, opacity) VALUES (?, ?, ?, ?, ?, ?)",
+                params![widget.name, widget.visible, widget.pos_x, widget.pos_y, widget.scale, widget.opacity],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    // --- Reset Keybindings ---
+    pub fn reset_keybindings(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM keybindings", [])?;
+        let default_binds = vec![
+            ("prev_image", "P"),
+            ("next_image", "N"),
+            ("toggle_pick", " "),
+            ("undo", "Ctrl+Z"),
+            ("unrate", "0"),
+            ("rot_cw", "ArrowUp"),
+            ("rot_ccw", "ArrowDown"),
+            ("compare", "C"),
+            ("fullscreen", "F"),
+            ("hud", "H"),
+            ("info", "I"),
+            ("toast", "T"),
+            ("filter", "U"),
+            ("home", "Home"),
+            ("end", "End"),
+            ("jump", "Ctrl+G"),
+            ("menu", "Escape"),
+            ("export", "Enter"),
+            ("delete", "Delete"),
+        ];
+        for (action, shortcut) in default_binds {
+            conn.execute(
+                "INSERT OR REPLACE INTO keybindings (action_name, shortcut_key) VALUES (?, ?)",
+                params![action, shortcut],
+            )?;
+        }
         Ok(())
     }
 }

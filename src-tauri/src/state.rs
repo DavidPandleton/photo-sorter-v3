@@ -1,9 +1,99 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::sync::{Arc, RwLock};
 use crate::database::PhotoDatabase;
 use crate::constants;
+
+const IMAGE_CACHE_MAX: usize = 30;
+const FULLRES_CACHE_MAX: usize = 10;
+
+pub struct ImageCache {
+    pub scaled: RwLock<HashMap<String, Vec<u8>>>,
+    pub full_res: RwLock<HashMap<String, Vec<u8>>>,
+    scaled_order: RwLock<VecDeque<String>>,
+    fullres_order: RwLock<VecDeque<String>>,
+}
+
+impl ImageCache {
+    pub fn new() -> Self {
+        ImageCache {
+            scaled: RwLock::new(HashMap::new()),
+            full_res: RwLock::new(HashMap::new()),
+            scaled_order: RwLock::new(VecDeque::new()),
+            fullres_order: RwLock::new(VecDeque::new()),
+        }
+    }
+
+    pub fn get_scaled(&self, path: &str) -> Option<Vec<u8>> {
+        let map = self.scaled.read().unwrap();
+        if let Some(bytes) = map.get(path) {
+            let mut order = self.scaled_order.write().unwrap();
+            if let Some(pos) = order.iter().position(|p| p == path) {
+                order.remove(pos);
+                order.push_back(path.to_string());
+            }
+            Some(bytes.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn insert_scaled(&self, path: &str, bytes: Vec<u8>) {
+        let mut map = self.scaled.write().unwrap();
+        let mut order = self.scaled_order.write().unwrap();
+        if map.contains_key(path) {
+            if let Some(pos) = order.iter().position(|p| p == path) {
+                order.remove(pos);
+            }
+        }
+        map.insert(path.to_string(), bytes);
+        order.push_back(path.to_string());
+        while map.len() > IMAGE_CACHE_MAX {
+            if let Some(old) = order.pop_front() {
+                map.remove(&old);
+            }
+        }
+    }
+
+    pub fn get_fullres(&self, path: &str) -> Option<Vec<u8>> {
+        let map = self.full_res.read().unwrap();
+        if let Some(bytes) = map.get(path) {
+            let mut order = self.fullres_order.write().unwrap();
+            if let Some(pos) = order.iter().position(|p| p == path) {
+                order.remove(pos);
+                order.push_back(path.to_string());
+            }
+            Some(bytes.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn insert_fullres(&self, path: &str, bytes: Vec<u8>) {
+        let mut map = self.full_res.write().unwrap();
+        let mut order = self.fullres_order.write().unwrap();
+        if map.contains_key(path) {
+            if let Some(pos) = order.iter().position(|p| p == path) {
+                order.remove(pos);
+            }
+        }
+        map.insert(path.to_string(), bytes);
+        order.push_back(path.to_string());
+        while map.len() > FULLRES_CACHE_MAX {
+            if let Some(old) = order.pop_front() {
+                map.remove(&old);
+            }
+        }
+    }
+
+    pub fn clear(&self) {
+        self.scaled.write().unwrap().clear();
+        self.full_res.write().unwrap().clear();
+        self.scaled_order.write().unwrap().clear();
+        self.fullres_order.write().unwrap().clear();
+    }
+}
 
 pub struct AppState {
     pub db: RwLock<Option<Arc<PhotoDatabase>>>,
@@ -21,6 +111,7 @@ pub struct AppState {
 
     pub project_id: RwLock<Option<i64>>,
     pub startup_folder: RwLock<Option<String>>,
+    pub image_cache: ImageCache,
 }
 
 impl AppState {
@@ -39,6 +130,7 @@ impl AppState {
             filter_date: RwLock::new(String::new()),
             project_id: RwLock::new(None),
             startup_folder: RwLock::new(None),
+            image_cache: ImageCache::new(),
         }
     }
 
@@ -54,7 +146,7 @@ impl AppState {
         *self.filter_text.write().unwrap() = String::new();
         *self.filter_date.write().unwrap() = String::new();
         *self.project_id.write().unwrap() = None;
-        *self.db.write().unwrap() = None;
+        self.image_cache.clear();
     }
 
     pub fn load_images(&self, db_path: PathBuf, root: &str) -> Result<usize, String> {
@@ -73,7 +165,7 @@ impl AppState {
                     let rel = p.strip_prefix(root_path).unwrap();
                     if rel.components().any(|c| {
                         let rel_upper = c.as_os_str().to_string_lossy().to_uppercase();
-                        constants::CATEGORIES.iter().any(|&cat| cat == rel_upper.as_str())
+                        constants::CATEGORIES.contains(&rel_upper.as_str())
                     }) { continue; }
                     if p.is_dir() { walk_dir(&p, root_path, paths, exts); }
                     else if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
@@ -87,8 +179,18 @@ impl AppState {
         paths.sort();
         for p in &mut paths { *p = p.replace('\\', "/"); }
 
-        let database = PhotoDatabase::new(db_path).map_err(|e| e.to_string())?;
-        let db_arc = Arc::new(database);
+        let db_arc = {
+            let db_opt = self.db.read().unwrap();
+            if let Some(db) = db_opt.as_ref() {
+                Arc::clone(db)
+            } else {
+                let database = PhotoDatabase::new(db_path).map_err(|e| e.to_string())?;
+                Arc::new(database)
+            }
+        };
+        // Keep it in the state if it wasn't already initialized
+        *self.db.write().unwrap() = Some(Arc::clone(&db_arc));
+
         let pid = db_arc.get_or_create_project(&root_abs).map_err(|e| e.to_string())?;
         db_arc.sync_images(pid, &paths).map_err(|e| e.to_string())?;
         *self.project_id.write().unwrap() = Some(pid);
@@ -105,7 +207,6 @@ impl AppState {
         let size = paths.len();
         *self.image_paths.write().unwrap() = paths;
         *self.current_index.write().unwrap() = 0;
-        *self.db.write().unwrap() = Some(db_arc);
         Ok(size)
     }
 
@@ -238,6 +339,27 @@ impl AppState {
         let db_opt = self.db.read().unwrap();
         if let Some(db) = db_opt.as_ref() {
             db.save_hud_items(items).map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn get_hud_widgets(&self) -> Result<Vec<crate::database::HudWidgetRecord>, String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.get_hud_widgets().map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn save_hud_widgets(&self, widgets: Vec<crate::database::HudWidgetRecord>) -> Result<(), String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.save_hud_widgets(widgets).map_err(|e| e.to_string())
+        } else { Err("No active database connection.".to_string()) }
+    }
+
+    pub fn reset_keybindings(&self) -> Result<(), String> {
+        let db_opt = self.db.read().unwrap();
+        if let Some(db) = db_opt.as_ref() {
+            db.reset_keybindings().map_err(|e| e.to_string())
         } else { Err("No active database connection.".to_string()) }
     }
 }

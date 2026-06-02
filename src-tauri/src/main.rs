@@ -69,17 +69,24 @@ fn restore_checkpoint(state: State<'_, AppState>, root: Option<String>) -> Resul
 }
 
 #[tauri::command]
-fn get_image_data(_state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
-    // Quality-focused culling viewport dimensions
+fn get_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
+    if let Some(cached) = state.image_cache.get_scaled(&path) {
+        return Ok(cached);
+    }
     let decoded = load_and_scale_image(&path, 1920)
         .ok_or_else(|| "Failed to load image data.".to_string())?;
+    state.image_cache.insert_scaled(&path, decoded.bytes.clone());
     Ok(decoded.bytes)
 }
 
 #[tauri::command]
-fn get_full_image_data(_state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
+fn get_full_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
+    if let Some(cached) = state.image_cache.get_fullres(&path) {
+        return Ok(cached);
+    }
     let decoded = load_image_unscaled(&path)
         .ok_or_else(|| "Failed to load full resolution image.".to_string())?;
+    state.image_cache.insert_fullres(&path, decoded.bytes.clone());
     Ok(decoded.bytes)
 }
 
@@ -335,6 +342,22 @@ fn save_hud_items(state: State<'_, AppState>, items: Vec<photo_sorter_v3::databa
     state.save_hud_items(items)
 }
 
+#[tauri::command]
+fn get_hud_widgets(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::HudWidgetRecord>, String> {
+    state.get_hud_widgets()
+}
+
+#[tauri::command]
+fn save_hud_widgets(state: State<'_, AppState>, widgets: Vec<photo_sorter_v3::database::HudWidgetRecord>) -> Result<(), String> {
+    state.save_hud_widgets(widgets)
+}
+
+#[tauri::command]
+fn reset_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::KeybindingRecord>, String> {
+    state.reset_keybindings()?;
+    state.get_keybindings()
+}
+
 fn main() {
     let mut startup_folder = None;
     let args: Vec<String> = std::env::args().collect();
@@ -363,6 +386,19 @@ fn main() {
         .manage(state)
         .setup(|app| {
             let app_handle = app.handle().clone();
+            
+            // Initialize global database connection on launch
+            let db_path = get_db_path(&app_handle);
+            let state = app.state::<AppState>();
+            match photo_sorter_v3::database::PhotoDatabase::new(db_path) {
+                Ok(db) => {
+                    *state.db.write().unwrap() = Some(Arc::new(db));
+                }
+                Err(e) => {
+                    eprintln!("Failed to initialize database: {}", e);
+                }
+            }
+
             std::thread::spawn(move || {
                 photo_sorter_v3::gamepad::start_gamepad_loop(app_handle);
             });
@@ -397,7 +433,10 @@ fn main() {
             get_keybindings,
             save_keybinding,
             get_hud_items,
-            save_hud_items
+            save_hud_items,
+            get_hud_widgets,
+            save_hud_widgets,
+            reset_keybindings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

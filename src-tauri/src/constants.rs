@@ -1,4 +1,4 @@
-/**
+/*
  * PHOTO SORTER V3 — Global Backend Constants & Configurations
  */
 

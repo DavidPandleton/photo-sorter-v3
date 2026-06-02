@@ -711,11 +711,11 @@ class PhotoSorterApp {
 
   private toggleHUD() {
     const hud = document.getElementById('hud-container');
-    if (hud) hud.style.display = hud.style.display === 'none' ? '' : 'none';
+    if (hud) hud.style.display = hud.style.display === 'none' ? 'flex' : 'none';
   }
 
   private toggleInfoPanel() {
-    const info = document.querySelector('.info-widget') as HTMLElement;
+    const info = document.getElementById('info-hud');
     if (info) info.style.display = info.style.display === 'none' ? 'flex' : 'none';
   }
 
@@ -957,6 +957,26 @@ class PhotoSorterApp {
     });
     
     document.getElementById('btn-settings-save')?.addEventListener('click', () => this.saveSettings());
+    
+    document.getElementById('btn-reset-keybindings')?.addEventListener('click', async () => {
+      if (confirm('Are you sure you want to reset all keyboard shortcuts to the system factory defaults? All your custom binds will be lost.')) {
+        try {
+          this.showProgressIndicator(true);
+          const defaultBinds = await invoke<KeybindingRecord[]>('reset_keybindings');
+          this.keybindings = new Map(defaultBinds.map(b => [b.action_name, b.shortcut_key]));
+          this.tempKeybindings = new Map(this.keybindings);
+          
+          this.renderSettingsKeybindings();
+          this.updateHUDControls();
+          
+          this.showToast('Keybindings restored to defaults!', 'GOOD');
+        } catch (err) {
+          this.showToast('Failed to reset keybindings: ' + err, 'BAD');
+        } finally {
+          this.showProgressIndicator(false);
+        }
+      }
+    });
   }
 
   private toggleSettingsModal() {
@@ -1075,20 +1095,17 @@ class PhotoSorterApp {
     if (!container) return;
     container.innerHTML = '';
     
-    this.tempHudItems.sort((a, b) => a.sort_order - b.sort_order);
+    const sorted = [...this.tempHudItems].sort((a, b) => a.sort_order - b.sort_order);
     
-    this.tempHudItems.forEach((item, index) => {
+    sorted.forEach((item) => {
       const row = document.createElement('div');
       row.className = 'hud-item';
-      row.draggable = true;
-      row.setAttribute('data-index', String(index));
       
       const actionLabel = ACTION_DISPLAY_NAMES[item.action_name] || item.action_name;
       const checked = item.visible === 1 ? 'checked' : '';
       const groupText = item.group_name ? `<span class="hud-item-group">${item.group_name}</span>` : '';
       
       row.innerHTML = `
-        <span class="hud-drag-handle">☰</span>
         <input type="checkbox" class="hud-item-checkbox" ${checked}>
         <span class="hud-item-label">${actionLabel}</span>
         ${groupText}
@@ -1096,57 +1113,10 @@ class PhotoSorterApp {
       
       const checkbox = row.querySelector('.hud-item-checkbox') as HTMLInputElement;
       checkbox.addEventListener('change', (e) => {
-        this.tempHudItems[index].visible = (e.target as HTMLInputElement).checked ? 1 : 0;
-      });
-      
-      row.addEventListener('dragstart', (e) => {
-        row.classList.add('dragging');
-        if (e.dataTransfer) {
-          e.dataTransfer.setData('text/plain', String(index));
-          e.dataTransfer.effectAllowed = 'move';
+        const idx = this.tempHudItems.indexOf(item);
+        if (idx >= 0) {
+          this.tempHudItems[idx].visible = (e.target as HTMLInputElement).checked ? 1 : 0;
         }
-      });
-      
-      row.addEventListener('dragend', () => {
-        row.classList.remove('dragging');
-      });
-      
-      row.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        if (e.dataTransfer) {
-          e.dataTransfer.dropEffect = 'move';
-        }
-        
-        const dragging = container.querySelector('.dragging') as HTMLElement;
-        if (dragging && dragging !== row) {
-          const bounding = row.getBoundingClientRect();
-          const offset = e.clientY - bounding.top - bounding.height / 2;
-          if (offset > 0) {
-            row.after(dragging);
-          } else {
-            row.before(dragging);
-          }
-        }
-      });
-      
-      row.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const sourceIndex = parseInt(e.dataTransfer?.getData('text/plain') || '-1');
-        if (sourceIndex === -1 || sourceIndex === index) return;
-        
-        const currentElements = Array.from(container.children);
-        const newHudItems: HudItemRecord[] = [];
-        currentElements.forEach((el, newIdx) => {
-          const origIdx = parseInt(el.getAttribute('data-index') || '-1');
-          if (origIdx !== -1 && this.tempHudItems[origIdx]) {
-            const itemCopy = { ...this.tempHudItems[origIdx] };
-            itemCopy.sort_order = newIdx + 1;
-            newHudItems.push(itemCopy);
-          }
-        });
-        
-        this.tempHudItems = newHudItems;
-        this.renderSettingsHUD();
       });
       
       container.appendChild(row);

@@ -104,3 +104,27 @@ Tauri compiles with an optional conditional feature flag for gamepad support, dr
 - Gamepad code is located in `src-tauri/src/gamepad.rs` and `src/gamepad.ts`.
 - It registers an asynchronous system thread during app startup to poll connected hardware.
 - It translates analog joystick vectors to sub-pixel canvas offsets for panning, and trigger values to exponential zoom scales.
+
+---
+
+## 🖼️ Frontend: Filmstrip Virtual Scrolling
+
+`src/filmstrip.ts` implements **virtual scrolling** for performance with large collections:
+
+- DOM elements created for ALL images (fast, no thumbnail data loaded)
+- Only visible items (viewport + 4 buffer) trigger `invoke('get_thumbnail_data')`
+- Scroll event listener loads thumbnails on-demand as user scrolls
+- Concurrency limited to 8 workers via internal task queue
+- `loadedIndices: Set<number>` prevents redundant loads
+
+---
+
+## 🦀 Backend: Rust Image Cache
+
+`src-tauri/src/state.rs` contains `ImageCache` — an in-memory LRU cache for decoded image bytes:
+
+- **30 slots** for scaled (1920px) images, **10 slots** for full-resolution
+- LRU eviction via `HashMap<String, Vec<u8>>` + `VecDeque<String>` order tracking
+- `get_image_data` and `get_full_image_data` check cache before decoding RAW
+- Second navigation to same image: <1ms instead of 200-500ms RAW decode
+- Cache cleared on `reset()` (new folder open)

@@ -1,135 +1,105 @@
-# Architecture Overview
+# Architecture Overview (v3)
 
-Photo Sorter follows a modular, event-driven architecture built on top of the **PyQt6** framework. It leverages a custom threading model and caching strategy to handle high-resolution image data without blocking the main UI thread.
+Photo Sorter v3 is built on **Tauri v2** with a **Rust** backend and **Vite + TypeScript** frontend. Communication between layers uses Tauri's high-speed IPC.
 
 ---
 
 ## Core Components
 
-### `PhotoSorter` (QMainWindow)
-The central controller in `photosorter/main.py`. Responsible for:
-- Application state (image paths, results, current index)
-- UI stack transitions (menu ↔ viewer)
-- Keyboard/gamepad event dispatch
-- Export/restore pipeline
-- Database persistence wiring
+### `AppState` (Rust — `state.rs`)
+Thread-safe global state manager behind `RwLock`:
+- Image paths, current index, filter state
+- Results map (rating per path), rotations map
+- Undo stack for ctrl+z
+- DB connection (Arc-shared)
+- **`ImageCache`** — LRU cache for decoded image bytes (30 scaled, 10 full-res)
+- Project ID, startup folder
 
-### `PhotoViewer` (QGraphicsView)
-The hero component in `photosorter/ui.py`. Optimized for high-performance rendering of pixmaps with built-in panning and normalized zooming. Supports:
-- EXIF text overlay (toggled via `I`)
-- Compare mode overlay (toggled via `C`)
-- Pick flag (★) and star rating (★★★★★) overlays
-- Color flash animation on rating
+### `PhotoSorterApp` (TS — `app.ts`)
+Main frontend orchestrator:
+- IPC command dispatch to Rust backend
+- Keyboard event listener (customizable keybindings)
+- Folder/date trees, search, HUD toggles
+- Settings modal (categories, keybindings, HUD visibility)
+- Filmstrip rebuild, cache preloader trigger
 
-### `ZoomController`
-A dedicated subsystem for input normalization in `photosorter/ui.py`. Translates varying hardware signals (mouse, trackpad, gestures) into a symmetric exponential scaling curve.
+### `PhotoViewer` (TS — `viewer.ts`)
+HTML5 Canvas 2D renderer:
+- Exponential zoom centered on cursor
+- Pan via mouse drag / gamepad stick
+- Split-screen compare mode (C key)
+- EXIF overlay, pick flag, star rating overlays
+- Auto-swap to full-res on zoom > 1.5x
+
+### `FilmstripBuilder` (TS — `filmstrip.ts`)
+Horizontal scrollbar with virtual scrolling:
+- Only loads thumbnails for visible items (~15-20 of N)
+- Lazy-loads as user scrolls, concurrency 8 workers
+- Rating ribbon, star badge, focus score bar, pick badge
+
+### `ImageCacheManager` (TS — `cache.ts`)
+Frontend LRU memory cache for HTMLImageElements:
+- Preview cache (limit 15), Full-res cache (limit 5)
+- Smart eviction: protects current + compare + preload targets
+- Triggered preload for N images ahead
 
 ---
 
-## Database Layer
+## Backend Layer
 
-### `PhotoDatabase` (SQLite)
-Defined in `photosorter/database.py`. Provides full CRUD operations for:
+### `main.rs` — Tauri Commands
+Registers all IPC command handlers. Key image commands:
+- `get_image_data` → serves from `ImageCache` or decodes RAW → caches result
+- `get_full_image_data` → same with full-resolution path
+- `get_thumbnail_data` → checks SQLite thumbnail cache, generates on miss
 
+### `database.rs` — SQLite (rusqlite, WAL mode)
+Tables:
 | Table | Purpose |
 |-------|---------|
-| `images` | Per-image metadata: rating, pick, stars, rotation, EXIF data, blur score |
-| `projects` | Folder-backed projects with timestamps |
-| `collections` | User-curated named sets across projects |
-| `collection_images` | Many-to-many collection membership |
-| `tags` | User-defined labels |
-| `image_tags` | Many-to-many tag membership |
+| `images` | Per-image metadata, rating, EXIF, blur score |
+| `projects` | Folder-backed projects |
+| `categories` | Dynamic rating categories with folder/shortcut/color |
+| `keybindings` | Remappable shortcuts |
+| `hud_items` | HUD action visibility & order |
+| `thumbnail_cache` | JPEG thumbnail blobs keyed by image_id |
 
-Key features:
-- **WAL mode** for concurrent read/write from multiple threads
-- **Schema versioning** via `_migrate_schema()` for forward-compatible upgrades
-- **Parameterized queries** throughout to prevent SQL injection
+Key: schema versioning, WAL mode, migrations.
 
-### `ProjectManager`
-Defined in `photosorter/project.py`. Handles:
-- Opening folders and creating per-folder SQLite databases
-- Recent projects index (`~/.photosorter/projects.json`)
-- Project metadata (name, root path, created date)
+### `image_loader.rs` — RAW Decoder
+Two strategies:
+1. **Embedded JPEG preview** (fast) — extracts camera's embedded preview via TIFF EXIF offsets
+2. **Fallback** — full decode via `image` crate
 
----
+Also computes Laplacian variance blur score.
 
-## Widget System
-
-### `FoldersBrowser` (QTreeWidget)
-Displays the directory tree of the currently opened project. Clicking a subfolder filters the image list to only show images in that subtree.
-
-### `SearchBar` (QLineEdit + QComboBox)
-Provides text search across filenames, camera model, and lens. Combined with a rating filter dropdown (All / Unrated / Picked / BAD / OK / GOOD).
-
-### `DateBrowser` (QTreeWidget)
-Queries `get_date_hierarchy()` from the database to display a year → month → day tree. Clicking a date filters images taken on that day.
-
-All widgets are in `photosorter/widgets.py`.
+### `state.rs` — State + Image Cache
+- `ImageCache`: LRU cache with `HashMap` + `VecDeque` ordering
+- 30 slots for scaled (1920px) images, 10 for full-res
+- Cache cleared on `reset()` (new folder open)
 
 ---
 
-## Threading Model
+## Data Flow (Rating Cycle)
 
-To ensure a "zero-lag" UI, all image decoding operations are offloaded to a background thread pool defined in `photosorter/workers.py`.
-
-- **Bounded Concurrency**: Uses `QThreadPool` with a maximum of 6 worker threads to handle simultaneous preloading and UI tasks without saturation.
-- **`ImageLoadTask` (QRunnable)**: Encapsulates the loading logic. Supports cancellation via a flag, allowing the pool to bail early if the user navigates past an image before it finishes loading.
-- **Signal/Slot Communication**: Workers communicate back to the UI thread via `WorkerSignals` to ensure thread-safe UI updates.
-
-### Filmstrip Navigator & Thumbnail Engine
-
-A secondary high-performance pipeline for thumbnail generation:
-
-- **Isolated Thread Pool**: A dedicated `QThreadPool` (4 workers) handles all filmstrip thumbnail generation independently from main image decoding.
-- **`ThumbnailTask` (QRunnable)**:
-    - **RAW Optimization**: Uses `rawpy.extract_thumb()` to fetch the camera-embedded JPEG preview instead of full demosaicing.
-    - **Memory-Efficient Scaling**: Uses `QImageReader.setScaledSize()` to decode directly into target dimensions.
-- **Layered Caching**: A secondary `MemoryBoundedCache` (200MB budget) stores rendered thumbnails for instantaneous scrolling.
-
-### Gamepad Support
-
-**`GamepadThread`** (QThread) polls the `inputs` library in a loop and emits signals for axis/button events. Key features:
-- **Universal Mapping**: Normalizes Xbox/PlayStation axis codes into standard logical actions (Zoom, Pan).
-- **Hardware Debouncing**: 100ms software debounce for rating actions to prevent accidental multi-triggers.
+```
+User press 1/2/3
+  → app.ts: rateCurrent()
+    → IPC: rate_image (Rust: DB write + undo push)
+    → 100ms debounce
+    → navigateNext()
+      → IPC: get_image_data (Rust: ImageCache hit/miss → RAW decode → cache)
+      → IPC: get_image_metadata_info (Rust: DB read)
+      → IPC: get_project_stats (Rust: DB aggregate)
+      → triggerPreloaders → 5× IPC: get_image_data (background)
+```
 
 ---
 
-## EXIF Extraction Pipeline
+## Performance Optimizations
 
-Defined in `photosorter/exif.py`. Two strategies:
-
-1. **RAW files** (`.CR2`, `.NEF`, `.ARW`, `.DNG`, etc.): Uses `rawpy` to extract EXIF metadata directly.
-2. **JPEG/TIFF files**: Falls back to `Pillow` (`PIL.Image._getexif()`).
-
-Extracted fields: ISO, aperture, shutter speed, focal length, lens model, camera model, date taken. All data is cached in the database and rendered via `format_exif_for_display()`.
-
----
-
-## Input Normalization Layer
-
-The gamepad and keyboard systems have been unified into a hardware-agnostic mapping layer:
-
-- **Universal Mapping**: Normalizes varying axis and button codes (e.g., Xbox `RX/RY` vs. PlayStation `Z/RZ`) into standard logical actions like `Zoom` or `Pan`.
-- **Dynamic HUD Engine**: A signal-driven observer that monitors the last-used input device and swaps the UI hotkey legend in real-time.
-- **Hardware Debouncing**: Implemented a 100ms software-level debounce for all rating actions to prevent accidental multi-triggers on sensitive controller buttons.
-
----
-
-## Caching & Memory Management
-
-Photo Sorter implements a deterministic memory management strategy to handle large RAW collections.
-
-- **`MemoryBoundedCache`**: A custom LRU (Least Recently Used) cache in `photosorter/utils.py`:
-    - **Byte-Aware Eviction**: Tracks approximate memory footprint of `QImage` objects (Width × Height × 4 bytes).
-    - **Global Budget**: Main high-res images at 1GB, filmstrip thumbnails at 200MB.
-    - **Correct LRU Order**: Uses `OrderedDict.move_to_end()` on access and `popitem(last=False)` on eviction.
-
----
-
-## RAW Processing Pipeline
-
-RAW files are processed via the `rawpy` (LibRaw) library:
-
-1. **Embedded Thumbnail**: Rapidly extracts the camera's JPEG preview (`raw.extract_thumb()`).
-2. **Half-Size Demosaic**: Fallback if no embedded thumbnail is found.
-3. **Full Render**: Standard full-resolution decode as final fallback.
+1. **Virtual Scrolling Filmstrip** — Only renders thumbnails for visible viewport + 4 buffer. 8 concurrent workers.
+2. **Rust-side ImageCache** — 30-image LRU cache avoids redundant RAW decode on navigation.
+3. **SQLite Thumbnail Cache** — Thumbnails stored as JPEG blobs; generated once, served forever.
+4. **Two-Phase Loading** — 1920px preview first (fast), full-res swaps in on zoom > 1.5x.
+5. **Frontend LRU Cache** — 15 preview + 5 full-res HTMLImageElements.

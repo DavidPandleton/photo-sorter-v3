@@ -100,9 +100,28 @@
               <!-- Dynamically populated -->
             </div>
           </div>
+        </aside>
 
-          <!-- Image Info Card -->
-          <div class="sidebar-widget info-widget">
+        <!-- PHOTO VIEWER VIEWPORT -->
+        <section id="viewer-container">
+          <canvas id="photo-canvas"></canvas>
+
+          <!-- Rating Notification Flash Overlay -->
+          <div id="flash-overlay"></div>
+
+          <!-- Absolute Floating Stats HUD -->
+          <div id="stats-hud" style="display: none;"></div>
+
+          <!-- Absolute Floating Controls HUD -->
+          <div class="sidebar-widget hud-widget" id="hud-container" style="display: none;">
+            <h4 class="widget-title">CONTROLS</h4>
+            <div id="hud-label" class="hud-content">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Absolute Floating Image Info Card -->
+          <div class="sidebar-widget info-widget" id="info-hud" style="display: none;">
             <h4 class="widget-title">IMAGE INFO</h4>
             <div class="info-content">
               <span id="info-progress" class="info-large">0 / 0</span>
@@ -111,25 +130,6 @@
               <span id="info-exif" class="info-small">-</span>
             </div>
           </div>
-
-          <!-- Keyboard / Gamepad Bindings HUD -->
-          <div class="sidebar-widget hud-widget" id="hud-container">
-            <h4 class="widget-title">CONTROLS</h4>
-            <div id="hud-label" class="hud-content">
-              <!-- Populated dynamically -->
-            </div>
-          </div>
-        </aside>
-
-        <!-- PHOTO VIEWER VIEWPORT -->
-        <section id="viewer-container">
-          <canvas id="photo-canvas"></canvas>
-          
-          <!-- Rating Notification Flash Overlay -->
-          <div id="flash-overlay"></div>
-
-          <!-- Absolute Floating Stats HUD -->
-          <div id="stats-hud" style="display: none;"></div>
         </section>
       </div>
 
@@ -184,10 +184,13 @@
             <div id="keybindings-list-container" class="keybindings-list">
               <!-- Dynamically populated -->
             </div>
+            <div class="keybindings-footer-actions" style="margin-top: 16px; display: flex; justify-content: flex-end; width: 100%;">
+              <button id="btn-reset-keybindings" class="btn" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-weight: 500;">Reset Keybinds to Defaults</button>
+            </div>
           </div>
           <!-- HUD Tab -->
           <div id="hud-tab" class="tab-pane">
-            <p class="tab-desc">Drag and drop items to reorder them in the HUD controls panel. Check or uncheck to toggle visibility.</p>
+            <p class="tab-desc">Toggle which control actions appear on the HUD overlay.</p>
             <div id="hud-list-container" class="hud-list">
               <!-- Dynamically populated -->
             </div>
@@ -199,6 +202,7 @@
       </footer>
     </div>
   </div>
+
 
   <!-- TOAST CONTAINER -->
   <div id="toast-container"></div>

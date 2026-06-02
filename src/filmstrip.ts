@@ -4,7 +4,14 @@ import type { ImageRecord } from './app';
 export class FilmstripBuilder {
   private queue: Array<() => Promise<void>> = [];
   private activeWorkers = 0;
-  private maxWorkers = 3;
+  private maxWorkers = 8;
+
+  private allPaths: string[] = [];
+  private container: HTMLElement | null = null;
+  private scrollContainer: HTMLElement | null = null;
+  private onNavigate: ((idx: number) => void) | null = null;
+  private loadedIndices: Set<number> = new Set();
+  private scrollHandler: (() => void) | null = null;
 
   private pushQueue(task: () => Promise<void>) {
     this.queue.push(task);
@@ -28,78 +35,125 @@ export class FilmstripBuilder {
     const container = document.getElementById('filmstrip-container');
     if (!container) return;
     container.innerHTML = '';
-    
-    // Clear any pending queue tasks
+
+    this.container = container;
+    this.allPaths = imagePaths;
+    this.onNavigate = onNavigate;
+    this.loadedIndices.clear();
     this.queue = [];
 
     for (let i = 0; i < imagePaths.length; i++) {
-      const path = imagePaths[i];
-      const item = document.createElement('div');
-      item.className = 'thumbnail-item';
-      item.setAttribute('data-path', path);
-
-      const ribbon = document.createElement('div');
-      ribbon.className = 'thumb-ribbon';
-      item.appendChild(ribbon);
-
-      const wrapper = document.createElement('div');
-      wrapper.className = 'thumb-img-wrapper';
-      const placeholder = document.createElement('div');
-      placeholder.className = 'empty-text';
-      placeholder.style.fontSize = '9px';
-      placeholder.textContent = 'loading...';
-      wrapper.appendChild(placeholder);
-
-      const starBadge = document.createElement('span');
-      starBadge.className = 'thumb-star-badge';
-      starBadge.style.display = 'none';
-      wrapper.appendChild(starBadge);
-
-      const focusBar = document.createElement('div');
-      focusBar.className = 'thumb-focus-bar';
-      focusBar.style.display = 'none';
-      const focusFill = document.createElement('div');
-      focusFill.className = 'thumb-focus-fill';
-      focusBar.appendChild(focusFill);
-      wrapper.appendChild(focusBar);
-      item.appendChild(wrapper);
-
-      const pickBadge = document.createElement('span');
-      pickBadge.className = 'thumb-pick-badge';
-      pickBadge.style.display = 'none';
-      pickBadge.textContent = '★';
-      item.appendChild(pickBadge);
-
+      const item = this.createThumbnailItem(i);
       container.appendChild(item);
-      item.addEventListener('click', () => onNavigate(i));
-      
-      this.pushQueue(() => {
-        return this.loadThumbnail(path, wrapper, starBadge, focusFill, focusBar, pickBadge, item);
-      });
+    }
+
+    const scrollContainer = document.getElementById('filmstrip-scroll');
+    if (this.scrollHandler && this.scrollContainer) {
+      this.scrollContainer.removeEventListener('scroll', this.scrollHandler);
+    }
+    this.scrollContainer = scrollContainer;
+    this.scrollHandler = () => this.loadVisibleThumbnails();
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', this.scrollHandler);
+    }
+
+    this.loadVisibleThumbnails();
+  }
+
+  private createThumbnailItem(index: number): HTMLElement {
+    const item = document.createElement('div');
+    item.className = 'thumbnail-item';
+    item.setAttribute('data-idx', String(index));
+
+    const ribbon = document.createElement('div');
+    ribbon.className = 'thumb-ribbon';
+    item.appendChild(ribbon);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'thumb-img-wrapper';
+    const placeholder = document.createElement('div');
+    placeholder.className = 'empty-text';
+    placeholder.style.fontSize = '9px';
+    placeholder.textContent = 'loading...';
+    wrapper.appendChild(placeholder);
+
+    const starBadge = document.createElement('span');
+    starBadge.className = 'thumb-star-badge';
+    starBadge.style.display = 'none';
+    wrapper.appendChild(starBadge);
+
+    const focusBar = document.createElement('div');
+    focusBar.className = 'thumb-focus-bar';
+    focusBar.style.display = 'none';
+    const focusFill = document.createElement('div');
+    focusFill.className = 'thumb-focus-fill';
+    focusBar.appendChild(focusFill);
+    wrapper.appendChild(focusBar);
+    item.appendChild(wrapper);
+
+    const pickBadge = document.createElement('span');
+    pickBadge.className = 'thumb-pick-badge';
+    pickBadge.style.display = 'none';
+    pickBadge.textContent = '\u2605';
+    item.appendChild(pickBadge);
+
+    item.addEventListener('click', () => {
+      if (this.onNavigate) this.onNavigate(index);
+    });
+
+    item.addEventListener('dblclick', () => {
+      if (this.onNavigate) this.onNavigate(index);
+    });
+
+    return item;
+  }
+
+  private loadVisibleThumbnails() {
+    if (!this.scrollContainer || !this.container) return;
+
+    const itemWidth = 162;
+    const buffer = 4;
+    const scrollLeft = this.scrollContainer.scrollLeft;
+    const viewW = this.scrollContainer.clientWidth;
+
+    const startIdx = Math.max(0, Math.floor(scrollLeft / itemWidth) - buffer);
+    const endIdx = Math.min(this.allPaths.length, Math.ceil((scrollLeft + viewW) / itemWidth) + buffer);
+
+    for (let i = startIdx; i < endIdx; i++) {
+      if (this.loadedIndices.has(i)) continue;
+      this.loadedIndices.add(i);
+
+      const item = this.container.children[i] as HTMLElement;
+      if (!item) continue;
+
+      this.pushQueue(() => this.loadThumbnail(this.allPaths[i], item));
     }
   }
 
-  private loadThumbnail(
-    path: string, wrapper: HTMLElement, starBadge: HTMLElement,
-    focusFill: HTMLElement, focusBar: HTMLElement,
-    pickBadge: HTMLElement, thumbItem: HTMLElement
-  ): Promise<void> {
-    const p1 = invoke<[number[], number]>('get_thumbnail_data', { path })
-      .then(([bytes, blurScore]) => {
-        const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
-        const url = URL.createObjectURL(blob);
-        const img = document.createElement('img');
-        img.className = 'thumb-img';
-        img.onload = () => {
-          wrapper.innerHTML = '';
-          wrapper.appendChild(img);
-          wrapper.appendChild(starBadge);
-          wrapper.appendChild(focusBar);
-          URL.revokeObjectURL(url);
-        };
-        img.src = url;
+  private async loadThumbnail(path: string, thumbItem: HTMLElement): Promise<void> {
+    try {
+      const [bytes, blurScore] = await invoke<[number[], number]>('get_thumbnail_data', { path });
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      const img = document.createElement('img');
+      img.className = 'thumb-img';
+      img.onload = () => {
+        const wrapper = thumbItem.querySelector('.thumb-img-wrapper') as HTMLElement;
+        if (!wrapper) return;
+        const starBadge = wrapper.querySelector('.thumb-star-badge') as HTMLElement;
+        const focusBar = wrapper.querySelector('.thumb-focus-bar') as HTMLElement;
+        wrapper.innerHTML = '';
+        wrapper.appendChild(img);
+        if (starBadge) wrapper.appendChild(starBadge);
+        if (focusBar) wrapper.appendChild(focusBar);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
 
-        if (blurScore > 0) {
+      if (blurScore > 0) {
+        const focusFill = thumbItem.querySelector('.thumb-focus-fill') as HTMLElement;
+        const focusBar = thumbItem.querySelector('.thumb-focus-bar') as HTMLElement;
+        if (focusFill && focusBar) {
           const pct = Math.min(Math.floor(blurScore / 20), 100);
           focusFill.style.width = `${pct}%`;
           if (pct >= 60) focusFill.className = 'thumb-focus-fill focus-high';
@@ -107,56 +161,71 @@ export class FilmstripBuilder {
           else focusFill.className = 'thumb-focus-fill focus-low';
           focusBar.style.display = 'block';
         }
-      })
-      .catch((err) => console.error(err));
+      }
+    } catch (err) {
+      console.error('Thumbnail load failed:', err);
+    }
 
-    const p2 = invoke<ImageRecord | null>('get_image_metadata_info', { path })
-      .then((meta) => {
-        if (!meta) return;
-        if (meta.pick === 1) {
-          pickBadge.style.display = 'block';
-          thumbItem.classList.add('thumb-picked');
+    try {
+      const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
+      if (!meta) return;
+      if (meta.pick === 1) {
+        const badge = thumbItem.querySelector('.thumb-pick-badge') as HTMLElement;
+        if (badge) badge.style.display = 'block';
+        thumbItem.classList.add('thumb-picked');
+      }
+      if (meta.star_rating > 0) {
+        const badge = thumbItem.querySelector('.thumb-star-badge') as HTMLElement;
+        if (badge) {
+          badge.textContent = '\u2605'.repeat(meta.star_rating);
+          badge.style.display = 'block';
         }
-        if (meta.star_rating > 0) {
-          starBadge.textContent = '★'.repeat(meta.star_rating);
-          starBadge.style.display = 'block';
-        }
-        if (meta.rating) {
-          const ribbon = thumbItem.querySelector('.thumb-ribbon') as HTMLElement;
-          if (ribbon) ribbon.className = `thumb-ribbon ribbon-${meta.rating.toLowerCase()}`;
-        }
-      })
-      .catch(() => {});
-
-    return Promise.all([p1, p2]).then(() => {});
+      }
+      if (meta.rating) {
+        const ribbon = thumbItem.querySelector('.thumb-ribbon') as HTMLElement;
+        if (ribbon) ribbon.className = `thumb-ribbon ribbon-${meta.rating.toLowerCase()}`;
+      }
+    } catch {
+      // metadata fetch failed, ignore
+    }
   }
 
   updateActiveItem(path: string) {
     document.querySelectorAll('.thumbnail-item').forEach(item => item.classList.remove('active'));
-    const item = document.querySelector(`[data-path="${CSS.escape(path)}"]`) as HTMLElement;
-    if (item) {
-      item.classList.add('active');
-      const scroller = document.getElementById('filmstrip-scroll');
-      if (scroller) {
-        const offset = item.offsetLeft - scroller.clientWidth / 2 + item.clientWidth / 2;
-        scroller.scrollTo({ left: offset, behavior: 'smooth' });
-      }
+    const idx = this.allPaths.indexOf(path);
+    if (idx < 0) return;
+    const item = this.container?.children[idx] as HTMLElement;
+    if (!item) return;
+    item.classList.add('active');
+    if (this.scrollContainer) {
+      const offset = item.offsetLeft - this.scrollContainer.clientWidth / 2 + item.clientWidth / 2;
+      this.scrollContainer.scrollTo({ left: offset, behavior: 'smooth' });
     }
   }
 
   updateRating(path: string, category: string | null) {
-    const item = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
+    if (!this.container) return;
+    const idx = this.allPaths.indexOf(path);
+    if (idx < 0) return;
+    const item = this.container.children[idx] as HTMLElement;
     if (!item) return;
     const ribbon = item.querySelector('.thumb-ribbon') as HTMLElement;
     if (ribbon) ribbon.className = category ? `thumb-ribbon ribbon-${category.toLowerCase()}` : 'thumb-ribbon';
   }
 
   updateStars(path: string, count: number) {
-    const item = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
+    if (!this.container) return;
+    const idx = this.allPaths.indexOf(path);
+    if (idx < 0) return;
+    const item = this.container.children[idx] as HTMLElement;
     if (!item) return;
     const badge = item.querySelector('.thumb-star-badge') as HTMLElement;
     if (!badge) return;
-    if (count > 0) { badge.textContent = '★'.repeat(count); badge.style.display = 'block'; }
-    else { badge.style.display = 'none'; }
+    if (count > 0) {
+      badge.textContent = '\u2605'.repeat(count);
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
   }
 }
