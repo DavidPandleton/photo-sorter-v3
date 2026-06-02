@@ -596,8 +596,9 @@ class PhotoSorterApp {
     try {
       this.showProgressIndicator(true);
       
-      // If rootFolder is empty, prompt folder selection
-      if (!this.rootFolder) {
+      // Always prompt from menu, use existing root from workspace
+      let root = this.rootFolder;
+      if (!root) {
         const selected = await open({
           directory: true,
           multiple: false,
@@ -607,14 +608,14 @@ class PhotoSorterApp {
           this.showProgressIndicator(false);
           return;
         }
-        this.rootFolder = selected;
+        root = selected;
       }
       
-      // Restore files
-      const count = await invoke<number>('restore_checkpoint', { root: this.rootFolder });
+      const count = await invoke<number>('restore_checkpoint', { root });
       if (count >= 0) {
         this.showToast(`Restored ${count} photos from checkpoint successfully!`, 'GOOD');
-        this.loadFolder(this.rootFolder);
+        this.rootFolder = root;
+        await this.loadFolder(root);
       } else {
         this.showToast('No valid checkpoint found to restore.', 'BAD');
       }
@@ -762,7 +763,7 @@ class PhotoSorterApp {
   }
 
   private exitApp() {
-    getCurrentWindow().close();
+    getCurrentWindow().close().catch(() => window.close());
   }
 
   // --- Side Panel Controls ---
