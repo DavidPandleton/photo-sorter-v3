@@ -10,8 +10,8 @@
 
 <p align="center">
   <b>Ini Bukan Photoshop.</b><br>
-  Ini alat buat milah-milih foto. Tekan 1 (BAD), 2 (OK), 3 (GOOD). Export. Selesai.<br>
-  Gak ada slider, gak ada layer, gak ada curve tool. Cuma culling. Cepet.
+  A keyboard-driven photo culling tool. Press 1/2/3, export, done.<br>
+  No sliders, no layers, no curve tools. Just culling. Fast.
 </p>
 
 <p align="center">
@@ -22,72 +22,73 @@
 
 ## Download
 
-Gak perlu install Rust atau npm. Tinggal download installer, jalanin.
+No Rust or Node.js required. Download the installer for your platform:
 
 | Platform | Download |
 |----------|----------|
-| Windows | [`Photo-Sorter-Setup.exe` (NSIS)](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) or [`Photo-Sorter.msi`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) |
-| macOS | [`Photo-Sorter.dmg`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) |
-| Linux | [`Photo-Sorter.AppImage`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) or `.deb` |
+| Windows | [`Photo-Sorter-Setup.exe`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) or `.msi` |
+| macOS | `.dmg` |
+| Linux | `.AppImage` or `.deb` |
 
-Atau kalo mau compile sendiri, liat [Build dari Source](#build-dari-source).
+Or [build from source](#build-from-source).
 
 ---
 
-## Cara Pake
+## Usage
 
 ```
-Buka folder foto  →  Tekan 1/2/3 tiap foto  →  Enter (export)
+Open a photo folder  →  Press 1/2/3 on each photo  →  Enter (export)
 ```
 
-| Tombol | Action |
+| Key | Action |
 |--------|--------|
-| `1` | BAD (blur, salah posisi, etc — bakal ke folder BAD) |
-| `2` | OK (maybe, bingung) |
-| `3` | GOOD (mantap, keep) |
-| `Space` | Tandai favorit (gold star) |
-| `Ctrl+1` - `Ctrl+5` | Rating bintang |
-| `N` / `P` | Next / Previous foto |
-| `C` | Compare mode (split-screen sama foto sebelumnya) |
-| `Del` | Hapus (masuk Recycle Bin, bukan permanen) |
-| `Ctrl+Z` | Undo rating terakhir |
-| `U` | Filter: sembunyiin foto yang udah di-rate |
+| `1` | BAD (blurry, misframed, etc — goes to BAD folder) |
+| `2` | OK (maybe, not sure) |
+| `3` | GOOD (sharp, keep) |
+| `Space` | Toggle pick flag (gold star) |
+| `Ctrl+1` - `Ctrl+5` | Star rating |
+| `N` / `P` | Next / Previous photo |
+| `C` | Compare mode (split-screen with previous photo) |
+| `Del` | Delete (moves to Recycle Bin, not permanent) |
+| `Ctrl+Z` | Undo last rating |
+| `U` | Filter: hide already-rated photos |
 | `F` | Fullscreen |
-| `H` | Sembunyiin HUD |
+| `H` | Toggle HUD overlay |
 
-**Export:** pas pencet Enter, foto lo bakal ke-sort ke folder:
+**Export:** Press Enter. Files are sorted into:
+
 ```
 📁 project-folder/
-├── 📁 BAD/     ← foto yang lo kasih rating 1
-├── 📁 OK/      ← rating 2
-└── 📁 GOOD/    ← rating 3
+├── 📁 BAD/     ← photos rated 1
+├── 📁 OK/      ← rated 2
+└── 📁 GOOD/    ← rated 3
 ```
 
 ---
 
-## Fitur
+## Features
 
-- **Keyboard-first** — gak perlu sentuh mouse sama sekali
-- **RAW support** — NEF, CR2, CR3, ARW, DNG, ORF, RW2, PEF. Pake embedded JPEG preview, cepet
-- **EXIF otomatis** — ISO, aperture, shutter speed, lens, camera model — tinggal liat
-- **Compare mode** — liat 2 foto bersebelahan buat milih mana yang lebih tajam
-- **Focus meter** — deteksi blur otomatis pake Laplace variance, disimpen di DB
-- **Checkpoint** — kalo export error atau salah folder, tinggal restore
-- **Gamepad** — dukung Xbox/PlayStation controller (optional)
-- **SQLite** — rating, star, rotation, pick — semua survive restart. Gak perlu save manual
+- **Keyboard-first** — no mouse needed
+- **RAW support** — NEF, CR2, CR3, ARW, DNG, ORF, RW2, PEF. Uses embedded JPEG preview for speed
+- **EXIF display** — ISO, aperture, shutter speed, lens, camera model
+- **Compare mode** — view 2 photos side-by-side to pick the sharpest
+- **Focus meter** — auto blur detection via Laplacian variance, cached in SQLite
+- **Checkpoint** — if export fails or goes to the wrong folder, one-click restore
+- **Gamepad** — Xbox/PlayStation controller support (optional feature)
+- **SQLite persistence** — ratings, stars, rotation, picks survive restart. No manual save
 - **Cross-platform** — Windows, macOS, Linux
 
 ---
 
-## Build dari Source
+## Build from Source
 
-Buat yang mau compile sendiri atau contribute:
+For developers who want to compile or contribute:
 
 ### Prerequisites
 
 | Platform | Dependency |
 |----------|------------|
-| **Semua** | [Rust](https://rustup.rs) 1.96+, [Bun](https://bun.sh) (atau npm) |
+| **All** | [Rust](https://rustup.rs) 1.96+, [Bun](https://bun.sh) (or npm) |
 | **Windows** | Visual Studio Build Tools (C++ workload) |
 | **macOS** | Xcode Command Line Tools: `xcode-select --install` |
 | **Linux** | `sudo apt install build-essential libwebkit2gtk-4.1-dev libgtk-3-dev` |
@@ -103,11 +104,11 @@ bun run tauri build
 
 Binary output: `src-tauri/target/release/photo-sorter-v3.exe`
 
-Opsional: `bun run tauri build --features gamepad` kalo mau dukung controller.
+Optional: `bun run tauri build --features gamepad` to enable controller support.
 
 ---
 
-## Arsitektur (buat yang mau ngoprek)
+## Architecture (for contributors)
 
 ```
 photo-sorter-v3/
