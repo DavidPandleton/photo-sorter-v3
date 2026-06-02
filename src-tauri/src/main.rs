@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tauri::{State, Manager};
 use photo_sorter_v3::state::AppState;
 use photo_sorter_v3::database::{ImageRecord, DateRecord};
-use photo_sorter_v3::image_loader::{load_and_scale_image, generate_thumbnail};
+use photo_sorter_v3::image_loader::{load_and_scale_image, load_image_unscaled, generate_thumbnail};
 use photo_sorter_v3::exif::extract_exif;
 
 // --- Helper path to local AppData DB ---
@@ -69,6 +69,13 @@ fn get_image_data(_state: State<'_, AppState>, path: String) -> Result<Vec<u8>, 
     // Quality-focused culling viewport dimensions
     let decoded = load_and_scale_image(&path, 1920)
         .ok_or_else(|| "Failed to load image data.".to_string())?;
+    Ok(decoded.bytes)
+}
+
+#[tauri::command]
+fn get_full_image_data(_state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
+    let decoded = load_image_unscaled(&path)
+        .ok_or_else(|| "Failed to load full resolution image.".to_string())?;
     Ok(decoded.bytes)
 }
 
@@ -250,6 +257,7 @@ fn main() {
             finish_sorting,
             restore_checkpoint,
             get_image_data,
+            get_full_image_data,
             get_thumbnail_data,
             get_project_stats,
             get_date_hierarchy,

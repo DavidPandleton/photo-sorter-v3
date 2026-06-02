@@ -68,6 +68,10 @@ export class PhotoViewer {
     this.resetView();
   }
 
+  public getScale(): number {
+    return this.scale;
+  }
+
   public setCompareImage(img: HTMLImageElement | null) {
     this.compareImage = img;
     this.draw();

@@ -93,6 +93,39 @@ pub fn load_and_scale_image<P: AsRef<Path>>(file_path: P, max_dim: u32) -> Optio
     }
 }
 
+pub fn load_image_unscaled<P: AsRef<Path>>(file_path: P) -> Option<DecodedImage> {
+    let ext = file_path.as_ref().extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+        
+    let is_raw = matches!(ext.as_str(), "nef" | "cr2" | "arw" | "dng" | "cr3" | "orf" | "rw2" | "pef");
+    
+    let img_bytes = if is_raw {
+        if let Some(preview) = extract_raw_preview(&file_path) {
+            preview
+        } else {
+            // If no RAW preview, try full raw decode via image crate
+            let img = ImageReader::open(&file_path).ok()?.decode().ok()?;
+            let (w, h) = img.dimensions();
+            let mut jpeg_bytes = Vec::new();
+            let mut cursor = std::io::Cursor::new(&mut jpeg_bytes);
+            img.write_to(&mut cursor, image::ImageFormat::Jpeg).ok()?;
+            return Some(DecodedImage { bytes: jpeg_bytes, format: "image/jpeg", width: w, height: h });
+        }
+    } else {
+        std::fs::read(&file_path).ok()?
+    };
+    
+    let format = "image/jpeg";
+    let img = ImageReader::new(std::io::Cursor::new(&img_bytes))
+        .with_guessed_format().ok()?
+        .decode().ok()?;
+    
+    let (w, h) = img.dimensions();
+    Some(DecodedImage { bytes: img_bytes, format, width: w, height: h })
+}
+
 /// Helper to detect blur (focus score) based on Laplacian variance
 pub fn calculate_focus_score(img: &DynamicImage) -> f64 {
     let gray = img.to_luma8();

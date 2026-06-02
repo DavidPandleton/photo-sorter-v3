@@ -57,10 +57,13 @@ class PhotoSorterApp {
   private isProcessingRating: boolean = false;
   private isSidePanelRight: boolean = false;
   private isCompareMode: boolean = false;
+  private ratedPaths: Set<string> = new Set();
+  private filterMode: string = 'all';
   private compareIndex: number = -1;
   
   // In-memory Image Cache (Pre-loaders)
   private imageCache: Map<string, HTMLImageElement> = new Map();
+  private fullResCache: Map<string, HTMLImageElement> = new Map();
   private activePreloadRequests: Set<string> = new Set();
 
   constructor() {
@@ -216,7 +219,7 @@ class PhotoSorterApp {
         return;
       }
 
-      // Fetch dynamic viewport scaling bytes from Rust
+      // Phase 1: Fetch scaled 1920px version (instant display)
       const bytes = await invoke<number[]>('get_image_data', { path });
       const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
       const url = URL.createObjectURL(blob);
@@ -228,10 +231,38 @@ class PhotoSorterApp {
         this.viewer.setImage(img, meta?.rotation || 0);
         this.viewer.setOverlays((meta?.pick || 0) === 1, meta?.star_rating || 0);
         URL.revokeObjectURL(url);
+        
+        // Phase 2: Background-load full resolution
+        this.loadFullResolution(path);
       };
       img.src = url;
     } catch (err) {
       console.error('Failed to render culling image: ', err);
+    }
+  }
+  
+  private async loadFullResolution(path: string) {
+    if (this.fullResCache.has(path)) return;
+    
+    try {
+      const bytes = await invoke<number[]>('get_full_image_data', { path });
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      
+      const img = new Image();
+      img.onload = () => {
+        this.fullResCache.set(path, img);
+        URL.revokeObjectURL(url);
+        
+        // If this is the currently displayed image, request viewer to swap
+        const currentPath = this.imagePaths[this.currentIndex];
+        if (currentPath === path && this.viewer.getScale() > 1.5) {
+          this.viewer.setImage(img);
+        }
+      };
+      img.src = url;
+    } catch (err) {
+      console.error('Full resolution load failed:', err);
     }
   }
 
@@ -254,6 +285,7 @@ class PhotoSorterApp {
       for (const key of keys) {
         if (!keepPaths.has(key)) {
           this.imageCache.delete(key);
+          this.fullResCache.delete(key);
         }
       }
     }
@@ -293,6 +325,8 @@ class PhotoSorterApp {
     try {
       await invoke('rate_image', { path, category });
       
+      this.ratedPaths.add(path);
+      
       // Update Ribbon on Filmstrip item immediately
       const item = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
       if (item) {
@@ -319,6 +353,7 @@ class PhotoSorterApp {
     const path = this.imagePaths[this.currentIndex];
     try {
       await invoke('rate_image', { path, category: null });
+      this.ratedPaths.delete(path);
       const item = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
       if (item) {
         const ribbon = item.querySelector('.thumb-ribbon') as HTMLElement;
@@ -516,16 +551,34 @@ class PhotoSorterApp {
   private async navigateNext() {
     if (this.isCompareMode) {
       await this.navigateCompare(1);
-    } else if (this.currentIndex < this.imagePaths.length - 1) {
-      await this.navigateImage(this.currentIndex + 1);
+      return;
+    }
+    
+    let idx = this.currentIndex + 1;
+    while (idx < this.imagePaths.length) {
+      if (this.filterMode === 'unrated' && this.ratedPaths.has(this.imagePaths[idx])) {
+        idx++;
+        continue;
+      }
+      await this.navigateImage(idx);
+      return;
     }
   }
 
   private async navigatePrev() {
     if (this.isCompareMode) {
       await this.navigateCompare(-1);
-    } else if (this.currentIndex > 0) {
-      await this.navigateImage(this.currentIndex - 1);
+      return;
+    }
+    
+    let idx = this.currentIndex - 1;
+    while (idx >= 0) {
+      if (this.filterMode === 'unrated' && this.ratedPaths.has(this.imagePaths[idx])) {
+        idx--;
+        continue;
+      }
+      await this.navigateImage(idx);
+      return;
     }
   }
 
@@ -605,6 +658,7 @@ class PhotoSorterApp {
     this.isCompareMode = false;
     this.compareIndex = -1;
     this.imageCache.clear();
+    this.fullResCache.clear();
     
     document.getElementById('workspace-screen')?.classList.remove('active');
     document.getElementById('menu-screen')?.classList.add('active');
@@ -1064,7 +1118,11 @@ class PhotoSorterApp {
 
   private async toggleFilterMode() {
     const isUnrated = await invoke<string>('toggle_filter_mode').catch(() => 'all');
-    this.updateFilters('', '', '', isUnrated === 'unrated' ? 'unrated' : 'all');
+    this.filterMode = isUnrated === 'unrated' ? 'unrated' : 'all';
+    this.updateFilters('', '', '', this.filterMode);
+    
+    const msg = this.filterMode === 'unrated' ? 'Unrated filter ON' : 'Showing all images';
+    this.showToast(msg, 'GOOD');
   }
 
   // --- UI HUD Updates ---
@@ -1163,11 +1221,17 @@ class PhotoSorterApp {
   }
 
   private showToast(msg: string, status: 'GOOD' | 'BAD') {
-    console.log(`[Toast ${status}]`, msg);
-    // Show brief alert for debugging
-    if (status === 'BAD') {
-      console.error(msg);
-    }
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${status.toLowerCase()}`;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+      if (toast.parentNode) toast.remove();
+    }, 2000);
   }
 
   private showCustomDialog(title: string, message: string, showCancel = false): Promise<boolean> {
