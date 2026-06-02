@@ -77,6 +77,7 @@ class PhotoSorterApp {
   private currentIndex: number = -1;
   private rootFolder: string = '';
   private isProcessingRating: boolean = false;
+  private isNavigating: boolean = false;
   private isSidePanelRight: boolean = false;
   private isCompareMode: boolean = false;
   private ratedPaths: Set<string> = new Set();
@@ -408,20 +409,26 @@ class PhotoSorterApp {
   }
 
   private async navigateNext() {
+    if (this.isNavigating) return;
     if (this.isCompareMode) { await this.navigateCompare(1); return; }
     let idx = this.currentIndex + 1;
     while (idx < this.imagePaths.length) {
       if (this.filterMode === 'unrated' && this.ratedPaths.has(this.imagePaths[idx])) { idx++; continue; }
-      await this.navigateImage(idx); return;
+      this.isNavigating = true;
+      try { await this.navigateImage(idx); } finally { this.isNavigating = false; }
+      return;
     }
   }
 
   private async navigatePrev() {
+    if (this.isNavigating) return;
     if (this.isCompareMode) { await this.navigateCompare(-1); return; }
     let idx = this.currentIndex - 1;
     while (idx >= 0) {
       if (this.filterMode === 'unrated' && this.ratedPaths.has(this.imagePaths[idx])) { idx--; continue; }
-      await this.navigateImage(idx); return;
+      this.isNavigating = true;
+      try { await this.navigateImage(idx); } finally { this.isNavigating = false; }
+      return;
     }
   }
 

@@ -2,6 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::sync::{Arc, RwLock};
+use rayon::prelude::*;
 use crate::database::PhotoDatabase;
 use crate::constants;
 
@@ -207,7 +208,37 @@ impl AppState {
         let size = paths.len();
         *self.image_paths.write().unwrap() = paths;
         *self.current_index.write().unwrap() = 0;
+
+        // Background: batch-generate thumbnails for all images using rayon
+        self.spawn_thumbnail_generation();
+
         Ok(size)
+    }
+
+    fn spawn_thumbnail_generation(&self) {
+        let db_opt = self.db.read().unwrap().clone();
+        let pid = *self.project_id.read().unwrap();
+        if db_opt.is_none() || pid.is_none() { return; }
+
+        std::thread::spawn(move || {
+            let db = db_opt.unwrap();
+            let pid = pid.unwrap();
+
+            let records = match db.get_images(pid) {
+                Ok(r) => r,
+                Err(_) => return,
+            };
+
+            records.par_iter().for_each(|record| {
+                if db.get_thumbnail(record.id).ok().flatten().is_some() {
+                    return;
+                }
+                if let Some((thumb, blur)) = crate::image_loader::generate_thumbnail(&record.path, 120) {
+                    db.save_thumbnail(record.id, &thumb).unwrap_or(());
+                    db.set_blur_score(record.id, blur).unwrap_or(());
+                }
+            });
+        });
     }
 
     pub fn rate_image(&self, path: &str, category: Option<&str>) -> Result<(), String> {
