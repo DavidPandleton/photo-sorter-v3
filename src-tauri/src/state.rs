@@ -425,7 +425,9 @@ impl AppState {
         }
         
         let json_str = serde_json::to_string_pretty(&cp_data).map_err(|e| e.to_string())?;
-        fs::write(cp_path, json_str).map_err(|e| e.to_string())?;
+        let tmp_path = cp_path.with_extension("json.tmp");
+        fs::write(&tmp_path, json_str).map_err(|e| e.to_string())?;
+        fs::rename(tmp_path, cp_path).map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -464,7 +466,7 @@ impl AppState {
         
         // Remove empty directories created during export in reverse depth order
         let mut folders = cp_data.created_folders.clone();
-        folders.sort_by(|a, b| b.len().cmp(&a.len())); // deeper folders first
+        folders.sort_by_key(|b| std::cmp::Reverse(b.len())); // deeper folders first
         
         for folder in folders {
             let fpath = Path::new(&root_str).join(&folder);
@@ -538,8 +540,21 @@ impl AppState {
             // Get file metadata for operations log
             let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
             
-            // Perform safe move
+            // Perform safe move (with fallback for cross-filesystem copies)
+            let mut move_ok = false;
             if fs::rename(path, &target_path).is_ok() {
+                move_ok = true;
+            } else {
+                if fs::copy(path, &target_path).is_ok() {
+                    if fs::remove_file(path).is_ok() {
+                        move_ok = true;
+                    } else {
+                        let _ = fs::remove_file(&target_path);
+                    }
+                }
+            }
+
+            if move_ok {
                 moved_count += 1;
                 *summary.entry(category.clone()).or_insert(0) += 1;
                 

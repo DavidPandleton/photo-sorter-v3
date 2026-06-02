@@ -115,6 +115,38 @@ export class PhotoViewer {
     this.draw();
   }
 
+  public resetZoom() {
+    this.resetView();
+  }
+
+  public zoomIn() {
+    if (!this.currentImage || this.showingCompare) return;
+    const factor = 1.1;
+    const nextScale = this.scale * factor;
+    if (nextScale > 25.0) return;
+
+    const cx = this.canvas.width / 2;
+    const cy = this.canvas.height / 2;
+    this.offsetX = cx - (cx - this.offsetX) * factor;
+    this.offsetY = cy - (cy - this.offsetY) * factor;
+    this.scale = nextScale;
+    this.draw();
+  }
+
+  public zoomOut() {
+    if (!this.currentImage || this.showingCompare) return;
+    const factor = 1.0 / 1.1;
+    const nextScale = this.scale * factor;
+    if (nextScale < 0.05) return;
+
+    const cx = this.canvas.width / 2;
+    const cy = this.canvas.height / 2;
+    this.offsetX = cx - (cx - this.offsetX) * factor;
+    this.offsetY = cy - (cy - this.offsetY) * factor;
+    this.scale = nextScale;
+    this.draw();
+  }
+
   // --- Transform Helpers ---
   private onMouseDown(e: MouseEvent) {
     if (e.button === 0) { // Left click
@@ -145,7 +177,12 @@ export class PhotoViewer {
     const zoomFactor = 1.1;
     let factor = e.deltaY < 0 ? zoomFactor : 1.0 / zoomFactor;
     
-    // Absolute zoom caps: 10% to 2000%
+    // Pinch-to-zoom support (e.ctrlKey is true when trackpad pinching)
+    if (e.ctrlKey) {
+      factor = 1.0 - e.deltaY * 0.01;
+    }
+    
+    // Absolute zoom caps: 5% to 2500%
     const nextScale = this.scale * factor;
     if (nextScale < 0.05 || nextScale > 25.0) return;
 

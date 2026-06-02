@@ -338,7 +338,7 @@ impl PhotoDatabase {
     pub fn set_star_rating(&self, image_id: i64, stars: i32) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Local::now().to_rfc3339();
-        let stars = stars.max(0).min(5);
+        let stars = stars.clamp(0, 5);
         conn.execute(
             "UPDATE images SET star_rating = ?, updated_at = ? WHERE id = ?",
             params![stars, now, image_id],

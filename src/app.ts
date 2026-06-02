@@ -56,6 +56,8 @@ class PhotoSorterApp {
   private rootFolder: string = '';
   private isProcessingRating: boolean = false;
   private isSidePanelRight: boolean = false;
+  private isCompareMode: boolean = false;
+  private compareIndex: number = -1;
   
   // In-memory Image Cache (Pre-loaders)
   private imageCache: Map<string, HTMLImageElement> = new Map();
@@ -512,14 +514,74 @@ class PhotoSorterApp {
   }
 
   private async navigateNext() {
-    if (this.currentIndex < this.imagePaths.length - 1) {
+    if (this.isCompareMode) {
+      await this.navigateCompare(1);
+    } else if (this.currentIndex < this.imagePaths.length - 1) {
       await this.navigateImage(this.currentIndex + 1);
     }
   }
 
   private async navigatePrev() {
-    if (this.currentIndex > 0) {
+    if (this.isCompareMode) {
+      await this.navigateCompare(-1);
+    } else if (this.currentIndex > 0) {
       await this.navigateImage(this.currentIndex - 1);
+    }
+  }
+
+  private async navigateCompare(direction: number) {
+    const total = this.imagePaths.length;
+    if (total <= 1) return;
+    
+    let targetIdx = this.compareIndex;
+    if (targetIdx < 0) {
+      targetIdx = Math.max(0, this.currentIndex - 1);
+    }
+    
+    do {
+      targetIdx = (targetIdx + direction + total) % total;
+    } while (targetIdx === this.currentIndex && total > 1);
+    
+    this.compareIndex = targetIdx;
+    await this.displayCompareImage(this.imagePaths[targetIdx]);
+  }
+
+  private async displayCompareImage(path: string) {
+    try {
+      if (this.imageCache.has(path)) {
+        const cachedImg = this.imageCache.get(path)!;
+        this.viewer.setCompareImage(cachedImg);
+        return;
+      }
+      
+      const bytes = await invoke<number[]>('get_image_data', { path });
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      
+      const img = new Image();
+      img.onload = () => {
+        this.imageCache.set(path, img);
+        this.viewer.setCompareImage(img);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    } catch (err) {
+      console.error('Failed to render compare image: ', err);
+    }
+  }
+
+  private async toggleCompareMode() {
+    if (this.imagePaths.length <= 1) return;
+    this.isCompareMode = !this.isCompareMode;
+    
+    if (this.isCompareMode) {
+      this.compareIndex = this.currentIndex > 0 ? this.currentIndex - 1 : this.imagePaths.length - 1;
+      this.viewer.toggleCompare(true);
+      await this.displayCompareImage(this.imagePaths[this.compareIndex]);
+    } else {
+      this.compareIndex = -1;
+      this.viewer.setCompareImage(null);
+      this.viewer.toggleCompare(false);
     }
   }
 
@@ -540,6 +602,8 @@ class PhotoSorterApp {
     this.rootFolder = '';
     this.imagePaths = [];
     this.currentIndex = -1;
+    this.isCompareMode = false;
+    this.compareIndex = -1;
     this.imageCache.clear();
     
     document.getElementById('workspace-screen')?.classList.remove('active');
@@ -904,15 +968,51 @@ class PhotoSorterApp {
         return;
       }
 
+      // Zoom controls (Ctrl + +/-/0)
+      if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        this.viewer.zoomIn();
+        return;
+      }
+      if (e.ctrlKey && e.key === '-') {
+        e.preventDefault();
+        this.viewer.zoomOut();
+        return;
+      }
+      if (e.ctrlKey && e.key === '0') {
+        e.preventDefault();
+        this.viewer.resetZoom();
+        return;
+      }
+
+      // Jump to image index (Ctrl + G)
+      if (e.ctrlKey && key === 'G') {
+        e.preventDefault();
+        this.jumpToImageNumber();
+        return;
+      }
+
       switch (key) {
         // Navigations
         case 'N':
+        case 'ARROWRIGHT':
+          this.navigateNext();
+          break;
+        case 'P':
         case 'ARROWLEFT':
           this.navigatePrev();
           break;
-        case 'P':
-        case 'ARROWRIGHT':
-          this.navigateNext();
+        case 'HOME':
+          this.navigateImage(0);
+          break;
+        case 'END':
+          this.navigateImage(this.imagePaths.length - 1);
+          break;
+        case 'ESCAPE':
+          this.confirmReturnToMenu();
+          break;
+        case 'ENTER':
+          this.finishSorting();
           break;
         
         // Ratings
@@ -936,6 +1036,18 @@ class PhotoSorterApp {
           break;
         case 'DELETE':
           this.deleteCurrent();
+          break;
+        case 'C': // Toggle compare mode
+          this.toggleCompareMode();
+          break;
+        case 'F': // Toggle fullscreen
+          this.toggleFullscreen();
+          break;
+        case 'H': // Toggle HUD
+          this.toggleHUD();
+          break;
+        case 'I': // Toggle Info panel
+          this.toggleInfoPanel();
           break;
         case 'U': // Toggle filter unrated
           this.toggleFilterMode();
@@ -1092,6 +1204,43 @@ class PhotoSorterApp {
       okBtn.addEventListener('click', onOk);
       cancelBtn.addEventListener('click', onCancel);
     });
+  }
+
+  private toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  private toggleHUD() {
+    const hud = document.getElementById('hud-container');
+    if (hud) {
+      hud.style.display = hud.style.display === 'none' ? 'block' : 'none';
+    }
+  }
+
+  private toggleInfoPanel() {
+    const info = document.querySelector('.info-widget') as HTMLElement;
+    if (info) {
+      info.style.display = info.style.display === 'none' ? 'flex' : 'none';
+    }
+  }
+
+  private async jumpToImageNumber() {
+    if (this.imagePaths.length === 0) return;
+    const input = prompt(`Jump to image number (1 to ${this.imagePaths.length}):`);
+    if (input) {
+      const num = parseInt(input);
+      if (!isNaN(num) && num >= 1 && num <= this.imagePaths.length) {
+        await this.navigateImage(num - 1);
+      } else {
+        await this.showCustomDialog('Invalid Number', `Please enter a number between 1 and ${this.imagePaths.length}.`, false);
+      }
+    }
   }
 }
 
