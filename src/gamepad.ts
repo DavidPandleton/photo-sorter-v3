@@ -22,11 +22,13 @@ export interface GamepadActions {
 
 export class GamepadHandler {
   private actions: GamepadActions;
-  private axes = { lx: 0, ly: 0, rx: 0, ry: 0 };
   private deadzone = GAMEPAD_DEADZONE;
   private panSpeed = GAMEPAD_PAN_SPEED;
   private zoomSpeed = GAMEPAD_ZOOM_SPEED;
   private _active = false;
+  private prevButtons: Map<number, boolean> = new Map();
+  private inactivityFrames = 0;
+  private readonly INACTIVITY_TIMEOUT = 300;
 
   get active() { return this._active; }
 
@@ -36,24 +38,6 @@ export class GamepadHandler {
 
   async init() {
     try {
-      await listen<{ code: string; state: boolean }>('gamepad-button', (event) => {
-        if (!this._active) {
-          this._active = true;
-          this.actions.updateHUD(true);
-        }
-        this.handleInput(event.payload.code, event.payload.state);
-      });
-      await listen<{ axis: string; value: number }>('gamepad-axis', (event) => {
-        if (!this._active) {
-          this._active = true;
-          this.actions.updateHUD(true);
-        }
-        const { axis, value } = event.payload;
-        if (axis === 'ABS_X') this.axes.lx = value;
-        else if (axis === 'ABS_Y') this.axes.ly = value;
-        else if (axis === 'ABS_RX') this.axes.rx = value;
-        else if (axis === 'ABS_RY') this.axes.ry = value;
-      });
       await listen<boolean>('gamepad-connection', (event) => {
         if (!event.payload && this._active) {
           this._active = false;
@@ -73,18 +57,102 @@ export class GamepadHandler {
 
   startLoop() {
     const tick = () => {
-      if (this._active) {
-        let dx = 0, dy = 0;
-        if (Math.abs(this.axes.lx) > this.deadzone) dx = -this.axes.lx * this.panSpeed;
-        if (Math.abs(this.axes.ly) > this.deadzone) dy = this.axes.ly * this.panSpeed;
-        if (dx !== 0 || dy !== 0) this.actions.panBy(dx, dy);
-        if (Math.abs(this.axes.ry) > this.deadzone) {
-          this.actions.zoomBy(1.0 + this.axes.ry * this.zoomSpeed);
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      let activePad: Gamepad | null = null;
+
+      for (const pad of gamepads) {
+        if (pad && pad.connected) {
+          activePad = pad;
+          break;
         }
       }
+
+      if (activePad) {
+        this.inactivityFrames = 0;
+
+        if (!this._active) {
+          this._active = true;
+          this.actions.updateHUD(true);
+          this.actions.showToast(`Gamepad: ${activePad.id}`, 'GOOD');
+        }
+
+        for (let i = 0; i < activePad.buttons.length; i++) {
+          const pressed = activePad.buttons[i].pressed || activePad.buttons[i].value > 0.5;
+          const wasPressed = this.prevButtons.get(i) ?? false;
+
+          if (pressed && !wasPressed) {
+            const code = this.mapWebButton(i, activePad);
+            if (code) this.handleInput(code, true);
+          }
+          this.prevButtons.set(i, pressed);
+        }
+
+        const lx = activePad.axes[0] ?? 0;
+        const ly = activePad.axes[1] ?? 0;
+        const ry = activePad.axes[3] ?? 0;
+
+        let dx = 0, dy = 0;
+        if (Math.abs(lx) > this.deadzone) dx = -lx * this.panSpeed;
+        if (Math.abs(ly) > this.deadzone) dy = -ly * this.panSpeed;
+        if (dx !== 0 || dy !== 0) this.actions.panBy(dx, dy);
+        if (Math.abs(ry) > this.deadzone) {
+          this.actions.zoomBy(1.0 - ry * this.zoomSpeed);
+        }
+      } else if (this._active) {
+        this.inactivityFrames++;
+        if (this.inactivityFrames > this.INACTIVITY_TIMEOUT) {
+          this._active = false;
+          this.actions.updateHUD(false);
+          this.prevButtons.clear();
+        }
+      }
+
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+  }
+
+  private mapWebButton(index: number, pad: Gamepad): string | null {
+    if (pad.mapping === 'standard') {
+      switch (index) {
+        case 0: return 'BTN_A';
+        case 1: return 'BTN_B';
+        case 2: return 'BTN_X';
+        case 3: return 'BTN_Y';
+        case 4: return 'BTN_TL';
+        case 5: return 'BTN_TR';
+        case 6: return 'BTN_TL2';
+        case 7: return 'BTN_TR2';
+        case 8: return 'BTN_SELECT';
+        case 9: return 'BTN_START';
+        case 10: return 'BTN_THUMBL';
+        case 11: return 'BTN_THUMBR';
+        case 12: return 'DPAD_UP';
+        case 13: return 'DPAD_DOWN';
+        case 14: return 'DPAD_LEFT';
+        case 15: return 'DPAD_RIGHT';
+      }
+    } else {
+      switch (index) {
+        case 0: return 'BTN_A';
+        case 1: return 'BTN_B';
+        case 2: return 'BTN_X';
+        case 3: return 'BTN_Y';
+        case 4: return 'BTN_TL';
+        case 5: return 'BTN_TR';
+        case 6: return 'BTN_TL2';
+        case 7: return 'BTN_TR2';
+        case 8: return 'BTN_SELECT';
+        case 9: return 'BTN_START';
+        case 10: return 'BTN_THUMBL';
+        case 11: return 'BTN_THUMBR';
+        case 12: return 'DPAD_UP';
+        case 13: return 'DPAD_DOWN';
+        case 14: return 'DPAD_LEFT';
+        case 15: return 'DPAD_RIGHT';
+      }
+    }
+    return null;
   }
 
   private handleInput(code: string, state: boolean) {

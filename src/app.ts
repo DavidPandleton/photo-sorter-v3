@@ -368,6 +368,7 @@ class PhotoSorterApp {
 
   private async finishSorting() {
     if (this.imagePaths.length === 0) return;
+    if (!confirm('Are you sure you want to finish sorting? This will move all rated photos to their category folders.')) return;
     try {
       this.showProgressIndicator(true);
       const [movedCount, summary] = await invoke<[number, Record<string, number>]>('finish_sorting');

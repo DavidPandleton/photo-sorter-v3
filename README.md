@@ -55,7 +55,7 @@ Open a photo folder  →  Press 1/2/3 on each photo  →  Enter (export)
 | `F` | Fullscreen |
 | `H` | Toggle HUD overlay |
 
-**Export:** Press Enter. Files are sorted into:
+**Export:** Press Enter (with confirmation dialog). Files are sorted into:
 
 ```
 📁 project-folder/
@@ -74,7 +74,7 @@ Open a photo folder  →  Press 1/2/3 on each photo  →  Enter (export)
 - **Compare mode** — view 2 photos side-by-side to pick the sharpest
 - **Focus meter** — auto blur detection via Laplacian variance, cached in SQLite
 - **Checkpoint** — if export fails or goes to the wrong folder, one-click restore
-- **Gamepad** — Xbox/PlayStation controller support (optional feature)
+- **Gamepad** — Xbox/PlayStation controller support via Web Gamepad API (USB & Bluetooth, no feature flag needed)
 - **SQLite persistence** — ratings, stars, rotation, picks survive restart. No manual save
 - **Cross-platform** — Windows, macOS, Linux
 
@@ -104,7 +104,8 @@ bun run tauri build
 
 Binary output: `src-tauri/target/release/photo-sorter-v3.exe`
 
-Optional: `bun run tauri build --features gamepad` to enable controller support.
+Gamepad support is built-in via the Web Gamepad API — no special flags needed.
+Enable the Rust `gilrs` backend for rumble support: `bun run tauri build -- --features gamepad`
 
 ---
 
@@ -125,6 +126,7 @@ photo-sorter-v3/
 │   ├── app.ts              ← Main logic, keyboard, filmstrip, settings
 │   ├── viewer.ts           ← Canvas 2D renderer (zoom/pan/compare)
 │   ├── filmstrip.ts        ← Virtual-scrolling thumbnail bar
+│   ├── gamepad.ts          ← Web Gamepad API handler (USB/Bluetooth)
 │   ├── cache.ts            ← Frontend LRU image cache
 │   └── style.css           ← Dark glassmorphic theme
 ├── index.html
@@ -142,13 +144,13 @@ Photo Sorter v2 (Python/PySide6) is still **significantly faster for RAW-heavy w
 
 | Scenario | v2 (Python) | v3 (Rust) |
 |----------|-------------|-----------|
-| Open folder + render filmstrip | ~2-3s | ~3-5s |
-| Hold N (rapid navigate) | Butter smooth | Can lag with large RAWs |
-| CPU usage during culling | Moderate | Higher (IPC overhead) |
+| Open folder + render filmstrip | ~2-3s | ~2-3s |
+| Hold N (rapid navigate) | Butter smooth | Smooth (with isNavigating guard) |
+| RAW thumbnail gen (background) | Before load | Parallel, non-blocking |
 
-**v3 wins on:** modern UI, cross-platform (Windows/macOS/Linux), customizable keybindings, gamepad support, compare mode, settings persistence, native trash integration.
+**v3 wins on:** modern UI, cross-platform (Windows/macOS/Linux), customizable keybindings, gamepad (USB/Bluetooth), compare mode, settings persistence, native trash integration, parallel thumbnail generation, export safety (confirm dialog).
 
-**v2 wins on:** raw speed, mature codebase, lower resource usage, filmstrip smoothness.
+**v2 wins on:** mature codebase.
 
 Both projects are maintained. Use v3 for its features; use v2 if your priority is maximum speed with RAW files.
 
