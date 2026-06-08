@@ -111,25 +111,28 @@ jobs:
           releaseBody: |
             **Manual culling, keyboard-fast. Zero AI.**
 
+            ### v3.1.0 — Changes
+            - **JPG performance**: Fast-path dimension check skips full decode for small images
+            - **Cross-platform**: Proper Cmd/Ctrl key handling on macOS, trash fallback, CI builds for all platforms
+            - **RAW handling**: Optimized preview extraction for non-RAW files
+            - **Info panel**: EXIF data, filename, dimensions
+            - **UI**: Better HUD, settings persistence, toast positions
+
             ### Downloads
             | Platform | Asset |
             |----------|-------|
-            | Windows | `-setup.exe` / `.msi` |
+            | Windows | `-setup.exe` / `.msi` / standalone `.exe` |
             | macOS (Intel) | `.dmg` (x86_64) |
             | macOS (Apple Silicon) | `.dmg` (aarch64) |
             | Linux | `.deb` / `.AppImage` |
             | Source | `.zip` |
 
-            ### Cara Pake
-            1. Buka folder foto
-            2. Tekan `1` (BAD), `2` (OK), `3` (GOOD) tiap foto
-            3. `Enter` untuk export
-
-            Lihat README untuk shortcut lengkap.
-          releaseDraft: true
+            Lihat [README](https://github.com/${{ github.repository }}/blob/main/README.md) untuk cara pake dan shortcut lengkap.
+          releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}
           uploadWorkflowArtifacts: true
+          uploadPlainBinary: true
 
       - name: Generate source code archive
         if: matrix.os == 'windows-latest'
