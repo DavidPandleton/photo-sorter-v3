@@ -38,6 +38,14 @@ interface KeybindingRecord {
   shortcut_key: string;
 }
 
+// --- Cross-platform helpers ---
+const IS_MAC = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
+function fmtShortcut(s: string): string {
+  if (!IS_MAC) return s;
+  return s.replace('Ctrl+', 'Cmd+');
+}
+
 interface HudItemRecord {
   action_name: string;
   visible: number;
@@ -623,7 +631,7 @@ class PhotoSorterApp {
       if (document.activeElement?.tagName === 'INPUT') return;
       
       let combo = '';
-      if (e.ctrlKey) combo += 'Ctrl+';
+      if (e.ctrlKey || e.metaKey) combo += 'Ctrl+';
       if (e.altKey) combo += 'Alt+';
       if (e.shiftKey) combo += 'Shift+';
       
@@ -640,30 +648,39 @@ class PhotoSorterApp {
         return;
       }
 
-      // Check standard Ctrl + , shortcut for Settings
+      // Check standard Ctrl/Cmd + , shortcut for Settings
       if (combo === 'Ctrl+,' || combo === 'Ctrl+<' || combo === 'Ctrl+m') {
-        if (combo === 'Ctrl+,' || combo === 'Ctrl+<') {
-          e.preventDefault();
-          this.toggleSettingsModal();
-          return;
-        }
+        e.preventDefault();
+        this.toggleSettingsModal();
+        return;
       }
 
-      // Standard Ctrl + zoom shortcuts
-      if (e.ctrlKey && (e.key === '=' || e.key === '+')) { e.preventDefault(); this.viewer.zoomIn(); return; }
-      if (e.ctrlKey && e.key === '-') { e.preventDefault(); this.viewer.zoomOut(); return; }
-      if (e.ctrlKey && e.key === '0') { e.preventDefault(); this.viewer.resetZoom(); return; }
+      // Standard Ctrl/Cmd + zoom shortcuts
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); this.viewer.zoomIn(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); this.viewer.zoomOut(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); this.viewer.resetZoom(); return; }
 
-      // Star rating binds (Ctrl+1-5) are global and non-customizable
-      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+      // Star rating binds (Ctrl/Cmd+1-5) are global and non-customizable
+      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '5') {
         e.preventDefault();
         this.setStarsCurrent(parseInt(e.key));
         return;
       }
       
+      // Build alternate combo (Meta+ variant for macOS)
+      let comboAlt: string | undefined;
+      if (e.ctrlKey || e.metaKey) {
+        const mod = e.metaKey ? 'Meta+' : 'Ctrl+';
+        if (combo.startsWith('Ctrl+')) {
+          comboAlt = mod + combo.slice(5);
+        }
+      }
+
       // Check dynamic categories shortcut key bindings
       for (const cat of this.categories) {
-        if (cat.shortcut_key && cat.shortcut_key.toUpperCase() === combo.toUpperCase()) {
+        if (!cat.shortcut_key) continue;
+        const s = cat.shortcut_key.toUpperCase();
+        if (s === combo.toUpperCase() || (comboAlt && s === comboAlt.toUpperCase())) {
           e.preventDefault();
           this.rateCurrent(cat.key_name, cat.flash_color);
           return;
@@ -671,7 +688,7 @@ class PhotoSorterApp {
       }
       
       // Lookup remapped actions in keybindings
-      const action = this.getActionFromCombo(combo);
+      const action = this.getActionFromCombo(combo) || (comboAlt ? this.getActionFromCombo(comboAlt) : null);
       if (action) {
         if (action === 'toggle_pick') e.preventDefault(); // prevent scrolling spacebar
         this.executeAction(action);
@@ -759,7 +776,7 @@ class PhotoSorterApp {
       activeHUD.forEach(h => {
         const actionLabel = ACTION_DISPLAY_NAMES[h.action_name] || h.action_name;
         const shortcut = this.keybindings.get(h.action_name) || 'None';
-        rows.push(`<span class="hud-key">[${shortcut}]</span> ${actionLabel}`);
+          rows.push(`<span class="hud-key">[${fmtShortcut(shortcut)}]</span> ${actionLabel}`);
       });
       
       this.categories.forEach(cat => {
@@ -1084,7 +1101,7 @@ class PhotoSorterApp {
       
       row.innerHTML = `
         <span class="keybinding-label">${label}</span>
-        <button class="keybinding-btn bind-btn" data-action="${actionName}">${shortcut}</button>
+        <button class="keybinding-btn bind-btn" data-action="${actionName}">${fmtShortcut(shortcut)}</button>
       `;
       
       const bindBtn = row.querySelector('.bind-btn') as HTMLButtonElement;

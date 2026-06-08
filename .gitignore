@@ -8,6 +8,9 @@ src-tauri/resources/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# --- Misc ---
+reqqq/
 package-lock.json
 
 # --- Build artifacts ---

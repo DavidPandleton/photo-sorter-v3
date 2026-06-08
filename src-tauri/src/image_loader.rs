@@ -64,8 +64,25 @@ pub fn load_and_scale_image<P: AsRef<Path>>(file_path: P, max_dim: u32) -> Optio
         std::fs::read(&file_path).ok()?
     };
     
-    let format = "image/jpeg"; // Preview is JPEG, and most supported web formats are JPEG/PNG/WebP
-    
+    let format = "image/jpeg";
+
+    // Fast path: check dimensions without full decode.
+    // For JPG/PNG/WebP that are already ≤ max_dim, skip decode entirely.
+    if !is_raw {
+        if let Ok(reader) = ImageReader::new(std::io::Cursor::new(&img_bytes)).with_guessed_format() {
+            if let Ok((w, h)) = reader.into_dimensions() {
+                if w <= max_dim && h <= max_dim {
+                    return Some(DecodedImage {
+                        bytes: img_bytes,
+                        format,
+                        width: w,
+                        height: h,
+                    });
+                }
+            }
+        }
+    }
+
     let img = ImageReader::new(std::io::Cursor::new(&img_bytes))
         .with_guessed_format().ok()?
         .decode().ok()?;

@@ -298,7 +298,9 @@ impl AppState {
         if idx < 0 || idx >= paths.len() as i32 { return Ok(None); }
         let path_str = paths.remove(idx as usize);
         let path = Path::new(&path_str);
-        if path.exists() { trash::delete(path).map_err(|e| format!("Failed to move file to trash: {}", e))?; }
+        if path.exists() && trash::delete(path).is_err() {
+            std::fs::remove_file(path).map_err(|e| format!("Failed to delete file: {}", e))?;
+        }
         self.results.write().unwrap().remove(&path_str);
         self.rotations.write().unwrap().remove(&path_str);
         let db_opt = self.db.read().unwrap();

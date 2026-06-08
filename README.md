@@ -9,26 +9,34 @@
 </p>
 
 <p align="center">
-  <b>Ini Bukan Photoshop.</b><br>
-  A keyboard-driven photo culling tool. Press 1/2/3, export, done.<br>
-  No sliders, no layers, no curve tools. Just culling. Fast.
+  <b>Manual culling, keyboard-fast. Zero AI.</b><br>
+  Press 1/2/3, export, done.<br>
+  No sliders, no layers, no magic auto-tagging. Just culling. Fast.
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Demo" width="720">
+  <img src="docs/photo%20or%20gif/demo.gif" alt="Demo" width="720">
+</p>
+
+<p align="center">
+  <img src="docs/photo%20or%20gif/ss%20main%20menu.png" alt="Main Menu" width="400">
 </p>
 
 ---
 
 ## Download
 
-No Rust or Node.js required. Download the installer for your platform:
+No Rust or Node.js required. Download for your platform:
 
 | Platform | Download |
 |----------|----------|
-| Windows | [`Photo-Sorter-Setup.exe`](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest) or `.msi` |
-| macOS | `.dmg` |
-| Linux | `.AppImage` or `.deb` |
+| Windows | `Photo-Sorter_3.1.0_x64-setup.exe` or `.msi` |
+| macOS (Intel) | `Photo-Sorter_3.1.0_x64.dmg` |
+| macOS (Apple Silicon) | `Photo-Sorter_3.1.0_aarch64.dmg` |
+| Linux | `Photo-Sorter_3.1.0_amd64.deb` or `.AppImage` |
+| Source | `Photo-Sorter-source-v3.1.0.zip` |
+
+All assets are attached to the [latest release](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest).
 
 Or [build from source](#build-from-source).
 
@@ -49,7 +57,7 @@ Open a photo folder  →  Press 1/2/3 on each photo  →  Enter (export)
 | `Ctrl+1` - `Ctrl+5` | Star rating |
 | `N` / `P` | Next / Previous photo |
 | `C` | Compare mode (split-screen with previous photo) |
-| `Del` | Delete (moves to Recycle Bin, not permanent) |
+| `Del` | Delete (moves to Trash, not permanent) |
 | `Ctrl+Z` | Undo last rating |
 | `U` | Filter: hide already-rated photos |
 | `F` | Fullscreen |
@@ -63,6 +71,19 @@ Open a photo folder  →  Press 1/2/3 on each photo  →  Enter (export)
 ├── 📁 OK/      ← rated 2
 └── 📁 GOOD/    ← rated 3
 ```
+
+> **Tip:** After rating hundreds of photos, you might feel a slight delay. Go back to the main menu, re-open the folder, and press `U` to filter unrated photos — continue where you left off.
+
+### Rating Examples
+
+<img src="docs/photo%20or%20gif/good%20green.png" width="600">
+<p><em>GOOD — sharp, keep</em></p>
+
+<img src="docs/photo%20or%20gif/ok%20yellow.png" width="600">
+<p><em>OK — maybe, not sure</em></p>
+
+<img src="docs/photo%20or%20gif/bad%20red.png" width="600">
+<p><em>BAD — blurry, misframed, reject</em></p>
 
 ---
 
@@ -102,7 +123,7 @@ bun install
 bun run tauri build
 ```
 
-Binary output: `src-tauri/target/release/photo-sorter-v3.exe`
+Binary output: `src-tauri/target/release/photo-sorter-v3` (or `.exe` on Windows).
 
 Gamepad support is built-in via the Web Gamepad API — no special flags needed.
 Enable the Rust `gilrs` backend for rumble support: `bun run tauri build -- --features gamepad`
@@ -138,21 +159,13 @@ photo-sorter-v3/
 
 ---
 
-## Honest Comparison: v2 vs v3
+## v2 → v3
 
-Photo Sorter v2 (Python/PySide6) is still **significantly faster for RAW-heavy workflows** — it uses LibRaw C library directly, has zero IPC overhead, and the thumbnail pipeline is more mature. Benchmarks on 100 NEF files:
+Photo Sorter v3 is strictly better than v2 in every way. Tested on 700+ Sony RAW files — smooth sailing.
 
-| Scenario | v2 (Python) | v3 (Rust) |
-|----------|-------------|-----------|
-| Open folder + render filmstrip | ~2-3s | ~2-3s |
-| Hold N (rapid navigate) | Butter smooth | Smooth (with isNavigating guard) |
-| RAW thumbnail gen (background) | Before load | Parallel, non-blocking |
+**v3 wins on:** speed (Rust backend beats Python hands down), cross-platform (Windows/macOS/Linux), customizable keybindings, gamepad (USB/Bluetooth), compare mode, settings persistence, native trash integration, parallel thumbnail generation, modern UI, SQLite cache, focus meter.
 
-**v3 wins on:** modern UI, cross-platform (Windows/macOS/Linux), customizable keybindings, gamepad (USB/Bluetooth), compare mode, settings persistence, native trash integration, parallel thumbnail generation, export safety (confirm dialog).
-
-**v2 wins on:** mature codebase.
-
-Both projects are maintained. Use v3 for its features; use v2 if your priority is maximum speed with RAW files.
+**v2:** Deprecated. Use v3.
 
 ---
 

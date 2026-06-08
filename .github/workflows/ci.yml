@@ -14,7 +14,11 @@ on:
 
 jobs:
   lint-and-test:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +35,14 @@ jobs:
         with:
           components: clippy
 
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev
+
       - name: Install dependencies
         run: bun install
 
@@ -43,10 +55,24 @@ jobs:
       - name: Rust Unit Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
-  build-windows:
+  build:
     needs: lint-and-test
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,30 +86,62 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install dependencies
         run: bun install
 
       - name: Build Tauri App
-        uses: tauri-apps/tauri-action@v0.6.2
+        id: tauri
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Photo Sorter ${{ github.ref_name }}"
           releaseBody: |
-            **Ini Bukan Photoshop.** Keyboard-driven photo culling tool. Rate 1/2/3, export, selesai.
+            **Manual culling, keyboard-fast. Zero AI.**
 
-            ### Downloads (Windows)
-            - `Photo-Sorter_3.0.0_x64_en-US.msi` — MSI installer
-            - `Photo-Sorter_3.0.0_x64-setup.exe` — NSIS portable installer
+            ### Downloads
+            | Platform | Asset |
+            |----------|-------|
+            | Windows | `-setup.exe` / `.msi` |
+            | macOS (Intel) | `.dmg` (x86_64) |
+            | macOS (Apple Silicon) | `.dmg` (aarch64) |
+            | Linux | `.deb` / `.AppImage` |
+            | Source | `.zip` |
 
             ### Cara Pake
             1. Buka folder foto
             2. Tekan `1` (BAD), `2` (OK), `3` (GOOD) tiap foto
-            3. `Enter` untuk export — foto ke-sort ke folder BAD/OK/GOOD
+            3. `Enter` untuk export
 
-            Lihat [README](https://github.com/${{ github.repository }}/blob/main/README.md) untuk shortcut lengkap.
+            Lihat README untuk shortcut lengkap.
           releaseDraft: true
           prerelease: false
-          args: ""
+          args: --target ${{ matrix.target }}
+          uploadWorkflowArtifacts: true
+
+      - name: Generate source code archive
+        if: matrix.os == 'windows-latest'
+        run: git archive --format=zip --output=source-code-${{ github.ref_name }}.zip HEAD
+
+      - name: Upload source code to release
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release upload "$TAG_NAME" "source-code-$TAG_NAME.zip" \
+            --repo ${{ github.repository }} \
+            --clobber
