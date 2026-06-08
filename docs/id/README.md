@@ -1,203 +1,180 @@
-# Photo Sorter
+# Photo Sorter v3
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platforms">
-  <img src="https://img.shields.io/badge/Python-3.9%2B-teal" alt="Python Version">
+  <img src="https://img.shields.io/badge/Rust-1.96%2B-orange" alt="Rust">
+  <img src="https://img.shields.io/badge/Tauri-v2-teal" alt="Tauri">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/tests-54%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/github/v/tag/DavidPandleton/photo-sorter-v3?label=version" alt="Version">
 </p>
 
 <p align="center">
-  <b>English:</b> <a href="../../README.md">🇺🇸 Read here</a>
+  <b>Manual sorting, cepet pake keyboard. Zero AI.</b><br>
+  Pencet 1/2/3, export, beres.<br>
+  Bukan Lightroom. Ini alat buat milah foto — <i>sebelum</i> masuk ke tahap editing.
 </p>
 
-Tool cepat berbasis keyboard buat nyortir dan nge-rating foto dalam jumlah banyak.
-**Bukan** pengganti Lightroom — ini pre-filter buat mutusin mana yang dipake *sebelum* masuk ke tahap editing.
+<p align="center">
+  <a href="https://davidpandleton.github.io/photo-sorter-v3">🌐 Buka landing page</a>
+  ·
+  <a href="../../README.md">🇺🇸 English version</a>
+</p>
 
-Kerjain ratusan foto dalam menit. Rating dengan sekali tekan tombol. Export folder terurut dalam satu klik.
-
----
-
-## Fitur
-
-- **Keyboard-first workflow** — rate, navigasi, zoom, hapus, pick — semua tanpa mouse
-- **Rating tiga level** — BAD (1), OK (2), GOOD (3) dengan animasi warna instan
-- **Star rating** — `Ctrl+1` sampai `Ctrl+5` buat skor kualitas detail
-- **Pick flag** — `Space` buat tandai favorit, tampil sebagai overlay bintang emas
-- **Compare mode** — `C` buat lihat side-by-side dengan foto sebelumnya
-- **Focus meter** — deteksi blur otomatis di setiap thumbnail (tanpa NumPy)
-- **EXIF extraction** — baca metadata kamera dari JPEG dan RAW (CR2/CR3/ARW/NEF/DNG/dll)
-- **Thumbnail cache** — tersimpan di SQLite, langsung muncul pas dibuka lagi
-- **Background EXIF sync** — proses metadata secara batch tanpa ngeblokir UI
-- **Viewport-scaled loading** — tampilkan versi 1920px dulu, baru resolusi penuh
-- **Undo** — `Ctrl+Z` buat balikin rating terakhir
-- **Fullscreen** — `F` buat review tanpa gangguan
-- **Gamepad support** — controller Xbox/PlayStation buat sorting ergonomis
-- **SQLite persistence** — rating aman meskipun aplikasi ditutup
-- **Cross-platform** — Windows (`.bat`), macOS (`.command`), Linux (`.sh` + launcher `.desktop`)
+<p align="center">
+  <img src="../photo%20or%20gif/demo.gif" alt="Demo" width="720">
+</p>
 
 ---
 
-## Cara Cepat Mulai
+## 📥 Download
+
+**Nggak perlu install Python, Rust, atau ribet-ribet.** Tinggal download, install, langsung pake.
+
+| Platform | File yang didownload |
+|----------|---------------------|
+| 🪟 **Windows** | `Photo-Sorter_3.1.0_x64-setup.exe` (installer) atau `.msi` |
+| 🍎 **macOS Intel** | `Photo-Sorter_3.1.0_x64.dmg` |
+| 🍎 **macOS Apple Silicon** (M1/M2/M3) | `Photo-Sorter_3.1.0_aarch64.dmg` |
+| 🐧 **Linux** | `Photo-Sorter_3.1.0_amd64.deb` atau `.AppImage` |
+
+**Cara download:**
+1. Buka link ini → [halaman download](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest)
+2. Cari tulisan **"Assets"** (biasanya di bagian bawah halaman)
+3. Klik file yang sesuai sama kompi lu (lihat tabel di atas)
+4. Buka file yang ke-download, jalanin, selesai!
+
+> Buat yang pengen compile sendiri: [Petunjuk Build dari Source](#-build-dari-source)
+
+---
+
+## 🚀 Cara Pake
+
+Konsepnya simpel banget:
+
+```
+Buka folder foto  →  Pencet 1/2/3 tiap foto  →  Enter (export beres)
+```
+
+Foto bakal otomatis ke-sortir ke dalam folder:
+
+```
+📁 folder-project-lu/
+├── 📁 BAD/      ← foto yang jelek (1)
+├── 📁 OK/       ← foto yang mungkin (2)
+└── 📁 GOOD/     ← foto yang bagus (3)
+```
+
+### Tombol-tombol penting
+
+| Tombol | Fungsi |
+|--------|--------|
+| `1` | BAD — fotonya jelek, blur, nggak kepake |
+| `2` | OK — mungkin, ragu-ragu |
+| `3` | GOOD — bagus, keep |
+| `Space` | Tandai favorit (bintang emas) |
+| `Ctrl+1` sampe `Ctrl+5` | Rating bintang |
+| `N` / `P` | Next / Previous foto |
+| `C` | Mode compare (liat 2 foto barengan) |
+| `Del` | Hapus (masuk recycle bin/trash, aman) |
+| `Ctrl+Z` | Balikin rating terakhir |
+| `U` | Filter: sembunyiin foto yang udah di-rating |
+| `F` | Fullscreen |
+| `H` | Tampilkan/sembunyiin petunjuk tombol |
+| `Enter` | Export — pindahin foto ke folder BAD/OK/GOOD |
+
+---
+
+## ✨ Fitur
+
+- **Keyboard-first** — nggak perlu mouse sama sekali.
+- **RAW support** — NEF, CR2, CR3, ARW, DNG, ORF, RW2, PEF. Pake preview biar cepet.
+- **EXIF display** — liat ISO, aperture, shutter speed, lens, kamera.
+- **Compare mode** — pencet `C` buat liat 2 foto side-by-side. Pilih yang paling tajam.
+- **Focus meter** — deteksi blur otomatis, ditampilin pake warna (ijo/kuning/merah).
+- **Checkpoint** — sebelum export, aplikasi nyimpen checkpoint. Kalo ada salah, tinggal pencet restore.
+- **Gamepad** — colok controller Xbox/PlayStation (USB atau Bluetooth). Bisa buat sorting dari sofa.
+- **SQLite persistence** — rating, bintang, rotasi, pick — semua aman meskipun aplikasi ditutup.
+- **Category kustom** — ganti nama kategori, shortcut, folder tujuan, warnanya — bebas.
+- **Keybinding customization** — ganti shortcut sesuka hati lewat menu Settings.
+- **Fullscreen** — `F` buat review foto tanpa gangguan.
+- **Cross-platform** — Windows, macOS, Linux.
+
+---
+
+## 🎮 Gamepad (Controller)
+
+Colok controller Xbox atau PlayStation, langsung jalan. Nggak perlu setting apa-apa.
+
+| Tombol | Fungsi |
+|--------|--------|
+| A | GOOD |
+| B | BAD |
+| X | OK |
+| LB / RB | Prev / Next foto |
+| LT / RT | Rotasi kiri / kanan |
+| Joystick kiri | Pan (geser-geser foto) |
+| Joystick kanan | Zoom |
+| Start | Export |
+| Select | Menu |
+
+---
+
+## 🛠️ Build dari Source
+
+Buat yang familiar sama coding dan mau compile sendiri:
 
 ### Prasyarat
 
-- **Python 3.9+** install dari [python.org](https://python.org)
+- [Rust](https://rustup.rs) — minimal versi 1.96+
+- [Bun](https://bun.sh) atau npm
+- **Windows**: Visual Studio Build Tools (C++ workload)
+- **macOS**: `xcode-select --install`
+- **Linux**: `sudo apt install build-essential libwebkit2gtk-4.1-dev libgtk-3-dev`
 
-### Windows
-
-```batch
-scripts\install.bat
-scripts\run.bat
-```
-
-### macOS
+### Compile
 
 ```bash
-bash scripts/install.command
-bash scripts/run.command
+git clone https://github.com/DavidPandleton/photo-sorter-v3.git
+cd photo-sorter-v3
+bun install
+bun run tauri build
 ```
 
-### Linux
-
-```bash
-bash scripts/install.sh
-bash scripts/run.sh
-```
-
-Setelah install, user Linux bisa cari **Photo Sorter** di menu aplikasi (GNOME/KDE).
+Hasilnya ada di folder `src-tauri/target/release/`.
 
 ---
 
-## Gimana Kerjanya
+## 🏗️ Arsitektur (buat kontributor)
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Buka       │ ──> │  Rating      │ ──> │  Export     │
-│  folder     │     │  1 / 2 / 3   │     │  (Enter)    │
-└─────────────┘     └──────────────┘     └─────────────┘
-                          │
-                     ┌────┴────┐
-                     │  BAD (1) │ → blur, nanti dihapus
-                     │  OK  (2) │ → mungkin
-                     │ GOOD (3) │ → keep
-                     └─────────┘
+photo-sorter-v3/
+├── src-tauri/              ← Backend Rust
+│   ├── src/
+│   │   ├── main.rs         ← Perintah-perintah Tauri IPC
+│   │   ├── database.rs     ← SQLite + cache thumbnail
+│   │   ├── image_loader.rs ← Decode RAW + resize + blur score
+│   │   ├── exif.rs         ← Ekstrak EXIF
+│   │   └── state.rs        ← AppState, ImageCache, filter, export
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── src/                    ← Frontend TypeScript
+│   ├── app.ts              ← Logic utama, keyboard, filmstrip, settings
+│   ├── viewer.ts           ← Render Canvas 2D (zoom/pan/compare)
+│   ├── filmstrip.ts        ← Virtual-scrolling thumbnail bar
+│   ├── gamepad.ts          ← Web Gamepad API
+│   ├── cache.ts            ← Cache gambar LRU
+│   └── style.css           ← Dark glassmorphic theme
+├── index.html
+├── package.json
+└── vite.config.ts
 ```
 
-1. Buka folder foto
-2. Navigasi pake `N` / `P` (atau arrow keys / gamepad)
-3. Rating tiap foto: `1` (BAD), `2` (OK), `3` (GOOD)
-4. Tekan `Enter` buat export — file pindah ke folder `BAD/`, `OK/`, `GOOD/`
-
-Semua rating auto-save ke database SQLite lokal. Tutup dan buka lagi kapan aja — kerjaan lo aman.
+**Stack:** Tauri v2 + Rust + Vite + TypeScript + SQLite (rusqlite) + HTML5 Canvas.
 
 ---
 
-## Pintasan Keyboard
-
-### Rating
-
-| Tombol | Aksi |
-|--------|------|
-| `1` | BAD |
-| `2` | OK |
-| `3` | GOOD |
-| `0` | Hapus rating |
-| `Ctrl+Z` | Undo rating terakhir |
-
-### Pick & Bintang
-
-| Tombol | Aksi |
-|--------|------|
-| `Space` | Toggle pick flag (bintang emas) |
-| `Ctrl+1` — `Ctrl+5` | Star rating (tekan sama buat clear) |
-
-### Navigasi
-
-| Tombol | Aksi |
-|--------|------|
-| `N` / `P` | Next / Previous |
-| `Home` / `End` | Ke gambar pertama / terakhir |
-| `Ctrl+G` | Loncat ke nomor gambar |
-| `C` | Compare side-by-side dengan sebelumnya |
-
-### Tampilan
-
-| Tombol | Aksi |
-|--------|------|
-| `F` | Fullscreen |
-| `H` | Tampilkan/sembunyikan HUD kontrol |
-| `I` | Tampilkan/sembunyikan panel info |
-| `Ctrl+`+ / `Ctrl+-` | Zoom in / out |
-| `Ctrl+0` | Reset zoom |
-| `Double-click` | Fit ke layar |
-
-### Edit
-
-| Tombol | Aksi |
-|--------|------|
-| `Del` | Hapus permanen (dengan konfirmasi) |
-| `R` / `Shift+R` | Rotasi kanan / kiri |
-| `U` | Filter: sembunyikan foto yang sudah di-rating |
-
-### Export
-
-| Tombol | Aksi |
-|--------|------|
-| `Enter` | Selesai & export ke folder `BAD/` / `OK/` / `GOOD/` |
-
-Referensi lengkap: [docs/keyboard_shortcuts.md](../keyboard_shortcuts.md)
-
----
-
-## Arsitektur
-
-```
-sorter.py                 ← entry point
-  └── photosorter/
-        ├── main.py       ← window, key handlers, signal wiring
-        ├── controller.py ← business logic, signals, filters
-        ├── database.py   ← SQLite layer
-        ├── ui.py         ← PhotoViewer, Filmstrip, StatsHUD
-        ├── widgets.py    ← FolderBrowser, SearchBar, DateBrowser
-        ├── workers.py    ← ImageLoadTask, ThumbnailTask, GamepadThread
-        ├── exif.py       ← RAW + JPEG EXIF extraction
-        └── utils.py      ← cache, file ops, platform detection
-```
-
-- **Signals & slots** — controller emit sinyal, main.py wiring ke UI
-- **Background loading** — loading gambar dan thumbnail jalan di thread pool
-- **Two-pass rendering** — versi viewport dulu, resolusi penuh nyusul
-
----
-
-## Penyimpanan
-
-| Data | Lokasi |
-|------|--------|
-| Database rating | `~/.photosorter/dbs/` |
-| Index project | `~/.photosorter/projects.json` |
-| Log | `~/.photosorter/logs/photosorter.log` |
-| Checkpoint | `.photosorter_checkpoint.json` (di folder project) |
-
----
-
-## Development
-
-```bash
-pip install -e ".[dev]"
-pytest tests/       # 54 test
-ruff check photosorter/
-```
-
-Prinsip utama:
-- Tiap module di bawah 1000 baris
-- Tanpa NumPy (blur detection pake Python murni)
-- Fully offline — tanpa service eksternal
-- Cross-platform dari awal
-
----
-
-## Lisensi
+## 📜 Lisensi
 
 MIT. Lihat [LICENSE](../../LICENSE).
+
+
