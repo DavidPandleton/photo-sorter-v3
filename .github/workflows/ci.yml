@@ -127,7 +127,7 @@ jobs:
             | Linux | `.deb` / `.AppImage` |
             | Source | `.zip` |
 
-            Lihat [README](https://github.com/${{ github.repository }}/blob/main/README.md) untuk cara pake dan shortcut lengkap.
+            See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full usage and shortcuts.
           releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}
