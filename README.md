@@ -15,6 +15,8 @@
 </p>
 <p align="center">
   <a href="https://davidpandleton.github.io/photo-sorter-v3">View landing page</a>
+  &ensp;·&ensp;
+  <a href="docs/id/README.md">🇮🇩 Bahasa Indonesia</a>
 </p>
 
 <p align="center">
