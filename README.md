@@ -13,6 +13,9 @@
   Press 1/2/3, export, done.<br>
   No sliders, no layers, no magic auto-tagging. Just culling. Fast.
 </p>
+<p align="center">
+  <a href="https://davidpandleton.github.io/photo-sorter-v3">View landing page</a>
+</p>
 
 <p align="center">
   <img src="docs/photo%20or%20gif/demo.gif" alt="Demo" width="720">
