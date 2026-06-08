@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Rust-1.96%2B-orange" alt="Rust Version">
   <img src="https://img.shields.io/badge/Tauri-v2-teal" alt="Tauri">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/github/v/tag/DavidPandleton/photo-sorter-v3?label=version" alt="Version">
+  <img src="https://img.shields.io/github/v/tag/DavidPandleton/photo-sorter-v3?label=version&cache=v3.1.0" alt="Version">
 </p>
 
 <p align="center">
