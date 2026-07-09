@@ -156,6 +156,31 @@ class PhotoSorterApp {
     });
   }
 
+  private initMenuParallax() {
+    const menuScreen = document.getElementById('menu-screen');
+    if (!menuScreen) return;
+
+    menuScreen.addEventListener('mousemove', (e: MouseEvent) => {
+      const cards = document.querySelectorAll<HTMLElement>('.menu-card');
+      if (!cards.length) return;
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const px = (e.clientX - cx) / cx;
+      const py = (e.clientY - cy) / cy;
+
+      cards.forEach((card, i) => {
+        const depth = 3 + i * 2;
+        card.style.transform = `translate(${px * depth}px, ${py * depth}px)`;
+      });
+    });
+
+    menuScreen.addEventListener('mouseleave', () => {
+      document.querySelectorAll<HTMLElement>('.menu-card').forEach(card => {
+        card.style.transform = '';
+      });
+    });
+  }
+
   private async loadRecentProjects() {
     const listContainer = document.getElementById('recent-projects-list');
     if (!listContainer) return;
@@ -906,6 +931,7 @@ class PhotoSorterApp {
 
   public async init() {
     this.initElements();
+    this.initMenuParallax();
     await this.loadConfigFromDB();
     this.initKeyboardBinds();
     this.initSettingsUI();
