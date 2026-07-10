@@ -4,6 +4,10 @@ version = "3.1.0"
 description = "Fast, distraction-free photo culling tool in Rust"
 authors = ["Blanc & Violet"]
 edition = "2021"
+repository = "https://github.com/DavidPandleton/photo-sorter-v3"
+homepage = "https://davidpandleton.github.io/photo-sorter-v3"
+license = "MIT"
+keywords = ["photo", "culling", "tauri", "photography", "raw"]
 
 [lib]
 name = "photo_sorter_v3"
