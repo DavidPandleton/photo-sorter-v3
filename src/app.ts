@@ -150,6 +150,7 @@ class PhotoSorterApp {
     document.getElementById('btn-toggle-side')?.addEventListener('click', () => this.togglePanelSide());
     document.getElementById('btn-top-restore')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-finish-export')?.addEventListener('click', () => this.finishSorting());
+    document.getElementById('btn-export-xmp')?.addEventListener('click', () => this.exportXMP());
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
     searchInput?.addEventListener('input', (e) => {
       this.updateFilters((e.target as HTMLInputElement).value, '', '', '');
@@ -411,6 +412,22 @@ class PhotoSorterApp {
       this.returnToMenu();
     } catch (err) { this.showToast('Export failed: ' + err, 'BAD'); }
     finally { this.showProgressIndicator(false); }
+  }
+
+  private async exportXMP() {
+    if (this.currentIndex < 0) {
+      this.showToast('Open a folder first.', 'BAD');
+      return;
+    }
+    try {
+      this.showProgressIndicator(true);
+      const count = await invoke<number>('export_xmp_sidecars');
+      this.showToast(`Exported ${count} XMP sidecar files. Import into Lightroom/Darktable to see ratings.`, 'GOOD');
+    } catch (err) {
+      this.showToast('XMP export failed: ' + err, 'BAD');
+    } finally {
+      this.showProgressIndicator(false);
+    }
   }
 
   private async restoreCheckpoint() {
