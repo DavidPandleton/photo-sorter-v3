@@ -370,6 +370,18 @@ export class PhotoViewer {
     this.ctx.moveTo(halfW, 0);
     this.ctx.lineTo(halfW, ch);
     this.ctx.stroke();
+
+    // Label sides — "CURRENT" (left) and "COMPARE" (right)
+    this.ctx.font = '10px -apple-system, "Segoe UI", sans-serif';
+    this.ctx.textBaseline = 'bottom';
+
+    this.ctx.fillStyle = 'rgba(16, 185, 129, 0.5)';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText('CURRENT', 10, ch - 10);
+
+    this.ctx.fillStyle = 'rgba(99, 102, 241, 0.5)';
+    this.ctx.textAlign = 'right';
+    this.ctx.fillText('COMPARE', cw - 10, ch - 10);
   }
 
   private drawOverlays() {
