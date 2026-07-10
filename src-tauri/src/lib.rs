@@ -9,3 +9,4 @@ pub mod filter;
 pub mod undo;
 pub mod export;
 pub mod gamepad;
+pub mod xmp;
