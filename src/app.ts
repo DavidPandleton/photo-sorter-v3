@@ -430,7 +430,8 @@ class PhotoSorterApp {
 
   private async finishSorting() {
     if (this.imagePaths.length === 0) return;
-    if (!confirm('Are you sure you want to finish sorting? This will move all rated photos to their category folders.')) return;
+    const confirmed = await this.showCustomDialog('Finish Sorting', 'Are you sure? This will move all rated photos to their category folders.', true);
+    if (!confirmed) return;
     try {
       this.showProgressIndicator(true);
       const [movedCount, summary] = await invoke<[number, Record<string, number>]>('finish_sorting');
@@ -1107,7 +1108,8 @@ class PhotoSorterApp {
     document.getElementById('btn-settings-save')?.addEventListener('click', () => this.saveSettings());
     
     document.getElementById('btn-reset-keybindings')?.addEventListener('click', async () => {
-      if (confirm('Are you sure you want to reset all keyboard shortcuts to the system factory defaults? All your custom binds will be lost.')) {
+      const confirmed = await this.showCustomDialog('Reset Keybindings', 'Reset all keyboard shortcuts to factory defaults? All custom binds will be lost.', true);
+      if (!confirmed) return;
         try {
           this.showProgressIndicator(true);
           const defaultBinds = await invoke<KeybindingRecord[]>('reset_keybindings');
@@ -1123,7 +1125,6 @@ class PhotoSorterApp {
         } finally {
           this.showProgressIndicator(false);
         }
-      }
     });
   }
 
