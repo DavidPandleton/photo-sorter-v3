@@ -1201,11 +1201,11 @@ class PhotoSorterApp {
       });
       
       const deleteBtn = row.querySelector('.btn-delete-cat') as HTMLButtonElement;
-      deleteBtn.addEventListener('click', () => {
-        if (confirm(`Are you sure you want to delete category "${cat.label}"? All images rated with this category will be reset to unrated.`)) {
-          this.tempCategories.splice(index, 1);
-          this.renderSettingsCategories();
-        }
+      deleteBtn.addEventListener('click', async () => {
+        const confirmed = await this.showCustomDialog('Delete Category', `Delete category "${cat.label}"? All images rated with this category will be reset to unrated.`, true);
+        if (!confirmed) return;
+        this.tempCategories.splice(index, 1);
+        this.renderSettingsCategories();
       });
       
       container.appendChild(row);
