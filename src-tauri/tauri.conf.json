@@ -26,6 +26,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "Photography",
+    "shortDescription": "Fast, distraction-free photo culling",
+    "longDescription": "Rate photos with 1/2/3, export, done. RAW support, gamepad, compare mode. Zero AI.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

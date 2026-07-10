@@ -125,7 +125,7 @@ class PhotoSorterApp {
       rotateCW: () => this.rotateCurrent(1),
       rotateCCW: () => this.rotateCurrent(-1),
       resetZoom: () => this.viewer.resetZoom(),
-      returnToMenu: () => this.confirmReturnToMenu(),
+      returnToMenu: async () => { await this.confirmReturnToMenu(); },
       finishSorting: () => this.finishSorting(),
       toggleHUD: () => this.toggleHUD(),
       selectFolder: () => this.selectFolder(),
@@ -145,11 +145,12 @@ class PhotoSorterApp {
     document.getElementById('btn-start-culling')?.addEventListener('click', () => this.selectFolder());
     document.getElementById('btn-restore-checkpoint')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-exit-app')?.addEventListener('click', () => this.exitApp());
-    document.getElementById('btn-back')?.addEventListener('click', () => this.confirmReturnToMenu());
+    document.getElementById('btn-back')?.addEventListener('click', async () => { await this.confirmReturnToMenu(); });
     document.getElementById('btn-toggle-browser')?.addEventListener('click', () => this.toggleBrowser());
     document.getElementById('btn-toggle-side')?.addEventListener('click', () => this.togglePanelSide());
     document.getElementById('btn-top-restore')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-finish-export')?.addEventListener('click', () => this.finishSorting());
+    document.getElementById('btn-export-xmp')?.addEventListener('click', () => this.exportXMP());
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
     searchInput?.addEventListener('input', (e) => {
       this.updateFilters((e.target as HTMLInputElement).value, '', '', '');
@@ -179,6 +180,34 @@ class PhotoSorterApp {
         card.style.transform = '';
       });
     });
+  }
+
+  private initCheatsheet() {
+    document.getElementById('btn-cheatsheet-close')?.addEventListener('click', () => this.toggleCheatsheet());
+    document.getElementById('cheatsheet-overlay')?.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) this.toggleCheatsheet();
+    });
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const overlay = document.getElementById('cheatsheet-overlay');
+        if (overlay && overlay.style.display !== 'none') return;
+        this.toggleCheatsheet();
+        return;
+      }
+      if ((e.key === '/' && (e.metaKey || e.ctrlKey))) {
+        e.preventDefault();
+        this.toggleCheatsheet();
+      }
+      if (e.key === 'Escape') {
+        document.getElementById('cheatsheet-overlay')!.style.display = 'none';
+      }
+    });
+  }
+
+  private toggleCheatsheet() {
+    const overlay = document.getElementById('cheatsheet-overlay');
+    if (!overlay) return;
+    overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
   }
 
   private async loadRecentProjects() {
@@ -381,7 +410,7 @@ class PhotoSorterApp {
         await this.syncImagePaths();
         this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
         if (this.imagePaths.length > 0) await this.navigateImage(this.currentIndex);
-        else this.confirmReturnToMenu();
+        else await this.confirmReturnToMenu();
       }
     } catch (err) { this.showToast('Failed to trash photo: ' + err, 'BAD'); }
   }
@@ -401,16 +430,34 @@ class PhotoSorterApp {
 
   private async finishSorting() {
     if (this.imagePaths.length === 0) return;
-    if (!confirm('Are you sure you want to finish sorting? This will move all rated photos to their category folders.')) return;
+    const confirmed = await this.showCustomDialog('Finish Sorting', 'Are you sure? This will move all rated photos to their category folders.', true);
+    if (!confirmed) return;
     try {
       this.showProgressIndicator(true);
       const [movedCount, summary] = await invoke<[number, Record<string, number>]>('finish_sorting');
       const summaryParts = Object.entries(summary).map(([folder, count]) => `${folder}: ${count}`);
       const msg = `Export finished!\nMoved: ${movedCount} photos.\n\n${summaryParts.join(' | ')}`;
       await this.showCustomDialog('Export Complete', msg, false);
+      this.showConfetti();
       this.returnToMenu();
     } catch (err) { this.showToast('Export failed: ' + err, 'BAD'); }
     finally { this.showProgressIndicator(false); }
+  }
+
+  private async exportXMP() {
+    if (this.currentIndex < 0) {
+      this.showToast('Open a folder first.', 'BAD');
+      return;
+    }
+    try {
+      this.showProgressIndicator(true);
+      const count = await invoke<number>('export_xmp_sidecars');
+      this.showToast(`Exported ${count} XMP sidecar files. Import into Lightroom/Darktable to see ratings.`, 'GOOD');
+    } catch (err) {
+      this.showToast('XMP export failed: ' + err, 'BAD');
+    } finally {
+      this.showProgressIndicator(false);
+    }
   }
 
   private async restoreCheckpoint() {
@@ -508,9 +555,59 @@ class PhotoSorterApp {
     }
   }
 
-  private confirmReturnToMenu() {
-    const ans = confirm('Are you sure you want to exit to the main menu?');
-    if (ans) this.returnToMenu();
+  private async confirmReturnToMenu() {
+    const confirmed = await this.showCustomDialog('Return to Menu', 'Exit to the main menu? All unsaved progress will be lost.', true);
+    if (confirmed) this.returnToMenu();
+  }
+
+  private showConfetti() {
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d')!;
+    const colors = ['#2dd4bf', '#f59e0b', '#10b981', '#ef4444', '#ffab40', '#6366f1', '#ec4899'];
+    const particles: {x:number;y:number;vx:number;vy:number;size:number;color:string;rotation:number;rotSpeed:number;opacity:number}[] = [];
+    for (let i = 0; i < 200; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height * -1,
+        vx: (Math.random() - 0.5) * 6,
+        vy: Math.random() * 3 + 2,
+        size: Math.random() * 8 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.2,
+        opacity: 1,
+      });
+    }
+    let frame = 0;
+    const anim = () => {
+      frame++;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      for (const p of particles) {
+        if (p.opacity <= 0) continue;
+        p.x += p.vx;
+        p.vy += 0.08;
+        p.y += p.vy;
+        p.rotation += p.rotSpeed;
+        if (frame > 60) p.opacity -= 0.01;
+        if (p.opacity <= 0) continue;
+        alive = true;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.globalAlpha = p.opacity;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        ctx.restore();
+      }
+      if (alive && frame < 240) requestAnimationFrame(anim);
+      else { canvas.remove(); }
+    };
+    anim();
   }
 
   private returnToMenu() {
@@ -748,7 +845,7 @@ class PhotoSorterApp {
       case 'home': this.navigateImage(0); break;
       case 'end': this.navigateImage(this.imagePaths.length - 1); break;
       case 'jump': this.jumpToImageNumber(); break;
-      case 'menu': this.confirmReturnToMenu(); break;
+      case 'menu': void this.confirmReturnToMenu(); break;
       case 'export': this.finishSorting(); break;
       case 'delete': this.deleteCurrent(); break;
     }
@@ -932,6 +1029,7 @@ class PhotoSorterApp {
   public async init() {
     this.initElements();
     this.initMenuParallax();
+    this.initCheatsheet();
     await this.loadConfigFromDB();
     this.initKeyboardBinds();
     this.initSettingsUI();
@@ -1010,7 +1108,8 @@ class PhotoSorterApp {
     document.getElementById('btn-settings-save')?.addEventListener('click', () => this.saveSettings());
     
     document.getElementById('btn-reset-keybindings')?.addEventListener('click', async () => {
-      if (confirm('Are you sure you want to reset all keyboard shortcuts to the system factory defaults? All your custom binds will be lost.')) {
+      const confirmed = await this.showCustomDialog('Reset Keybindings', 'Reset all keyboard shortcuts to factory defaults? All custom binds will be lost.', true);
+      if (!confirmed) return;
         try {
           this.showProgressIndicator(true);
           const defaultBinds = await invoke<KeybindingRecord[]>('reset_keybindings');
@@ -1026,7 +1125,6 @@ class PhotoSorterApp {
         } finally {
           this.showProgressIndicator(false);
         }
-      }
     });
   }
 
@@ -1103,11 +1201,11 @@ class PhotoSorterApp {
       });
       
       const deleteBtn = row.querySelector('.btn-delete-cat') as HTMLButtonElement;
-      deleteBtn.addEventListener('click', () => {
-        if (confirm(`Are you sure you want to delete category "${cat.label}"? All images rated with this category will be reset to unrated.`)) {
-          this.tempCategories.splice(index, 1);
-          this.renderSettingsCategories();
-        }
+      deleteBtn.addEventListener('click', async () => {
+        const confirmed = await this.showCustomDialog('Delete Category', `Delete category "${cat.label}"? All images rated with this category will be reset to unrated.`, true);
+        if (!confirmed) return;
+        this.tempCategories.splice(index, 1);
+        this.renderSettingsCategories();
       });
       
       container.appendChild(row);

@@ -1,0 +1,34 @@
+# Auto-detect text files, ensure LF
+* text=auto eol=lf
+
+# Rust
+*.rs text diff=rust
+
+# TypeScript/JS
+*.ts text diff=typescript
+*.tsx text diff=typescript
+*.js text diff=javascript
+*.jsx text diff=javascript
+*.json text diff=json
+
+# Markdown
+*.md text diff=markdown
+
+# YAML
+*.yml text diff=yaml
+*.yaml text diff=yaml
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows scripts
+*.ps1 text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.mp4 binary

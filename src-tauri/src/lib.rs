@@ -1,5 +1,5 @@
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::new_without_default)]
+#![allow(clippy::too_many_arguments)] // Tauri commands often need many params
+#![allow(clippy::new_without_default)] // AppState requires initialization logic
 pub mod constants;
 pub mod database;
 pub mod exif;
@@ -9,3 +9,4 @@ pub mod filter;
 pub mod undo;
 pub mod export;
 pub mod gamepad;
+pub mod xmp;

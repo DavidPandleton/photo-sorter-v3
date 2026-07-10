@@ -308,6 +308,39 @@ fn get_startup_folder(state: State<'_, AppState>) -> Option<String> {
 }
 
 #[tauri::command]
+fn export_xmp_sidecars(state: State<'_, AppState>) -> Result<usize, String> {
+    let results_map = state.results.read().unwrap().clone();
+    if results_map.is_empty() {
+        return Err("No images have been rated yet.".to_string());
+    }
+    
+    let db_opt = state.db.read().unwrap();
+    let pid_opt = state.project_id.read().unwrap();
+    let mut count = 0;
+    
+    if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
+        for (path_str, category) in &results_map {
+            let record = db.get_image_by_path(*pid, path_str)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| format!("Image not found: {}", path_str))?;
+            
+            let xmp_content = photo_sorter_v3::xmp::generate_xmp_sidecar(
+                path_str,
+                category,
+                record.star_rating,
+                record.pick == 1,
+            );
+            
+            photo_sorter_v3::xmp::write_sidecar(path_str, &xmp_content)?;
+            count += 1;
+        }
+        Ok(count)
+    } else {
+        Err("No active project database found.".to_string())
+    }
+}
+
+#[tauri::command]
 fn get_categories(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::CategoryRecord>, String> {
     state.get_categories()
 }
@@ -361,6 +394,25 @@ fn reset_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::
 fn main() {
     let mut startup_folder = None;
     let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && (args[1] == "--help" || args[1] == "-h") {
+        println!("Photo Sorter v{}", env!("CARGO_PKG_VERSION"));
+        println!("Fast, distraction-free photo culling tool");
+        println!();
+        println!("USAGE:");
+        println!("  photo-sorter-v3 [OPTIONS]");
+        println!();
+        println!("OPTIONS:");
+        println!("  --folder <PATH>  Open a photo directory on startup");
+        println!("  -f <PATH>        Short alias for --folder");
+        println!("  <PATH>           If the argument is a directory, open it on startup");
+        println!("  --help, -h       Print this help message");
+        println!("  --version, -v    Print version information");
+        std::process::exit(0);
+    }
+    if args.len() > 1 && (args[1] == "--version" || args[1] == "-v") {
+        println!("Photo Sorter v{}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
     let mut i = 1;
     while i < args.len() {
         if (args[i] == "--folder" || args[i] == "-f") && i + 1 < args.len() {
@@ -427,6 +479,7 @@ fn main() {
             toggle_filter_mode,
             get_recent_projects,
             get_startup_folder,
+            export_xmp_sidecars,
             get_categories,
             save_category,
             delete_category,

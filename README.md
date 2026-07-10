@@ -5,7 +5,9 @@
   <img src="https://img.shields.io/badge/Rust-1.96%2B-orange" alt="Rust Version">
   <img src="https://img.shields.io/badge/Tauri-v2-teal" alt="Tauri">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/github/v/tag/DavidPandleton/photo-sorter-v3?label=version&cache=v3.1.0" alt="Version">
+  <img src="https://img.shields.io/github/v/tag/DavidPandleton/photo-sorter-v3?label=version" alt="Version">
+  <img src="https://img.shields.io/github/actions/workflow/status/DavidPandleton/photo-sorter-v3/ci.yml?label=CI" alt="CI">
+  <img src="https://img.shields.io/github/downloads/DavidPandleton/photo-sorter-v3/total?label=downloads" alt="Downloads">
 </p>
 
 <p align="center">
@@ -171,6 +173,12 @@ Photo Sorter v3 is strictly better than v2 in every way. Tested on 700+ Sony RAW
 **v3 wins on:** speed (Rust backend beats Python hands down), cross-platform (Windows/macOS/Linux), customizable keybindings, gamepad (USB/Bluetooth), compare mode, settings persistence, native trash integration, parallel thumbnail generation, modern UI, SQLite cache, focus meter.
 
 **v2:** Deprecated. Use v3.
+
+---
+
+## Contributing
+
+Found a bug or have an idea? [Open an issue](https://github.com/DavidPandleton/photo-sorter-v3/issues/new/choose) — we have templates for bug reports and feature requests. Pull requests welcome.
 
 ---
 
