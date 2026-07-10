@@ -125,7 +125,7 @@ class PhotoSorterApp {
       rotateCW: () => this.rotateCurrent(1),
       rotateCCW: () => this.rotateCurrent(-1),
       resetZoom: () => this.viewer.resetZoom(),
-      returnToMenu: () => this.confirmReturnToMenu(),
+      returnToMenu: async () => { await this.confirmReturnToMenu(); },
       finishSorting: () => this.finishSorting(),
       toggleHUD: () => this.toggleHUD(),
       selectFolder: () => this.selectFolder(),
@@ -145,7 +145,7 @@ class PhotoSorterApp {
     document.getElementById('btn-start-culling')?.addEventListener('click', () => this.selectFolder());
     document.getElementById('btn-restore-checkpoint')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-exit-app')?.addEventListener('click', () => this.exitApp());
-    document.getElementById('btn-back')?.addEventListener('click', () => this.confirmReturnToMenu());
+    document.getElementById('btn-back')?.addEventListener('click', async () => { await this.confirmReturnToMenu(); });
     document.getElementById('btn-toggle-browser')?.addEventListener('click', () => this.toggleBrowser());
     document.getElementById('btn-toggle-side')?.addEventListener('click', () => this.togglePanelSide());
     document.getElementById('btn-top-restore')?.addEventListener('click', () => this.restoreCheckpoint());
@@ -410,7 +410,7 @@ class PhotoSorterApp {
         await this.syncImagePaths();
         this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
         if (this.imagePaths.length > 0) await this.navigateImage(this.currentIndex);
-        else this.confirmReturnToMenu();
+        else await this.confirmReturnToMenu();
       }
     } catch (err) { this.showToast('Failed to trash photo: ' + err, 'BAD'); }
   }
@@ -555,9 +555,9 @@ class PhotoSorterApp {
     }
   }
 
-  private confirmReturnToMenu() {
-    const ans = confirm('Are you sure you want to exit to the main menu?');
-    if (ans) this.returnToMenu();
+  private async confirmReturnToMenu() {
+    const confirmed = await this.showCustomDialog('Return to Menu', 'Exit to the main menu? All unsaved progress will be lost.', true);
+    if (confirmed) this.returnToMenu();
   }
 
   private showConfetti() {
@@ -845,7 +845,7 @@ class PhotoSorterApp {
       case 'home': this.navigateImage(0); break;
       case 'end': this.navigateImage(this.imagePaths.length - 1); break;
       case 'jump': this.jumpToImageNumber(); break;
-      case 'menu': this.confirmReturnToMenu(); break;
+      case 'menu': void this.confirmReturnToMenu(); break;
       case 'export': this.finishSorting(); break;
       case 'delete': this.deleteCurrent(); break;
     }
