@@ -394,6 +394,25 @@ fn reset_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::
 fn main() {
     let mut startup_folder = None;
     let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && (args[1] == "--help" || args[1] == "-h") {
+        println!("Photo Sorter v{}", env!("CARGO_PKG_VERSION"));
+        println!("Fast, distraction-free photo culling tool");
+        println!();
+        println!("USAGE:");
+        println!("  photo-sorter-v3 [OPTIONS]");
+        println!();
+        println!("OPTIONS:");
+        println!("  --folder <PATH>  Open a photo directory on startup");
+        println!("  -f <PATH>        Short alias for --folder");
+        println!("  <PATH>           If the argument is a directory, open it on startup");
+        println!("  --help, -h       Print this help message");
+        println!("  --version, -v    Print version information");
+        std::process::exit(0);
+    }
+    if args.len() > 1 && (args[1] == "--version" || args[1] == "-v") {
+        println!("Photo Sorter v{}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
     let mut i = 1;
     while i < args.len() {
         if (args[i] == "--folder" || args[i] == "-f") && i + 1 < args.len() {
