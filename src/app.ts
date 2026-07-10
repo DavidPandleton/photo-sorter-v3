@@ -182,6 +182,34 @@ class PhotoSorterApp {
     });
   }
 
+  private initCheatsheet() {
+    document.getElementById('btn-cheatsheet-close')?.addEventListener('click', () => this.toggleCheatsheet());
+    document.getElementById('cheatsheet-overlay')?.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) this.toggleCheatsheet();
+    });
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const overlay = document.getElementById('cheatsheet-overlay');
+        if (overlay && overlay.style.display !== 'none') return;
+        this.toggleCheatsheet();
+        return;
+      }
+      if ((e.key === '/' && (e.metaKey || e.ctrlKey))) {
+        e.preventDefault();
+        this.toggleCheatsheet();
+      }
+      if (e.key === 'Escape') {
+        document.getElementById('cheatsheet-overlay')!.style.display = 'none';
+      }
+    });
+  }
+
+  private toggleCheatsheet() {
+    const overlay = document.getElementById('cheatsheet-overlay');
+    if (!overlay) return;
+    overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
+  }
+
   private async loadRecentProjects() {
     const listContainer = document.getElementById('recent-projects-list');
     if (!listContainer) return;
@@ -409,6 +437,7 @@ class PhotoSorterApp {
       const summaryParts = Object.entries(summary).map(([folder, count]) => `${folder}: ${count}`);
       const msg = `Export finished!\nMoved: ${movedCount} photos.\n\n${summaryParts.join(' | ')}`;
       await this.showCustomDialog('Export Complete', msg, false);
+      this.showConfetti();
       this.returnToMenu();
     } catch (err) { this.showToast('Export failed: ' + err, 'BAD'); }
     finally { this.showProgressIndicator(false); }
@@ -528,6 +557,56 @@ class PhotoSorterApp {
   private confirmReturnToMenu() {
     const ans = confirm('Are you sure you want to exit to the main menu?');
     if (ans) this.returnToMenu();
+  }
+
+  private showConfetti() {
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d')!;
+    const colors = ['#2dd4bf', '#f59e0b', '#10b981', '#ef4444', '#ffab40', '#6366f1', '#ec4899'];
+    const particles: {x:number;y:number;vx:number;vy:number;size:number;color:string;rotation:number;rotSpeed:number;opacity:number}[] = [];
+    for (let i = 0; i < 200; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height * -1,
+        vx: (Math.random() - 0.5) * 6,
+        vy: Math.random() * 3 + 2,
+        size: Math.random() * 8 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.2,
+        opacity: 1,
+      });
+    }
+    let frame = 0;
+    const anim = () => {
+      frame++;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      for (const p of particles) {
+        if (p.opacity <= 0) continue;
+        p.x += p.vx;
+        p.vy += 0.08;
+        p.y += p.vy;
+        p.rotation += p.rotSpeed;
+        if (frame > 60) p.opacity -= 0.01;
+        if (p.opacity <= 0) continue;
+        alive = true;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.globalAlpha = p.opacity;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        ctx.restore();
+      }
+      if (alive && frame < 240) requestAnimationFrame(anim);
+      else { canvas.remove(); }
+    };
+    anim();
   }
 
   private returnToMenu() {
@@ -949,6 +1028,7 @@ class PhotoSorterApp {
   public async init() {
     this.initElements();
     this.initMenuParallax();
+    this.initCheatsheet();
     await this.loadConfigFromDB();
     this.initKeyboardBinds();
     this.initSettingsUI();
