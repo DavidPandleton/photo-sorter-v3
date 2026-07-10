@@ -15,7 +15,7 @@ pub fn generate_xmp_sidecar(
     image_path: &str,
     category: &str,
     star_rating: i32,
-    is_picked: bool,
+    _is_picked: bool,
 ) -> String {
     // Map category → XMP rating
     let xmp_rating = match category.to_lowercase().as_str() {
@@ -35,16 +35,6 @@ pub fn generate_xmp_sidecar(
         "good" => "Approved",
         _ => category,
     };
-
-    // Build filename for the sidecar (same basename, .xmp extension)
-    let path = Path::new(image_path);
-    let basename = path.file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
-    let parent = path.parent()
-        .and_then(|p| p.to_str())
-        .unwrap_or(".");
-    let sidecar_path = format!("{}/{}.xmp", parent, basename);
 
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
