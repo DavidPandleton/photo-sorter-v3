@@ -2,11 +2,6 @@
  * PHOTO SORTER V3 — Global Frontend Constants & Configurations
  */
 
-export const CATEGORY_BAD = 'BAD';
-export const CATEGORY_OK = 'OK';
-export const CATEGORY_GOOD = 'GOOD';
-export const CATEGORIES = [CATEGORY_BAD, CATEGORY_OK, CATEGORY_GOOD] as const;
-
 export const COLOR_BAD_FLASH = 'rgba(239, 68, 68, 0.4)';
 export const COLOR_OK_FLASH = 'rgba(245, 158, 11, 0.4)';
 export const COLOR_GOOD_FLASH = 'rgba(16, 185, 129, 0.4)';

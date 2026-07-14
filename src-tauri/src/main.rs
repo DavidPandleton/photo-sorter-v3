@@ -451,9 +451,7 @@ fn main() {
                 }
             }
 
-            std::thread::spawn(move || {
-                photo_sorter_v3::gamepad::start_gamepad_loop(app_handle);
-            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

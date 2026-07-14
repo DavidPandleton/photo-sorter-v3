@@ -12,6 +12,4 @@ pub const SUPPORTED_EXTENSIONS: [&str; 12] = [
     "nef", "cr2", "arw", "dng", "cr3", "orf", "rw2", "pef"
 ];
 
-pub const GAMEPAD_TRIGGER_PRESS_THRESHOLD: f32 = 0.5;
-pub const GAMEPAD_TRIGGER_RELEASE_THRESHOLD: f32 = 0.1;
-pub const GAMEPAD_POLL_INTERVAL_MS: u64 = 8;
+
