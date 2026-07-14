@@ -11,12 +11,7 @@ use std::fs;
 ///
 /// The generated XMP is compatible with Adobe Lightroom, Bridge,
 /// Darktable, RawTherapee, and Capture One.
-pub fn generate_xmp_sidecar(
-    image_path: &str,
-    category: &str,
-    star_rating: i32,
-    _is_picked: bool,
-) -> String {
+pub fn generate_xmp_sidecar(_image_path: &str, category: &str, star_rating: i32, _is_picked: bool) -> String {
     // Map category → XMP rating
     let xmp_rating = match category.to_lowercase().as_str() {
         "bad" | "reject" => 1,
