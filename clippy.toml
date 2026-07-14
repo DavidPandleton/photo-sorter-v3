@@ -11,6 +11,3 @@ disallowed-macros = [
 
 # Max allowed cognitive complexity per function
 cognitive-complexity-threshold = 25
-
-# Flag macros that could be replaced with a function
-allow-mixed-unclear-patterns = false
