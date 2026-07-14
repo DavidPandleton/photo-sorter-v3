@@ -12,6 +12,15 @@ pub struct DecodedImage {
     pub height: u32,
 }
 
+fn read_image_bytes<P: AsRef<Path>>(path: &P) -> Option<Vec<u8>> {
+    let ext = path.as_ref().extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if matches!(ext.as_str(), "nef" | "cr2" | "arw" | "dng" | "cr3" | "orf" | "rw2" | "pef") {
+        extract_raw_preview(path)
+    } else {
+        std::fs::read(path).ok()
+    }
+}
+
 /// Extract embedded preview JPEG from a RAW file using TIFF offsets.
 /// This works for NEF, CR2, ARW, DNG, etc. because they are TIFF containers.
 pub fn extract_raw_preview<P: AsRef<Path>>(file_path: P) -> Option<Vec<u8>> {
@@ -51,18 +60,9 @@ pub fn extract_raw_preview<P: AsRef<Path>>(file_path: P) -> Option<Vec<u8>> {
 
 /// Loads and resizes an image to fit a viewport box (e.g. 1920x1080)
 pub fn load_and_scale_image<P: AsRef<Path>>(file_path: P, max_dim: u32) -> Option<DecodedImage> {
-    let ext = file_path.as_ref().extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-        
+    let ext = file_path.as_ref().extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
     let is_raw = matches!(ext.as_str(), "nef" | "cr2" | "arw" | "dng" | "cr3" | "orf" | "rw2" | "pef");
-    
-    let img_bytes = if is_raw {
-        extract_raw_preview(&file_path)?
-    } else {
-        std::fs::read(&file_path).ok()?
-    };
+    let img_bytes = read_image_bytes(&file_path)?;
     
     let format = "image/jpeg";
 
@@ -111,28 +111,7 @@ pub fn load_and_scale_image<P: AsRef<Path>>(file_path: P, max_dim: u32) -> Optio
 }
 
 pub fn load_image_unscaled<P: AsRef<Path>>(file_path: P) -> Option<DecodedImage> {
-    let ext = file_path.as_ref().extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-        
-    let is_raw = matches!(ext.as_str(), "nef" | "cr2" | "arw" | "dng" | "cr3" | "orf" | "rw2" | "pef");
-    
-    let img_bytes = if is_raw {
-        if let Some(preview) = extract_raw_preview(&file_path) {
-            preview
-        } else {
-            // If no RAW preview, try full raw decode via image crate
-            let img = ImageReader::open(&file_path).ok()?.decode().ok()?;
-            let (w, h) = img.dimensions();
-            let mut jpeg_bytes = Vec::new();
-            let mut cursor = std::io::Cursor::new(&mut jpeg_bytes);
-            img.write_to(&mut cursor, image::ImageFormat::Jpeg).ok()?;
-            return Some(DecodedImage { bytes: jpeg_bytes, format: "image/jpeg", width: w, height: h });
-        }
-    } else {
-        std::fs::read(&file_path).ok()?
-    };
+    let img_bytes = read_image_bytes(&file_path)?;
     
     let format = "image/jpeg";
     let img = ImageReader::new(std::io::Cursor::new(&img_bytes))
@@ -204,18 +183,7 @@ pub fn calculate_focus_score(img: &DynamicImage) -> f64 {
 
 /// Generates a thumbnail JPEG and returns it along with the focus score.
 pub fn generate_thumbnail<P: AsRef<Path>>(file_path: P, target_height: u32) -> Option<(Vec<u8>, f64)> {
-    let ext = file_path.as_ref().extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-        
-    let is_raw = matches!(ext.as_str(), "nef" | "cr2" | "arw" | "dng" | "cr3" | "orf" | "rw2" | "pef");
-    
-    let img_bytes = if is_raw {
-        extract_raw_preview(&file_path)?
-    } else {
-        std::fs::read(&file_path).ok()?
-    };
+    let img_bytes = read_image_bytes(&file_path)?;
     
     let img = ImageReader::new(std::io::Cursor::new(&img_bytes))
         .with_guessed_format().ok()?

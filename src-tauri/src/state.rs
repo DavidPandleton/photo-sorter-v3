@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::sync::{Arc, RwLock};
@@ -12,8 +12,6 @@ const FULLRES_CACHE_MAX: usize = 10;
 pub struct ImageCache {
     pub scaled: RwLock<HashMap<String, Vec<u8>>>,
     pub full_res: RwLock<HashMap<String, Vec<u8>>>,
-    scaled_order: RwLock<VecDeque<String>>,
-    fullres_order: RwLock<VecDeque<String>>,
 }
 
 impl ImageCache {
@@ -21,78 +19,36 @@ impl ImageCache {
         ImageCache {
             scaled: RwLock::new(HashMap::new()),
             full_res: RwLock::new(HashMap::new()),
-            scaled_order: RwLock::new(VecDeque::new()),
-            fullres_order: RwLock::new(VecDeque::new()),
         }
     }
 
     pub fn get_scaled(&self, path: &str) -> Option<Vec<u8>> {
-        let map = self.scaled.read().unwrap();
-        if let Some(bytes) = map.get(path) {
-            let mut order = self.scaled_order.write().unwrap();
-            if let Some(pos) = order.iter().position(|p| p == path) {
-                order.remove(pos);
-                order.push_back(path.to_string());
-            }
-            Some(bytes.clone())
-        } else {
-            None
-        }
+        self.scaled.read().unwrap().get(path).cloned()
     }
 
     pub fn insert_scaled(&self, path: &str, bytes: Vec<u8>) {
         let mut map = self.scaled.write().unwrap();
-        let mut order = self.scaled_order.write().unwrap();
-        if map.contains_key(path) {
-            if let Some(pos) = order.iter().position(|p| p == path) {
-                order.remove(pos);
-            }
-        }
         map.insert(path.to_string(), bytes);
-        order.push_back(path.to_string());
-        while map.len() > IMAGE_CACHE_MAX {
-            if let Some(old) = order.pop_front() {
-                map.remove(&old);
-            }
+        if map.len() > IMAGE_CACHE_MAX {
+            map.clear();
         }
     }
 
     pub fn get_fullres(&self, path: &str) -> Option<Vec<u8>> {
-        let map = self.full_res.read().unwrap();
-        if let Some(bytes) = map.get(path) {
-            let mut order = self.fullres_order.write().unwrap();
-            if let Some(pos) = order.iter().position(|p| p == path) {
-                order.remove(pos);
-                order.push_back(path.to_string());
-            }
-            Some(bytes.clone())
-        } else {
-            None
-        }
+        self.full_res.read().unwrap().get(path).cloned()
     }
 
     pub fn insert_fullres(&self, path: &str, bytes: Vec<u8>) {
         let mut map = self.full_res.write().unwrap();
-        let mut order = self.fullres_order.write().unwrap();
-        if map.contains_key(path) {
-            if let Some(pos) = order.iter().position(|p| p == path) {
-                order.remove(pos);
-            }
-        }
         map.insert(path.to_string(), bytes);
-        order.push_back(path.to_string());
-        while map.len() > FULLRES_CACHE_MAX {
-            if let Some(old) = order.pop_front() {
-                map.remove(&old);
-            }
+        if map.len() > FULLRES_CACHE_MAX {
+            map.clear();
         }
     }
 
     pub fn clear(&self) {
         self.scaled.write().unwrap().clear();
         self.full_res.write().unwrap().clear();
-        self.scaled_order.write().unwrap().clear();
-        self.fullres_order.write().unwrap().clear();
     }
 }
 
