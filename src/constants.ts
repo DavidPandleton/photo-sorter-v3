@@ -11,8 +11,6 @@ export const ZOOM_MIN = 0.05;
 export const ZOOM_MAX = 25.0;
 export const ZOOM_FACTOR = 1.1;
 
-export const CACHE_LIMIT_PREVIEW = 15;
-export const CACHE_LIMIT_FULL_RES = 5;
 export const PRELOAD_WINDOW_SIZE = 5;
 
 export const GAMEPAD_DEADZONE = 0.25;

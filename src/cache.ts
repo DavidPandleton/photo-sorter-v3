@@ -1,59 +1,34 @@
 import { invoke } from '@tauri-apps/api/core';
 import { PhotoViewer } from './viewer';
-import { CACHE_LIMIT_PREVIEW, CACHE_LIMIT_FULL_RES, PRELOAD_WINDOW_SIZE } from './constants';
+import { PRELOAD_WINDOW_SIZE } from './constants';
 
 export class ImageCacheManager {
   private imageCache: Map<string, HTMLImageElement> = new Map();
   private fullResCache: Map<string, HTMLImageElement> = new Map();
   private activePreloadRequests: Set<string> = new Set();
 
-  getFromCache(path: string): HTMLImageElement | undefined {
-    return this.imageCache.get(path);
-  }
-
-  getFromFullResCache(path: string): HTMLImageElement | undefined {
-    return this.fullResCache.get(path);
-  }
-
-  addToCache(path: string, img: HTMLImageElement) {
-    this.imageCache.set(path, img);
-  }
-
-  addToFullResCache(path: string, img: HTMLImageElement) {
-    this.fullResCache.set(path, img);
-  }
-
-  clear() {
-    this.imageCache.clear();
-    this.fullResCache.clear();
-  }
+  getFromCache(path: string): HTMLImageElement | undefined { return this.imageCache.get(path); }
+  getFromFullResCache(path: string): HTMLImageElement | undefined { return this.fullResCache.get(path); }
+  addToCache(path: string, img: HTMLImageElement) { this.imageCache.set(path, img); }
+  addToFullResCache(path: string, img: HTMLImageElement) { this.fullResCache.set(path, img); }
+  clear() { this.imageCache.clear(); this.fullResCache.clear(); }
 
   evictIfNeeded(currentIdx: number, imagePaths: string[]) {
-    if (this.imageCache.size <= CACHE_LIMIT_PREVIEW &&
-        this.fullResCache.size <= CACHE_LIMIT_FULL_RES) return;
     const preloadWindowSize = PRELOAD_WINDOW_SIZE;
     const keep = new Set<string>();
     for (let d = -preloadWindowSize; d <= preloadWindowSize; d++) {
       const i = currentIdx + d;
       if (i >= 0 && i < imagePaths.length) keep.add(imagePaths[i]);
     }
-    for (const key of this.imageCache.keys()) {
-      if (!keep.has(key)) this.imageCache.delete(key);
-    }
-    for (const key of this.fullResCache.keys()) {
-      if (!keep.has(key)) this.fullResCache.delete(key);
-    }
+    for (const key of this.imageCache.keys()) { if (!keep.has(key)) this.imageCache.delete(key); }
+    for (const key of this.fullResCache.keys()) { if (!keep.has(key)) this.fullResCache.delete(key); }
   }
 
   triggerPreloaders(idx: number, imagePaths: string[]) {
     const preloadWindowSize = PRELOAD_WINDOW_SIZE;
-    const targets = [];
     for (let i = 1; i <= preloadWindowSize; i++) {
-      if (idx + i < imagePaths.length) targets.push(imagePaths[idx + i]);
-    }
-    this.evictIfNeeded(idx, imagePaths);
-
-    for (const path of targets) {
+      if (idx + i >= imagePaths.length) break;
+      const path = imagePaths[idx + i];
       if (this.imageCache.has(path) || this.activePreloadRequests.has(path)) continue;
       this.activePreloadRequests.add(path);
       invoke<number[]>('get_image_data', { path })
@@ -61,15 +36,12 @@ export class ImageCacheManager {
           const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
           const url = URL.createObjectURL(blob);
           const img = new Image();
-          img.onload = () => {
-            this.imageCache.set(path, img);
-            this.activePreloadRequests.delete(path);
-            URL.revokeObjectURL(url);
-          };
+          img.onload = () => { this.imageCache.set(path, img); this.activePreloadRequests.delete(path); URL.revokeObjectURL(url); };
           img.src = url;
         })
         .catch(() => this.activePreloadRequests.delete(path));
     }
+    this.evictIfNeeded(idx, imagePaths);
   }
 
   async loadFullResolution(path: string, viewer: PhotoViewer, currentIdx: number, imagePaths: string[]) {
@@ -87,8 +59,6 @@ export class ImageCacheManager {
         }
       };
       img.src = url;
-    } catch (err) {
-      console.error('Full resolution load failed:', err);
-    }
+    } catch (err) { console.error('Full resolution load failed:', err); }
   }
 }

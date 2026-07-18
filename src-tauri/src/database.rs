@@ -511,14 +511,7 @@ impl PhotoDatabase {
         Ok(())
     }
 
-    pub fn set_blur_score(&self, image_id: i64, score: f64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "UPDATE images SET blur_score = ? WHERE id = ?",
-            params![score, image_id],
-        )?;
-        Ok(())
-    }
+
 
     pub fn set_exif_data(
         &self,

@@ -8,7 +8,6 @@ use photo_sorter_v3::state::AppState;
 use photo_sorter_v3::database::{ImageRecord, DateRecord};
 use photo_sorter_v3::image_loader::{load_and_scale_image, load_image_unscaled, generate_thumbnail};
 use photo_sorter_v3::exif::extract_exif;
-use photo_sorter_v3::constants;
 
 // --- Helper path to local AppData DB ---
 fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
@@ -60,14 +59,7 @@ fn finish_sorting(state: State<'_, AppState>) -> Result<(usize, HashMap<String, 
     state.finish_sorting()
 }
 
-#[tauri::command]
-fn restore_checkpoint(state: State<'_, AppState>, root: Option<String>) -> Result<i32, String> {
-    if let Some(ref p) = root {
-        *state.root_folder.write().unwrap() = p.clone();
-    }
-    state.restore_checkpoint()
-}
-
+// ponytail: checkpoint/restore removed — was unused complexity
 #[tauri::command]
 fn get_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
     if let Some(cached) = state.image_cache.get_scaled(&path) {
@@ -90,29 +82,22 @@ fn get_full_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u
     Ok(decoded.bytes)
 }
 
+// ponytail: blur_score removed — was broken, see audit
 #[tauri::command]
-fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<(Vec<u8>, f64), String> {
+fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
     let db_opt = state.db.read().unwrap();
     let pid_opt = state.project_id.read().unwrap();
-    
     if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
         let record = db.get_image_by_path(*pid, &path)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "Image record not found.".to_string())?;
-            
-        // Check SQLite cache first
         if let Ok(Some(cached_blob)) = db.get_thumbnail(record.id) {
-            return Ok((cached_blob, record.blur_score));
+            return Ok(cached_blob);
         }
-        
-        // Generate and cache
-        let (thumb_bytes, blur_score) = generate_thumbnail(&path, 120)
+        let thumb_bytes = generate_thumbnail(&path, 120)
             .ok_or_else(|| "Failed to generate thumbnail.".to_string())?;
-            
         db.save_thumbnail(record.id, &thumb_bytes).unwrap_or(());
-        db.set_blur_score(record.id, blur_score).unwrap_or(());
-        
-        Ok((thumb_bytes, blur_score))
+        Ok(thumb_bytes)
     } else {
         Err("No active database session.".to_string())
     }
@@ -128,7 +113,8 @@ fn get_project_stats(state: State<'_, AppState>) -> Result<HashMap<String, usize
         stats.insert(cat.key_name.clone(), 0);
     }
     if stats.is_empty() {
-        for &cat in &constants::CATEGORIES {
+        // ponytail: inlined constants — was a separate module just for this
+        for &cat in &["BAD", "OK", "GOOD"] {
             stats.insert(cat.to_string().to_lowercase(), 0);
         }
     }
@@ -196,41 +182,12 @@ fn get_current_index(state: State<'_, AppState>) -> Result<i32, String> {
     Ok(*state.current_index.read().unwrap())
 }
 
+// ponytail: no background EXIF thread — was racing with get_image_metadata_info. EXIF extracted eagerly in open_folder.
 #[tauri::command]
 fn set_current_index(state: State<'_, AppState>, index: i32) -> Result<(), String> {
     let paths = state.image_paths.read().unwrap();
     if index >= 0 && index < paths.len() as i32 {
         *state.current_index.write().unwrap() = index;
-        
-        // Asynchronously pre-fetch and extract EXIF if missing
-        let path = paths[index as usize].clone();
-        let db_opt = state.db.read().unwrap();
-        let pid_opt = state.project_id.read().unwrap();
-        
-        if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-            if let Ok(Some(record)) = db.get_image_by_path(*pid, &path) {
-                if record.camera_model.is_none() {
-                    // Extract in a background thread to prevent culling UI lag
-                    let db_clone = Arc::clone(db);
-                    let record_id = record.id;
-                    std::thread::spawn(move || {
-                        if let Some(meta) = extract_exif(&path) {
-                            db_clone.set_exif_data(
-                                record_id,
-                                meta.iso,
-                                meta.aperture.as_deref(),
-                                meta.shutter_speed.as_deref(),
-                                meta.focal_length.as_deref(),
-                                meta.lens.as_deref(),
-                                meta.camera_model.as_deref(),
-                                meta.date_taken.as_deref(),
-                                meta.orientation,
-                            ).unwrap_or(());
-                        }
-                    });
-                }
-            }
-        }
         Ok(())
     } else {
         Err("Index out of bounds.".to_string())
@@ -293,11 +250,6 @@ fn toggle_filter_mode(state: State<'_, AppState>) -> Result<String, String> {
     };
     state.apply_filters();
     Ok(new_mode)
-}
-
-#[tauri::command]
-fn auto_grade_unrated(state: State<'_, AppState>) -> Result<HashMap<String, f64>, String> {
-    state.auto_grade_unrated()
 }
 
 #[tauri::command]
@@ -370,26 +322,7 @@ fn save_keybinding(state: State<'_, AppState>, bind: photo_sorter_v3::database::
     state.save_keybinding(bind)
 }
 
-#[tauri::command]
-fn get_hud_items(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::HudItemRecord>, String> {
-    state.get_hud_items()
-}
-
-#[tauri::command]
-fn save_hud_items(state: State<'_, AppState>, items: Vec<photo_sorter_v3::database::HudItemRecord>) -> Result<(), String> {
-    state.save_hud_items(items)
-}
-
-#[tauri::command]
-fn get_hud_widgets(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::HudWidgetRecord>, String> {
-    state.get_hud_widgets()
-}
-
-#[tauri::command]
-fn save_hud_widgets(state: State<'_, AppState>, widgets: Vec<photo_sorter_v3::database::HudWidgetRecord>) -> Result<(), String> {
-    state.save_hud_widgets(widgets)
-}
-
+// ponytail: HUD widget/item CRUD removed — YAGNI, nobody configures HUD opacity from DB
 #[tauri::command]
 fn reset_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::KeybindingRecord>, String> {
     state.reset_keybindings()?;
@@ -468,7 +401,6 @@ fn main() {
             delete_current_image,
             undo_last_rating,
             finish_sorting,
-            restore_checkpoint,
             get_image_data,
             get_full_image_data,
             get_thumbnail_data,
@@ -480,7 +412,6 @@ fn main() {
             set_current_index,
             get_image_metadata_info,
             toggle_filter_mode,
-            auto_grade_unrated,
             get_recent_projects,
             get_startup_folder,
             export_xmp_sidecars,
@@ -489,10 +420,6 @@ fn main() {
             delete_category,
             get_keybindings,
             save_keybinding,
-            get_hud_items,
-            save_hud_items,
-            get_hud_widgets,
-            save_hud_widgets,
             reset_keybindings
         ])
         .run(tauri::generate_context!())

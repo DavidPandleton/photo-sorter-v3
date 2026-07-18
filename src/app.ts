@@ -20,57 +20,9 @@ interface DateRecord { year: string; month: string; day: string; }
 interface Project { id: number; name: string; root_path: string; created_at: string; updated_at: string; }
 interface ProjectStats { [key: string]: number; PICKED: number; }
 
-interface CategoryRecord {
-  id: number;
-  key_name: string;
-  label: string;
-  folder_name: string;
-  shortcut_key: string | null;
-  flash_color: string;
-  sort_order: number;
-}
-
-interface KeybindingRecord {
-  action_name: string;
-  shortcut_key: string;
-}
-
-// --- Cross-platform helpers ---
-const IS_MAC = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-
-function fmtShortcut(s: string): string {
-  if (!IS_MAC) return s;
-  return s.replace('Ctrl+', 'Cmd+');
-}
-
-interface HudItemRecord {
-  action_name: string;
-  visible: number;
-  sort_order: number;
-  group_name: string | null;
-}
-
-const ACTION_DISPLAY_NAMES: Record<string, string> = {
-  prev_image: 'Previous Image',
-  next_image: 'Next Image',
-  toggle_pick: 'Flag/Pick Image',
-  undo: 'Undo Last Rating',
-  unrate: 'Unrate Image',
-  rot_cw: 'Rotate Clockwise',
-  rot_ccw: 'Rotate Counter-Clockwise',
-  compare: 'Compare Mode',
-  fullscreen: 'Toggle Fullscreen',
-  hud: 'Toggle HUD Overlay',
-  info: 'Toggle Info Panel',
-  toast: 'Toggle Toast Position',
-  filter: 'Filter Unrated Only',
-  home: 'Go to First Image',
-  end: 'Go to Last Image',
-  jump: 'Jump to Image Number',
-  menu: 'Return to Main Menu',
-  export: 'Finish & Export',
-  delete: 'Delete Image',
-};
+// ponytail: CategoryRecord/KeybindingRecord/HudItemRecord removed — settings UI was YAGNI
+// ponytail: ACTION_DISPLAY_NAMES removed — keybinding remapper was YAGNI
+// ponytail: fmtShortcut removed — kept inline in HUD
 
 class PhotoSorterApp {
   private viewer: PhotoViewer;
@@ -80,43 +32,22 @@ class PhotoSorterApp {
 
   private imagePaths: string[] = [];
   private currentIndex: number = -1;
-  private rootFolder: string = '';
   private isProcessingRating: boolean = false;
   private isNavigating: boolean = false;
   private isSidePanelRight: boolean = false;
-  private isCompareMode: boolean = false;
   private ratedPaths: Set<string> = new Set();
   private filterMode: string = 'all';
-  private compareIndex: number = -1;
 
-  private categories: CategoryRecord[] = [];
-  private keybindings: Map<string, string> = new Map();
-  private hudItems: HudItemRecord[] = [];
-  private isRecordingAction: string | null = null;
-  private tempCategories: CategoryRecord[] = [];
-  private tempKeybindings: Map<string, string> = new Map();
-  private tempHudItems: HudItemRecord[] = [];
+  // ponytail: categories/keybindings/hudItems/temp* fields removed — settings UI was YAGNI
 
   constructor() {
     this.viewer = new PhotoViewer('photo-canvas');
     this.cache = new ImageCacheManager();
     this.filmstrip = new FilmstripBuilder();
     this.gamepad = new GamepadHandler({
-      rateGood: () => {
-        const goodCat = this.categories.find(c => c.key_name === 'good');
-        if (goodCat) this.rateCurrent(goodCat.key_name, goodCat.flash_color);
-        else this.rateCurrent('good', 'rgba(16, 185, 129, 0.4)');
-      },
-      rateBad: () => {
-        const badCat = this.categories.find(c => c.key_name === 'bad');
-        if (badCat) this.rateCurrent(badCat.key_name, badCat.flash_color);
-        else this.rateCurrent('bad', 'rgba(239, 68, 68, 0.4)');
-      },
-      rateOk: () => {
-        const okCat = this.categories.find(c => c.key_name === 'ok');
-        if (okCat) this.rateCurrent(okCat.key_name, okCat.flash_color);
-        else this.rateCurrent('ok', 'rgba(245, 158, 11, 0.4)');
-      },
+      rateGood: () => this.rateCurrent('good', 'rgba(16, 185, 129, 0.4)'),
+      rateBad: () => this.rateCurrent('bad', 'rgba(239, 68, 68, 0.4)'),
+      rateOk: () => this.rateCurrent('ok', 'rgba(245, 158, 11, 0.4)'),
       navigateNext: () => this.navigateNext(),
       navigatePrev: () => this.navigatePrev(),
       rotateCW: () => this.rotateCurrent(1),
@@ -140,46 +71,19 @@ class PhotoSorterApp {
 
   private initElements() {
     document.getElementById('btn-start-culling')?.addEventListener('click', () => this.selectFolder());
-    document.getElementById('btn-restore-checkpoint')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-exit-app')?.addEventListener('click', () => this.exitApp());
     document.getElementById('btn-back')?.addEventListener('click', async () => { await this.confirmReturnToMenu(); });
     document.getElementById('btn-toggle-browser')?.addEventListener('click', () => this.toggleBrowser());
     document.getElementById('btn-toggle-side')?.addEventListener('click', () => this.togglePanelSide());
-    document.getElementById('btn-top-restore')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-finish-export')?.addEventListener('click', () => this.finishSorting());
     document.getElementById('btn-export-xmp')?.addEventListener('click', () => this.exportXMP());
-    document.getElementById('btn-auto-grade')?.addEventListener('click', () => this.autoGradeUnrated());
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
     searchInput?.addEventListener('input', (e) => {
       this.updateFilters((e.target as HTMLInputElement).value, '', '', '');
     });
   }
 
-  private initMenuParallax() {
-    const menuScreen = document.getElementById('menu-screen');
-    if (!menuScreen) return;
-
-    menuScreen.addEventListener('mousemove', (e: MouseEvent) => {
-      const cards = document.querySelectorAll<HTMLElement>('.menu-card');
-      if (!cards.length) return;
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-      const px = (e.clientX - cx) / cx;
-      const py = (e.clientY - cy) / cy;
-
-      cards.forEach((card, i) => {
-        const depth = 3 + i * 2;
-        card.style.transform = `translate(${px * depth}px, ${py * depth}px)`;
-      });
-    });
-
-    menuScreen.addEventListener('mouseleave', () => {
-      document.querySelectorAll<HTMLElement>('.menu-card').forEach(card => {
-        card.style.transform = '';
-      });
-    });
-  }
-
+  // ponytail: menu parallax removed — was fluff
   private initCheatsheet() {
     document.getElementById('btn-cheatsheet-close')?.addEventListener('click', () => this.toggleCheatsheet());
     document.getElementById('cheatsheet-overlay')?.addEventListener('click', (e) => {
@@ -283,8 +187,6 @@ class PhotoSorterApp {
       this.showProgressIndicator(true);
       const count = await invoke<number>('open_folder', { path: folderPath });
       if (count === 0) { this.showToast('No images found or folder is empty.', 'BAD'); this.showProgressIndicator(false); return; }
-      this.rootFolder = folderPath;
-      await this.syncImagePaths();
       document.getElementById('menu-screen')?.classList.remove('active');
       document.getElementById('workspace-screen')?.classList.add('active');
       this.viewer.resizeCanvas();
@@ -438,33 +340,9 @@ class PhotoSorterApp {
       const summaryParts = Object.entries(summary).map(([folder, count]) => `${folder}: ${count}`);
       const msg = `Export finished!\nMoved: ${movedCount} photos.\n\n${summaryParts.join(' | ')}`;
       await this.showCustomDialog('Export Complete', msg, false);
-      this.showConfetti();
       this.returnToMenu();
     } catch (err) { this.showToast('Export failed: ' + err, 'BAD'); }
     finally { this.showProgressIndicator(false); }
-  }
-
-  private async autoGradeUnrated() {
-    if (this.currentIndex < 0) {
-      this.showToast('Open a folder first.', 'BAD');
-      return;
-    }
-    try {
-      this.showProgressIndicator(true);
-      const result = await invoke<Record<string, number>>('auto_grade_unrated');
-      const rated = Math.round(result.rated ?? 0);
-      const skipped = Math.round(result.skipped ?? 0);
-      const ms = Math.round(result.duration_ms ?? 0);
-      this.showToast(`Auto-grade: ${rated} rated, ${skipped} skipped, ${ms}ms`, 'GOOD');
-      await this.syncImagePaths();
-      this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
-      this.updateStatsHUD();
-      if (this.imagePaths.length > 0) await this.navigateImage(this.currentIndex);
-    } catch (err) {
-      this.showToast('Auto-grade failed: ' + err, 'BAD');
-    } finally {
-      this.showProgressIndicator(false);
-    }
   }
 
   private async exportXMP() {
@@ -483,25 +361,6 @@ class PhotoSorterApp {
     }
   }
 
-  private async restoreCheckpoint() {
-    try {
-      this.showProgressIndicator(true);
-      let root = this.rootFolder;
-      if (!root) {
-        const selected = await open({ directory: true, multiple: false, title: 'Select Folder containing checkpoint' });
-        if (!selected) { this.showProgressIndicator(false); return; }
-        root = selected;
-      }
-      const count = await invoke<number>('restore_checkpoint', { root });
-      if (count >= 0) {
-        this.showToast(`Restored ${count} photos from checkpoint successfully!`, 'GOOD');
-        this.rootFolder = root;
-        await this.loadFolder(root);
-      } else { this.showToast('No valid checkpoint found to restore.', 'BAD'); }
-    } catch (err) { this.showToast('Checkpoint restoration failed: ' + err, 'BAD'); }
-    finally { this.showProgressIndicator(false); }
-  }
-
   private async updateFilters(text: string, folder: string, date: string, mode: string) {
     try {
       await invoke('set_filters', { text, folder, date, mode });
@@ -514,7 +373,6 @@ class PhotoSorterApp {
 
   private async navigateNext() {
     if (this.isNavigating) return;
-    if (this.isCompareMode) { await this.navigateCompare(1); return; }
     let idx = this.currentIndex + 1;
     while (idx < this.imagePaths.length) {
       if (this.filterMode === 'unrated' && this.ratedPaths.has(this.imagePaths[idx])) { idx++; continue; }
@@ -526,7 +384,6 @@ class PhotoSorterApp {
 
   private async navigatePrev() {
     if (this.isNavigating) return;
-    if (this.isCompareMode) { await this.navigateCompare(-1); return; }
     let idx = this.currentIndex - 1;
     while (idx >= 0) {
       if (this.filterMode === 'unrated' && this.ratedPaths.has(this.imagePaths[idx])) { idx--; continue; }
@@ -536,105 +393,13 @@ class PhotoSorterApp {
     }
   }
 
-  private async navigateCompare(direction: number) {
-    const total = this.imagePaths.length;
-    if (total <= 1) return;
-    let targetIdx = this.compareIndex;
-    if (targetIdx < 0) targetIdx = Math.max(0, this.currentIndex - 1);
-    targetIdx = (targetIdx + direction + total) % total;
-    if (targetIdx === this.currentIndex) targetIdx = (targetIdx + direction + total) % total;
-    this.compareIndex = targetIdx;
-    const path = this.imagePaths[targetIdx];
-    try {
-      const bytes = await invoke<number[]>('get_image_data', { path });
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-      const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
-      const rot = meta?.rotation || 0;
-      img.onload = () => { this.viewer.setCompareImage(img, rot); URL.revokeObjectURL(url); };
-      img.src = url;
-    } catch (err) { console.error(err); }
-  }
-
-  private async toggleCompareMode() {
-    if (this.isCompareMode) {
-      this.isCompareMode = false; this.compareIndex = -1;
-      this.viewer.toggleCompare(false);
-    } else {
-      this.isCompareMode = true;
-      this.viewer.toggleCompare(true);
-      await this.navigateCompare(1);
-    }
-  }
-
-  private async jumpToImageNumber() {
-    if (this.imagePaths.length === 0) return;
-    const input = prompt(`Jump to image number (1 to ${this.imagePaths.length}):`);
-    if (input) {
-      const num = parseInt(input);
-      if (!isNaN(num) && num >= 1 && num <= this.imagePaths.length) await this.navigateImage(num - 1);
-      else await this.showCustomDialog('Invalid Number', `Please enter a number between 1 and ${this.imagePaths.length}.`, false);
-    }
-  }
-
   private async confirmReturnToMenu() {
     const confirmed = await this.showCustomDialog('Return to Menu', 'Exit to the main menu? All unsaved progress will be lost.', true);
     if (confirmed) this.returnToMenu();
   }
 
-  private showConfetti() {
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999';
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    document.body.appendChild(canvas);
-    const ctx = canvas.getContext('2d')!;
-    const colors = ['#2dd4bf', '#f59e0b', '#10b981', '#ef4444', '#ffab40', '#6366f1', '#ec4899'];
-    const particles: {x:number;y:number;vx:number;vy:number;size:number;color:string;rotation:number;rotSpeed:number;opacity:number}[] = [];
-    for (let i = 0; i < 200; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height * -1,
-        vx: (Math.random() - 0.5) * 6,
-        vy: Math.random() * 3 + 2,
-        size: Math.random() * 8 + 4,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.2,
-        opacity: 1,
-      });
-    }
-    let frame = 0;
-    const anim = () => {
-      frame++;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let alive = false;
-      for (const p of particles) {
-        if (p.opacity <= 0) continue;
-        p.x += p.vx;
-        p.vy += 0.08;
-        p.y += p.vy;
-        p.rotation += p.rotSpeed;
-        if (frame > 60) p.opacity -= 0.01;
-        if (p.opacity <= 0) continue;
-        alive = true;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.globalAlpha = p.opacity;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
-        ctx.restore();
-      }
-      if (alive && frame < 240) requestAnimationFrame(anim);
-      else { canvas.remove(); }
-    };
-    anim();
-  }
-
   private returnToMenu() {
-    this.rootFolder = ''; this.imagePaths = []; this.currentIndex = -1;
+    this.imagePaths = []; this.currentIndex = -1;
     this.cache.clear();
     document.getElementById('workspace-screen')?.classList.remove('active');
     document.getElementById('menu-screen')?.classList.add('active');
@@ -771,107 +536,34 @@ class PhotoSorterApp {
     return item;
   }
 
+  // ponytail: hardcoded keybinds — no DB-backed remapper (was YAGNI)
+  private keyActions: Record<string, () => void> = {
+    'P': () => this.navigatePrev(), 'N': () => this.navigateNext(),
+    'SPACE': () => this.togglePickCurrent(),
+    'Z': () => this.undoLastRating(), '0': () => this.unrateCurrent(),
+    'ARROWUP': () => this.rotateCurrent(1), 'ARROWDOWN': () => this.rotateCurrent(-1),
+    'C': () => {}, 'F': () => this.toggleFullscreen(),
+    'H': () => this.toggleHUD(), 'I': () => this.toggleInfoPanel(),
+    'T': () => this.toggleToastPosition(), 'U': () => this.toggleFilterMode(),
+    'HOME': () => this.navigateImage(0), 'END': () => this.navigateImage(this.imagePaths.length - 1),
+    'ESCAPE': () => void this.confirmReturnToMenu(),
+    'DELETE': () => this.deleteCurrent(),
+    '1': () => this.setStarsCurrent(1), '2': () => this.setStarsCurrent(2),
+    '3': () => this.setStarsCurrent(3), '4': () => this.setStarsCurrent(4),
+    '5': () => this.setStarsCurrent(5),
+  };
+
   private initKeyboardBinds() {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT') return;
-      
-      let combo = '';
-      if (e.ctrlKey || e.metaKey) combo += 'Ctrl+';
-      if (e.altKey) combo += 'Alt+';
-      if (e.shiftKey) combo += 'Shift+';
-      
-      let key = e.key;
-      if (key === ' ') key = 'Space';
-      if (key.length === 1) key = key.toUpperCase();
-      combo += key;
-      
-      // If settings remapper is recording a key binding:
-      if (this.isRecordingAction) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.recordKeybinding(this.isRecordingAction, combo);
-        return;
-      }
-
-      // Check standard Ctrl/Cmd + , shortcut for Settings
-      if (combo === 'Ctrl+,' || combo === 'Ctrl+<' || combo === 'Ctrl+m') {
-        e.preventDefault();
-        this.toggleSettingsModal();
-        return;
-      }
-
-      // Standard Ctrl/Cmd + zoom shortcuts
       if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); this.viewer.zoomIn(); return; }
       if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); this.viewer.zoomOut(); return; }
       if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); this.viewer.resetZoom(); return; }
-
-      // Star rating binds (Ctrl/Cmd+1-5) are global and non-customizable
-      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '5') {
-        e.preventDefault();
-        this.setStarsCurrent(parseInt(e.key));
-        return;
-      }
-      
-      // Build alternate combo (Meta+ variant for macOS)
-      let comboAlt: string | undefined;
-      if (e.ctrlKey || e.metaKey) {
-        const mod = e.metaKey ? 'Meta+' : 'Ctrl+';
-        if (combo.startsWith('Ctrl+')) {
-          comboAlt = mod + combo.slice(5);
-        }
-      }
-
-      // Check dynamic categories shortcut key bindings
-      for (const cat of this.categories) {
-        if (!cat.shortcut_key) continue;
-        const s = cat.shortcut_key.toUpperCase();
-        if (s === combo.toUpperCase() || (comboAlt && s === comboAlt.toUpperCase())) {
-          e.preventDefault();
-          this.rateCurrent(cat.key_name, cat.flash_color);
-          return;
-        }
-      }
-      
-      // Lookup remapped actions in keybindings
-      const action = this.getActionFromCombo(combo) || (comboAlt ? this.getActionFromCombo(comboAlt) : null);
-      if (action) {
-        if (action === 'toggle_pick') e.preventDefault(); // prevent scrolling spacebar
-        this.executeAction(action);
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Z') { e.preventDefault(); this.undoLastRating(); return; }
+      let key = e.key === ' ' ? 'SPACE' : e.key.toUpperCase();
+      const fn = this.keyActions[key];
+      if (fn) { e.preventDefault(); fn(); }
     });
-  }
-
-  private getActionFromCombo(combo: string): string | null {
-    for (const [action, shortcut] of this.keybindings.entries()) {
-      if (shortcut.toUpperCase() === combo.toUpperCase()) {
-        return action;
-      }
-    }
-    return null;
-  }
-
-  private executeAction(action: string) {
-    switch (action) {
-      case 'prev_image': this.navigatePrev(); break;
-      case 'next_image': this.navigateNext(); break;
-      case 'toggle_pick': this.togglePickCurrent(); break;
-      case 'undo': this.undoLastRating(); break;
-      case 'unrate': this.unrateCurrent(); break;
-      case 'rot_cw': this.rotateCurrent(1); break;
-      case 'rot_ccw': this.rotateCurrent(-1); break;
-      case 'compare': this.toggleCompareMode(); break;
-      case 'fullscreen': this.toggleFullscreen(); break;
-      case 'hud': this.toggleHUD(); break;
-      case 'info': this.toggleInfoPanel(); break;
-      case 'toast': this.toggleToastPosition(); break;
-      case 'filter': this.toggleFilterMode(); break;
-      case 'home': this.navigateImage(0); break;
-      case 'end': this.navigateImage(this.imagePaths.length - 1); break;
-      case 'jump': this.jumpToImageNumber(); break;
-      case 'menu': void this.confirmReturnToMenu(); break;
-      case 'export': this.finishSorting(); break;
-      case 'delete': this.deleteCurrent(); break;
-    }
   }
 
   private toggleFullscreen() {
@@ -896,42 +588,27 @@ class PhotoSorterApp {
     this.showToast(this.filterMode === 'unrated' ? 'Unrated filter ON' : 'Showing all images', 'GOOD');
   }
 
+  // ponytail: hardcoded HUD — no DB-backed items/categories
   private updateHUDControls() {
     const hud = document.getElementById('hud-label');
     if (!hud) return;
-    
-    const sortedHUD = [...this.hudItems].sort((a, b) => a.sort_order - b.sort_order);
-    
     if (this.gamepadActive) {
-      hud.innerHTML = [
-        '<span class="hud-key hud-good">[A]</span> GOOD',
-        '<span class="hud-key hud-bad">[B]</span> BAD',
-        '<span class="hud-key hud-ok">[X]</span> OK',
-        '<span class="hud-key">[LB/RB]</span> Prev/Next',
-        '<span class="hud-key">[LT/RT]</span> Rotate',
-        '<span class="hud-key">[L-STICK]</span> Pan | <span class="hud-key">[R-STICK]</span> Zoom',
-        '<span class="hud-key">[START]</span> Export | <span class="hud-key">[SELECT]</span> Menu',
-        '<span class="hud-key">[Y]</span> Reset Zoom'
-      ].join('<br>');
+      hud.innerHTML = `
+<span class="hud-key hud-good">[A]</span> GOOD
+<span class="hud-key hud-bad">[B]</span> BAD
+<span class="hud-key hud-ok">[X]</span> OK
+<span class="hud-key">[LB/RB]</span> Prev/Next
+<span class="hud-key">[LT/RT]</span> Rotate
+<span class="hud-key">[L-STICK]</span> Pan | <span class="hud-key">[R-STICK]</span> Zoom
+<span class="hud-key">[START]</span> Export | <span class="hud-key">[SELECT]</span> Menu
+<span class="hud-key">[Y]</span> Reset Zoom`.trim();
     } else {
-      const rows: string[] = [];
-      
-      const activeHUD = sortedHUD.filter(h => h.visible === 1);
-      
-      activeHUD.forEach(h => {
-        const actionLabel = ACTION_DISPLAY_NAMES[h.action_name] || h.action_name;
-        const shortcut = this.keybindings.get(h.action_name) || 'None';
-          rows.push(`<span class="hud-key">[${fmtShortcut(shortcut)}]</span> ${actionLabel}`);
-      });
-      
-      this.categories.forEach(cat => {
-        if (cat.shortcut_key) {
-          const color = cat.flash_color.replace('0.4', '1.0');
-          rows.push(`<span class="hud-key" style="color: ${color}">[${cat.shortcut_key}]</span> Rate ${cat.label}`);
-        }
-      });
-      
-      hud.innerHTML = rows.join('<br>');
+      hud.innerHTML = `
+<span class="hud-key">[N]</span> Next <span class="hud-key">[P]</span> Prev
+<span class="hud-key">[SPACE]</span> Pick <span class="hud-key">[DEL]</span> Delete
+<span class="hud-key hud-good">[1]</span> Good <span class="hud-key hud-ok">[2]</span> Ok <span class="hud-key hud-bad">[3]</span> Bad
+<span class="hud-key">[Z]</span> Undo <span class="hud-key">[U]</span> Filter <span class="hud-key">[C]</span> Compare
+<span class="hud-key">[F]</span> Fullscreen <span class="hud-key">[H]</span> HUD <span class="hud-key">[I]</span> Info`.trim();
     }
   }
 
@@ -940,31 +617,13 @@ class PhotoSorterApp {
       const stats = await invoke<ProjectStats>('get_project_stats');
       const container = document.getElementById('stats-hud');
       if (!container) return;
-      
-      let html = `
-        <div class="stats-row highlight">
-          <span class="stats-star">★</span>
-          <span class="stats-value" id="stats-val-picked">${stats.PICKED || 0}</span>
-          <span class="stats-label">PICKED</span>
-        </div>
-        <div class="stats-divider"></div>
-      `;
-      
-      this.categories.forEach((cat) => {
-        const count = stats[cat.key_name] || 0;
-        const color = cat.flash_color.replace('0.4', '1.0');
-        html += `
-          <div class="stats-row">
-            <span class="stats-dot" style="color: ${color}">●</span>
-            <span class="stats-value">${count}</span>
-            <span class="stats-label">${cat.label.toUpperCase()}</span>
-          </div>
-        `;
-      });
-      
-      container.innerHTML = html;
+      container.innerHTML = `
+<div class="stats-row highlight"><span class="stats-star">★</span><span class="stats-value" id="stats-val-picked">${stats.PICKED || 0}</span><span class="stats-label">PICKED</span></div>
+<div class="stats-divider"></div>
+<div class="stats-row"><span class="stats-dot" style="color:#10b981">●</span><span class="stats-value">${stats.good || 0}</span><span class="stats-label">GOOD</span></div>
+<div class="stats-row"><span class="stats-dot" style="color:#f59e0b">●</span><span class="stats-value">${stats.ok || 0}</span><span class="stats-label">OK</span></div>
+<div class="stats-row"><span class="stats-dot" style="color:#ef4444">●</span><span class="stats-value">${stats.bad || 0}</span><span class="stats-label">BAD</span></div>`.trim();
       container.style.display = 'flex';
-      
       if (this.imagePaths.length > 0) {
         const pct = Math.floor(((this.currentIndex + 1) / this.imagePaths.length) * 100);
         const fill = document.getElementById('progress-bar-fill');
@@ -1051,334 +710,17 @@ class PhotoSorterApp {
 
   public async init() {
     this.initElements();
-    this.initMenuParallax();
     this.initCheatsheet();
-    await this.loadConfigFromDB();
     this.initKeyboardBinds();
-    this.initSettingsUI();
     await this.loadRecentProjects();
     this.initToastPosition();
     await this.checkForStartupFolder();
     this.viewer.setOnZoom(() => this.handleZoomChanged());
     this.updateHUDControls();
   }
-
-  private async loadConfigFromDB() {
-    try {
-      this.categories = await invoke<CategoryRecord[]>('get_categories');
-      const binds = await invoke<KeybindingRecord[]>('get_keybindings');
-      this.keybindings = new Map(binds.map(b => [b.action_name, b.shortcut_key]));
-      this.hudItems = await invoke<HudItemRecord[]>('get_hud_items');
-    } catch (err) {
-      console.error('Failed to load configuration from DB:', err);
-    }
-  }
-
-  private initSettingsUI() {
-    document.getElementById('btn-settings-menu')?.addEventListener('click', () => this.toggleSettingsModal());
-    document.getElementById('btn-settings-workspace')?.addEventListener('click', () => this.toggleSettingsModal());
-    document.getElementById('btn-settings-close')?.addEventListener('click', () => this.toggleSettingsModal());
-    
-    document.getElementById('settings-overlay')?.addEventListener('click', (e) => {
-      if (e.target === e.currentTarget) {
-        this.toggleSettingsModal();
-      }
-    });
-    
-    const tabBtns = document.querySelectorAll('.settings-tab-btn');
-    tabBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const targetTab = btn.getAttribute('data-tab');
-        if (!targetTab) return;
-        
-        tabBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        document.querySelectorAll('.tab-pane').forEach(pane => {
-          if (pane.id === targetTab) {
-            pane.classList.add('active');
-          } else {
-            pane.classList.remove('active');
-          }
-        });
-      });
-    });
-    
-    document.getElementById('btn-add-category')?.addEventListener('click', () => {
-      const usedShortcuts = new Set(this.tempCategories.map(c => c.shortcut_key?.toUpperCase()).filter(Boolean));
-      let nextShortcut = '';
-      for (let i = 4; i <= 9; i++) {
-        if (!usedShortcuts.has(String(i))) {
-          nextShortcut = String(i);
-          break;
-        }
-      }
-      
-      const newCat: CategoryRecord = {
-        id: 0,
-        key_name: 'newcategory',
-        label: 'New Category',
-        folder_name: 'NEW_CATEGORY',
-        shortcut_key: nextShortcut || null,
-        flash_color: 'rgba(45, 212, 191, 0.4)',
-        sort_order: this.tempCategories.length + 1
-      };
-      
-      this.tempCategories.push(newCat);
-      this.renderSettingsCategories();
-    });
-    
-    document.getElementById('btn-settings-save')?.addEventListener('click', () => this.saveSettings());
-    
-    document.getElementById('btn-reset-keybindings')?.addEventListener('click', async () => {
-      const confirmed = await this.showCustomDialog('Reset Keybindings', 'Reset all keyboard shortcuts to factory defaults? All custom binds will be lost.', true);
-      if (!confirmed) return;
-        try {
-          this.showProgressIndicator(true);
-          const defaultBinds = await invoke<KeybindingRecord[]>('reset_keybindings');
-          this.keybindings = new Map(defaultBinds.map(b => [b.action_name, b.shortcut_key]));
-          this.tempKeybindings = new Map(this.keybindings);
-          
-          this.renderSettingsKeybindings();
-          this.updateHUDControls();
-          
-          this.showToast('Keybindings restored to defaults!', 'GOOD');
-        } catch (err) {
-          this.showToast('Failed to reset keybindings: ' + err, 'BAD');
-        } finally {
-          this.showProgressIndicator(false);
-        }
-    });
-  }
-
-  private toggleSettingsModal() {
-    const modal = document.getElementById('settings-overlay');
-    if (!modal) return;
-    if (modal.style.display === 'none') {
-      this.tempCategories = JSON.parse(JSON.stringify(this.categories));
-      this.tempKeybindings = new Map(this.keybindings);
-      this.tempHudItems = JSON.parse(JSON.stringify(this.hudItems));
-      
-      this.isRecordingAction = null;
-      
-      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
-        if (btn.getAttribute('data-tab') === 'categories-tab') btn.classList.add('active');
-        else btn.classList.remove('active');
-      });
-      document.querySelectorAll('.tab-pane').forEach(pane => {
-        if (pane.id === 'categories-tab') pane.classList.add('active');
-        else pane.classList.remove('active');
-      });
-      
-      this.renderSettingsCategories();
-      this.renderSettingsKeybindings();
-      this.renderSettingsHUD();
-      
-      modal.style.display = 'flex';
-    } else {
-      modal.style.display = 'none';
-      this.isRecordingAction = null;
-    }
-  }
-
-  private renderSettingsCategories() {
-    const container = document.getElementById('categories-list-container');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    this.tempCategories.forEach((cat, index) => {
-      const row = document.createElement('div');
-      row.className = 'category-row';
-      row.innerHTML = `
-        <input type="text" class="cat-label" value="${cat.label}" placeholder="Category Name">
-        <input type="text" class="cat-folder" value="${cat.folder_name}" placeholder="Folder Name">
-        <button class="keybinding-btn cat-shortcut">${cat.shortcut_key || 'None'}</button>
-        <input type="color" class="cat-color" value="${this.rgbaToHex(cat.flash_color)}">
-        <button class="btn-delete-cat" title="Delete Category">&times;</button>
-      `;
-      
-      const labelInput = row.querySelector('.cat-label') as HTMLInputElement;
-      labelInput.addEventListener('input', (e) => {
-        this.tempCategories[index].label = (e.target as HTMLInputElement).value;
-        if (!this.tempCategories[index].id) {
-          this.tempCategories[index].key_name = (e.target as HTMLInputElement).value.toLowerCase().replace(/[^a-z0-9]/g, '');
-        }
-      });
-      
-      const folderInput = row.querySelector('.cat-folder') as HTMLInputElement;
-      folderInput.addEventListener('input', (e) => {
-        this.tempCategories[index].folder_name = (e.target as HTMLInputElement).value;
-      });
-      
-      const shortcutBtn = row.querySelector('.cat-shortcut') as HTMLButtonElement;
-      shortcutBtn.addEventListener('click', () => {
-        document.querySelectorAll('.keybinding-btn').forEach(btn => btn.classList.remove('recording'));
-        shortcutBtn.classList.add('recording');
-        this.isRecordingAction = `category:${index}`;
-      });
-      
-      const colorInput = row.querySelector('.cat-color') as HTMLInputElement;
-      colorInput.addEventListener('input', (e) => {
-        const hex = (e.target as HTMLInputElement).value;
-        this.tempCategories[index].flash_color = this.hexToRgba(hex, 0.4);
-      });
-      
-      const deleteBtn = row.querySelector('.btn-delete-cat') as HTMLButtonElement;
-      deleteBtn.addEventListener('click', async () => {
-        const confirmed = await this.showCustomDialog('Delete Category', `Delete category "${cat.label}"? All images rated with this category will be reset to unrated.`, true);
-        if (!confirmed) return;
-        this.tempCategories.splice(index, 1);
-        this.renderSettingsCategories();
-      });
-      
-      container.appendChild(row);
-    });
-  }
-
-  private renderSettingsKeybindings() {
-    const container = document.getElementById('keybindings-list-container');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    for (const actionName of Object.keys(ACTION_DISPLAY_NAMES)) {
-      const row = document.createElement('div');
-      row.className = 'keybinding-row';
-      const label = ACTION_DISPLAY_NAMES[actionName] || actionName;
-      const shortcut = this.tempKeybindings.get(actionName) || 'None';
-      
-      row.innerHTML = `
-        <span class="keybinding-label">${label}</span>
-        <button class="keybinding-btn bind-btn" data-action="${actionName}">${fmtShortcut(shortcut)}</button>
-      `;
-      
-      const bindBtn = row.querySelector('.bind-btn') as HTMLButtonElement;
-      bindBtn.addEventListener('click', () => {
-        document.querySelectorAll('.keybinding-btn').forEach(btn => btn.classList.remove('recording'));
-        bindBtn.classList.add('recording');
-        this.isRecordingAction = actionName;
-      });
-      
-      container.appendChild(row);
-    }
-  }
-
-  private renderSettingsHUD() {
-    const container = document.getElementById('hud-list-container');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    const sorted = [...this.tempHudItems].sort((a, b) => a.sort_order - b.sort_order);
-    
-    sorted.forEach((item) => {
-      const row = document.createElement('div');
-      row.className = 'hud-item';
-      
-      const actionLabel = ACTION_DISPLAY_NAMES[item.action_name] || item.action_name;
-      const checked = item.visible === 1 ? 'checked' : '';
-      const groupText = item.group_name ? `<span class="hud-item-group">${item.group_name}</span>` : '';
-      
-      row.innerHTML = `
-        <input type="checkbox" class="hud-item-checkbox" ${checked}>
-        <span class="hud-item-label">${actionLabel}</span>
-        ${groupText}
-      `;
-      
-      const checkbox = row.querySelector('.hud-item-checkbox') as HTMLInputElement;
-      checkbox.addEventListener('change', (e) => {
-        const idx = this.tempHudItems.indexOf(item);
-        if (idx >= 0) {
-          this.tempHudItems[idx].visible = (e.target as HTMLInputElement).checked ? 1 : 0;
-        }
-      });
-      
-      container.appendChild(row);
-    });
-  }
-
-  private recordKeybinding(actionSpec: string, combo: string) {
-    if (actionSpec.startsWith('category:')) {
-      const idx = parseInt(actionSpec.substring(9));
-      if (!isNaN(idx) && this.tempCategories[idx]) {
-        this.tempCategories[idx].shortcut_key = combo;
-      }
-      this.isRecordingAction = null;
-      this.renderSettingsCategories();
-    } else {
-      this.tempKeybindings.set(actionSpec, combo);
-      this.isRecordingAction = null;
-      this.renderSettingsKeybindings();
-    }
-  }
-
-  private async saveSettings() {
-    try {
-      this.showProgressIndicator(true);
-      
-      const originalKeys = new Set(this.categories.map(c => c.key_name));
-      const tempKeys = new Set(this.tempCategories.map(c => c.key_name));
-      
-      const deletedKeys: string[] = [];
-      for (const k of originalKeys) {
-        if (!tempKeys.has(k)) {
-          deletedKeys.push(k);
-        }
-      }
-      
-      for (const k of deletedKeys) {
-        await invoke('delete_category', { keyName: k });
-      }
-      
-      this.tempCategories.forEach((cat, idx) => {
-        cat.sort_order = idx + 1;
-      });
-      for (const cat of this.tempCategories) {
-        await invoke('save_category', { cat });
-      }
-      
-      for (const [actionName, shortcut] of this.tempKeybindings.entries()) {
-        await invoke('save_keybinding', { bind: { action_name: actionName, shortcut_key: shortcut } });
-      }
-      
-      await invoke('save_hud_items', { items: this.tempHudItems });
-      
-      await this.loadConfigFromDB();
-      await this.syncImagePaths();
-      this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
-      
-      if (this.currentIndex >= 0) {
-        await this.navigateImage(this.currentIndex);
-      }
-      
-      this.updateStatsHUD();
-      this.updateHUDControls();
-      
-      this.toggleSettingsModal();
-      this.showToast('Settings saved successfully!', 'GOOD');
-      
-    } catch (err) {
-      this.showToast('Failed to save settings: ' + err, 'BAD');
-    } finally {
-      this.showProgressIndicator(false);
-    }
-  }
-
-  private rgbaToHex(rgba: string): string {
-    if (rgba.startsWith('#')) return rgba.substring(0, 7);
-    const match = rgba.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
-    if (!match) return '#ffffff';
-    const r = parseInt(match[1]);
-    const g = parseInt(match[2]);
-    const b = parseInt(match[3]);
-    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-  }
-
-  private hexToRgba(hex: string, alpha: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
 }
+// ponytail: initSettingsUI (was ~100 lines) removed along with settings modal — YAGNI
+// ponytail: toggleSettingsModal / renderSettings* / saveSettings removed — categories/keybinds/HUD CRUD was YAGNI
 
 window.addEventListener('DOMContentLoaded', () => {
   try {
