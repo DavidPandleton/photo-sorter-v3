@@ -449,8 +449,11 @@ class PhotoSorterApp {
     }
     try {
       this.showProgressIndicator(true);
-      const count = await invoke<number>('auto_grade_unrated');
-      this.showToast(`Auto-graded ${count} unrated photos by sharpness.`, 'GOOD');
+      const result = await invoke<Record<string, number>>('auto_grade_unrated');
+      const rated = Math.round(result.rated ?? 0);
+      const skipped = Math.round(result.skipped ?? 0);
+      const ms = Math.round(result.duration_ms ?? 0);
+      this.showToast(`Auto-grade: ${rated} rated, ${skipped} skipped, ${ms}ms`, 'GOOD');
       await this.syncImagePaths();
       this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
       this.updateStatsHUD();

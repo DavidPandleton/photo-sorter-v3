@@ -296,7 +296,7 @@ fn toggle_filter_mode(state: State<'_, AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn auto_grade_unrated(state: State<'_, AppState>) -> Result<usize, String> {
+fn auto_grade_unrated(state: State<'_, AppState>) -> Result<HashMap<String, f64>, String> {
     state.auto_grade_unrated()
 }
 
