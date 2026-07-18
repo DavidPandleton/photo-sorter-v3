@@ -148,6 +148,7 @@ class PhotoSorterApp {
     document.getElementById('btn-top-restore')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-finish-export')?.addEventListener('click', () => this.finishSorting());
     document.getElementById('btn-export-xmp')?.addEventListener('click', () => this.exportXMP());
+    document.getElementById('btn-auto-grade')?.addEventListener('click', () => this.autoGradeUnrated());
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
     searchInput?.addEventListener('input', (e) => {
       this.updateFilters((e.target as HTMLInputElement).value, '', '', '');
@@ -439,6 +440,26 @@ class PhotoSorterApp {
       this.returnToMenu();
     } catch (err) { this.showToast('Export failed: ' + err, 'BAD'); }
     finally { this.showProgressIndicator(false); }
+  }
+
+  private async autoGradeUnrated() {
+    if (this.currentIndex < 0) {
+      this.showToast('Open a folder first.', 'BAD');
+      return;
+    }
+    try {
+      this.showProgressIndicator(true);
+      const count = await invoke<number>('auto_grade_unrated');
+      this.showToast(`Auto-graded ${count} unrated photos by sharpness.`, 'GOOD');
+      await this.syncImagePaths();
+      this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
+      this.updateStatsHUD();
+      if (this.imagePaths.length > 0) await this.navigateImage(this.currentIndex);
+    } catch (err) {
+      this.showToast('Auto-grade failed: ' + err, 'BAD');
+    } finally {
+      this.showProgressIndicator(false);
+    }
   }
 
   private async exportXMP() {

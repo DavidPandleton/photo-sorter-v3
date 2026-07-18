@@ -345,6 +345,33 @@ impl AppState {
         } else { Err("No active database connection.".to_string()) }
     }
 
+    /// Rate all unrated images based on blur_score.
+    /// < 150 → BAD, 150-500 → OK, > 500 → GOOD.
+    /// ponytail: hardcoded thresholds, configurable if someone asks.
+    pub fn auto_grade_unrated(&self) -> Result<usize, String> {
+        let db_opt = self.db.read().unwrap();
+        let pid_opt = self.project_id.read().unwrap();
+        let (db, pid) = match (db_opt.as_ref(), pid_opt.as_ref()) {
+            (Some(db), Some(pid)) => (Arc::clone(db), *pid),
+            _ => return Err("No active project database.".to_string()),
+        };
+        drop(db_opt);
+        drop(pid_opt);
+        let all = db.get_images(pid).map_err(|e| e.to_string())?;
+        let mut rated: usize = 0;
+        for img in &all {
+            if img.rating.is_some() { continue; }
+            if img.blur_score == 0.0 { continue; } // no thumbnail generated yet
+            let cat = if img.blur_score < 150.0 { "bad" }
+                      else if img.blur_score < 500.0 { "ok" }
+                      else { "good" };
+            db.set_rating(img.id, Some(cat)).map_err(|e| e.to_string())?;
+            self.results.write().unwrap().insert(img.path.clone(), cat.to_string());
+            rated += 1;
+        }
+        Ok(rated)
+    }
+
     pub fn reset_keybindings(&self) -> Result<(), String> {
         let db_opt = self.db.read().unwrap();
         if let Some(db) = db_opt.as_ref() {
