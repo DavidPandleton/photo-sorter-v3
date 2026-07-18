@@ -112,12 +112,10 @@ jobs:
           releaseBody: |
             **Manual culling, keyboard-fast. Zero AI.**
 
-            ### v3.1.0 — Changes
-            - **JPG performance**: Fast-path dimension check skips full decode for small images
-            - **Cross-platform**: Proper Cmd/Ctrl key handling on macOS, trash fallback, CI builds for all platforms
-            - **RAW handling**: Optimized preview extraction for non-RAW files
-            - **Info panel**: EXIF data, filename, dimensions
-            - **UI**: Better HUD, settings persistence, toast positions
+            ### v3.2.0 — Changes
+            - **Auto Grade**: One-click auto-rate all unrated photos by sharpness (blur detection). Button in workspace.
+            - **Code quality**: Remove dead clippy lint config, fix RAW_EXTENSIONS inline duplication
+            - **Under the hood**: Rust clippy-clean, TypeScript-clean, all 14 tests pass
 
             ### Downloads
             | Platform | Asset |

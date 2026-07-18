@@ -296,6 +296,11 @@ fn toggle_filter_mode(state: State<'_, AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn auto_grade_unrated(state: State<'_, AppState>) -> Result<usize, String> {
+    state.auto_grade_unrated()
+}
+
+#[tauri::command]
 fn get_recent_projects(app: tauri::AppHandle) -> Result<Vec<photo_sorter_v3::database::Project>, String> {
     let db_path = get_db_path(&app);
     let db = photo_sorter_v3::database::PhotoDatabase::new(db_path).map_err(|e| e.to_string())?;
@@ -475,6 +480,7 @@ fn main() {
             set_current_index,
             get_image_metadata_info,
             toggle_filter_mode,
+            auto_grade_unrated,
             get_recent_projects,
             get_startup_folder,
             export_xmp_sidecars,
