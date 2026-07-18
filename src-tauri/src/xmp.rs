@@ -11,12 +11,7 @@ use std::fs;
 ///
 /// The generated XMP is compatible with Adobe Lightroom, Bridge,
 /// Darktable, RawTherapee, and Capture One.
-pub fn generate_xmp_sidecar(
-    image_path: &str,
-    category: &str,
-    star_rating: i32,
-    _is_picked: bool,
-) -> String {
+pub fn generate_xmp_sidecar(_image_path: &str, category: &str, star_rating: i32, _is_picked: bool) -> String {
     // Map category → XMP rating
     let xmp_rating = match category.to_lowercase().as_str() {
         "bad" | "reject" => 1,
@@ -89,17 +84,6 @@ pub fn write_sidecar(image_path: &str, xmp_content: &str) -> Result<String, Stri
     Ok(sidecar_path)
 }
 
-/// Write XMP sidecar at a specific path (used during export).
-pub fn write_sidecar_at(target_path: &str, xmp_content: &str) -> Result<(), String> {
-    // Replace image extension with .xmp
-    let path = Path::new(target_path);
-    let sidecar_path = path.with_extension("xmp");
-
-    fs::write(&sidecar_path, xmp_content)
-        .map_err(|e| format!("Failed to write XMP sidecar: {}", e))?;
-
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {
@@ -155,24 +139,5 @@ mod tests {
         fs::remove_file(&fake_image).unwrap();
         fs::remove_file(&sidecar_path).unwrap();
         fs::remove_dir(&dir).unwrap();
-    }
-
-    #[test]
-    fn test_write_sidecar_at() {
-        let dir = std::env::temp_dir().join("xmp_test_at");
-        fs::create_dir_all(&dir).unwrap();
-        let exported_path = dir.join("GOOD/event/photo.jpg");
-        fs::create_dir_all(exported_path.parent().unwrap()).unwrap();
-        fs::write(&exported_path, "fake jpeg").unwrap();
-
-        let xmp = generate_xmp_sidecar(exported_path.to_str().unwrap(), "GOOD", 0, false);
-        let result = write_sidecar_at(exported_path.to_str().unwrap(), &xmp);
-        assert!(result.is_ok());
-
-        let sidecar = dir.join("GOOD/event/photo.xmp");
-        assert!(sidecar.exists());
-
-        // Cleanup
-        fs::remove_dir_all(&dir).unwrap();
     }
 }

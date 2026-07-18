@@ -25,11 +25,9 @@ kamadak-exif = "0.5.5"
 image = { version = "0.25.1", default-features = false, features = ["jpeg", "png", "webp"] }
 rayon = "1.10.0"
 trash = "5.1.1"
-gilrs = { version = "0.10.2", optional = true }
 chrono = "0.4"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
 
 [features]
 default = []
-gamepad = ["dep:gilrs"]

@@ -5,10 +5,7 @@ import { PhotoViewer } from './viewer';
 import { ImageCacheManager } from './cache';
 import { FilmstripBuilder } from './filmstrip';
 import { GamepadHandler } from './gamepad';
-import {
-  COLOR_UNRATE_FLASH,
-  RAW_EXTENSIONS
-} from './constants';
+import { COLOR_UNRATE_FLASH, RAW_EXTENSIONS } from './constants';
 
 export interface ImageRecord {
   id: number; project_id: number; path: string; filename: string;
