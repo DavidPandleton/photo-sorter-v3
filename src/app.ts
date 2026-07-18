@@ -76,7 +76,7 @@ class PhotoSorterApp {
     document.getElementById('btn-toggle-browser')?.addEventListener('click', () => this.toggleBrowser());
     document.getElementById('btn-toggle-side')?.addEventListener('click', () => this.togglePanelSide());
     document.getElementById('btn-finish-export')?.addEventListener('click', () => this.finishSorting());
-    document.getElementById('btn-export-xmp')?.addEventListener('click', () => this.exportXMP());
+    // ponytail: btn-export-xmp removed — feature cut
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
     searchInput?.addEventListener('input', (e) => {
       this.updateFilters((e.target as HTMLInputElement).value, '', '', '');
@@ -159,22 +159,7 @@ class PhotoSorterApp {
     }
   }
 
-  private handleZoomChanged() {
-    if (this.currentIndex < 0) return;
-    const path = this.imagePaths[this.currentIndex];
-    if (this.viewer.getScale() > 1.5) {
-      const fullResImg = this.cache.getFromFullResCache(path);
-      if (fullResImg && this.viewer.getCurrentImage() !== fullResImg) {
-        this.viewer.swapCurrentImage(fullResImg);
-      }
-    } else {
-      const lowResImg = this.cache.getFromCache(path);
-      if (lowResImg && this.viewer.getCurrentImage() !== lowResImg) {
-        this.viewer.swapCurrentImage(lowResImg);
-      }
-    }
-  }
-
+  // ponytail: handleZoomChanged removed — full-res cache was YAGNI
   private async selectFolder() {
     try {
       const selected = await open({ directory: true, multiple: false, title: 'Select Photo Directory' });
@@ -232,11 +217,11 @@ class PhotoSorterApp {
       const img = new Image();
       img.onload = async () => {
         this.cache.addToCache(path, img);
+        // ponytail: no full-res lazy load — passthrough bytes are always full quality
         const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
         this.viewer.setImage(img, meta?.rotation || 0);
         this.viewer.setOverlays((meta?.pick || 0) === 1, meta?.star_rating || 0);
         URL.revokeObjectURL(url);
-        this.cache.loadFullResolution(path, this.viewer, this.currentIndex, this.imagePaths);
       };
       img.src = url;
     } catch (err) { console.error('Failed to render image: ', err); }
@@ -345,22 +330,7 @@ class PhotoSorterApp {
     finally { this.showProgressIndicator(false); }
   }
 
-  private async exportXMP() {
-    if (this.currentIndex < 0) {
-      this.showToast('Open a folder first.', 'BAD');
-      return;
-    }
-    try {
-      this.showProgressIndicator(true);
-      const count = await invoke<number>('export_xmp_sidecars');
-      this.showToast(`Exported ${count} XMP sidecar files. Import into Lightroom/Darktable to see ratings.`, 'GOOD');
-    } catch (err) {
-      this.showToast('XMP export failed: ' + err, 'BAD');
-    } finally {
-      this.showProgressIndicator(false);
-    }
-  }
-
+  // ponytail: exportXMP removed — button cut from HTML, xmp.rs deleted
   private async updateFilters(text: string, folder: string, date: string, mode: string) {
     try {
       await invoke('set_filters', { text, folder, date, mode });
@@ -715,7 +685,6 @@ class PhotoSorterApp {
     await this.loadRecentProjects();
     this.initToastPosition();
     await this.checkForStartupFolder();
-    this.viewer.setOnZoom(() => this.handleZoomChanged());
     this.updateHUDControls();
   }
 }

@@ -17,8 +17,6 @@ export class PhotoViewer {
   private starsCount: number = 0;
   private onZoomCallback: (() => void) | null = null;
 
-  public setOnZoom(callback: () => void) { this.onZoomCallback = callback; }
-
   constructor(canvasId: string) {
     this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d')!;

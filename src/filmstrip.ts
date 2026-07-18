@@ -2,24 +2,13 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ImageRecord } from './app';
 
 export class FilmstripBuilder {
-  private queue: Array<() => Promise<void>> = [];
-  private activeWorkers = 0;
-  private maxWorkers = 8;
   private allPaths: string[] = [];
   private container: HTMLElement | null = null;
   private scrollContainer: HTMLElement | null = null;
   private onNavigate: ((idx: number) => void) | null = null;
   private loadedIndices: Set<number> = new Set();
   private scrollHandler: (() => void) | null = null;
-
-  private pushQueue(task: () => Promise<void>) { this.queue.push(task); this.processQueue(); }
-
-  private processQueue() {
-    while (this.activeWorkers < this.maxWorkers && this.queue.length > 0) {
-      const task = this.queue.shift();
-      if (task) { this.activeWorkers++; task().finally(() => { this.activeWorkers--; this.processQueue(); }); }
-    }
-  }
+  // ponytail: removed worker queue — sequential Promise.all is fine for <5000 thumbs
 
   rebuild(imagePaths: string[], onNavigate: (idx: number) => void) {
     const container = document.getElementById('filmstrip-container');
@@ -29,7 +18,6 @@ export class FilmstripBuilder {
     this.allPaths = imagePaths;
     this.onNavigate = onNavigate;
     this.loadedIndices.clear();
-    this.queue = [];
     for (let i = 0; i < imagePaths.length; i++) {
       const item = document.createElement('div');
       item.className = 'thumbnail-item';
@@ -45,7 +33,7 @@ export class FilmstripBuilder {
       item.addEventListener('dblclick', () => { if (this.onNavigate) this.onNavigate(i); });
       container.appendChild(item);
     }
-    // ponytail: focus bar removed — blur detection was broken
+    // ponytail: focus bar removed
     const scrollContainer = document.getElementById('filmstrip-scroll');
     if (this.scrollHandler && this.scrollContainer) { this.scrollContainer.removeEventListener('scroll', this.scrollHandler); }
     this.scrollContainer = scrollContainer;
@@ -65,8 +53,8 @@ export class FilmstripBuilder {
       if (this.loadedIndices.has(i)) continue;
       this.loadedIndices.add(i);
       const item = this.container.children[i] as HTMLElement;
-      if (!item) continue;
-      this.pushQueue(() => this.loadThumbnail(this.allPaths[i], item));
+      if (!item) continue; // ponytail: direct async call, no queue
+      this.loadThumbnail(this.allPaths[i], item);
     }
   }
 
