@@ -6,8 +6,8 @@ use rayon::prelude::*;
 use crate::database::PhotoDatabase;
 use crate::constants;
 
-const IMAGE_CACHE_MAX: usize = 30;
-const FULLRES_CACHE_MAX: usize = 10;
+const IMAGE_CACHE_MAX: usize = 60;
+const FULLRES_CACHE_MAX: usize = 20;
 
 pub struct ImageCache {
     pub scaled: RwLock<HashMap<String, Vec<u8>>>,
@@ -30,7 +30,10 @@ impl ImageCache {
         let mut map = self.scaled.write().unwrap();
         map.insert(path.to_string(), bytes);
         if map.len() > IMAGE_CACHE_MAX {
-            map.clear();
+            // Drop one entry instead of clearing all — less destructive
+            if let Some(key) = map.keys().next().cloned() {
+                map.remove(&key);
+            }
         }
     }
 
@@ -42,7 +45,9 @@ impl ImageCache {
         let mut map = self.full_res.write().unwrap();
         map.insert(path.to_string(), bytes);
         if map.len() > FULLRES_CACHE_MAX {
-            map.clear();
+            if let Some(key) = map.keys().next().cloned() {
+                map.remove(&key);
+            }
         }
     }
 
