@@ -351,9 +351,9 @@ impl AppState {
     }
 
     /// Rate all unrated images based on blur_score.
-    /// < 150 → BAD, 150-500 → OK, > 500 → GOOD.
-    /// ponytail: hardcoded thresholds, configurable if someone asks.
-    pub fn auto_grade_unrated(&self) -> Result<usize, String> {
+    /// Returns a map: {"rated": N, "skipped": N, "duration_ms": D}
+    pub fn auto_grade_unrated(&self) -> Result<HashMap<String, f64>, String> {
+        let start = std::time::Instant::now();
         let db_opt = self.db.read().unwrap();
         let pid_opt = self.project_id.read().unwrap();
         let (db, pid) = match (db_opt.as_ref(), pid_opt.as_ref()) {
@@ -363,21 +363,26 @@ impl AppState {
         drop(db_opt);
         drop(pid_opt);
         let all = db.get_images(pid).map_err(|e| e.to_string())?;
-        let mut rated: usize = 0;
+        let mut rated: f64 = 0.0;
+        let mut skipped: f64 = 0.0;
         for img in &all {
-            if img.rating.is_some() { continue; }
-            if img.blur_score == 0.0 { continue; } // no thumbnail generated yet
+            if img.rating.is_some() { skipped += 1.0; continue; }
+            if img.blur_score == 0.0 { skipped += 1.0; continue; }
             let cat = if img.blur_score < 150.0 { "bad" }
                       else if img.blur_score < 500.0 { "ok" }
                       else { "good" };
-            // Push each to undo stack so Ctrl+Z can reverse auto-grade
             self.undo_stack.write().unwrap()
                 .push(crate::undo::UndoAction { path: img.path.clone(), old_rating: None });
             db.set_rating(img.id, Some(cat)).map_err(|e| e.to_string())?;
             self.results.write().unwrap().insert(img.path.clone(), cat.to_string());
-            rated += 1;
+            rated += 1.0;
         }
-        Ok(rated)
+        let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+        let mut map = HashMap::new();
+        map.insert("rated".to_string(), rated);
+        map.insert("skipped".to_string(), skipped);
+        map.insert("duration_ms".to_string(), elapsed);
+        Ok(map)
     }
 
     pub fn reset_keybindings(&self) -> Result<(), String> {
