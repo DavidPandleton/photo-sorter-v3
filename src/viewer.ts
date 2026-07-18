@@ -74,8 +74,8 @@ export class PhotoViewer {
 
   public resetZoom() { this.resetView(); }
 
-  public zoomIn() { this.zoomAt(1 / ZOOM_FACTOR, this.canvas.width / 2, this.canvas.height / 2); }
-  public zoomOut() { this.zoomAt(ZOOM_FACTOR, this.canvas.width / 2, this.canvas.height / 2); }
+  public zoomIn() { this.zoomAt(ZOOM_FACTOR, this.canvas.width / 2, this.canvas.height / 2); }
+  public zoomOut() { this.zoomAt(1.0 / ZOOM_FACTOR, this.canvas.width / 2, this.canvas.height / 2); }
 
   public panBy(dx: number, dy: number) { if (!this.currentImage) return; this.offsetX += dx; this.offsetY += dy; this.draw(); }
 

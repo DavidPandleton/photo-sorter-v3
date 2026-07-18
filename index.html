@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Photo Sorter v3 — Keyboard-driven photo culling tool. Fast, distraction-free, zero AI. Rate photos with 1/2/3, export, done.">
+  <meta name="description" content="Photo Sorter v3 — Keyboard-driven photo culling tool.">
   <meta name="format-detection" content="telephone=no">
   <meta name="theme-color" content="#08080c">
   <link rel="icon" type="image/png" sizes="128x128" href="/src-tauri/icons/128x128.png">
@@ -15,29 +15,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!-- MAIN APP CONTAINER (SWITCHABLE SCREENS) -->
   <main id="app-container">
-    
-    <!-- SCREEN 1: WELCOME MENU SCREEN -->
+    <!-- SCREEN 1: MENU -->
     <section id="menu-screen" class="screen active">
-          <button id="btn-settings-menu" class="settings-trigger-btn" title="Open Settings">⚙ Settings</button>
       <div class="radial-bg"></div>
       <div class="menu-content">
         <header class="menu-header">
           <h1 class="glow-text">PHOTO SORTER</h1>
           <p class="subtitle">Blazing fast, distraction-free photo culling & sorting in Rust</p>
         </header>
-
         <div class="cards-grid">
           <div class="menu-card" id="btn-start-culling">
             <span class="card-icon">📁</span>
             <h2>Start Culling</h2>
             <p>Choose a directory and organize your photos.</p>
-          </div>
-          <div class="menu-card" id="btn-restore-checkpoint">
-            <span class="card-icon">🔄</span>
-            <h2>Restore Checkpoint</h2>
-            <p>Recover your previous sorting checkpoint.</p>
           </div>
           <div class="menu-card" id="btn-exit-app">
             <span class="card-icon">❌</span>
@@ -45,93 +36,60 @@
             <p>Close the Photo Sorter application.</p>
           </div>
         </div>
-
         <section class="recent-projects-panel" id="recent-projects-section">
           <h3>RECENT PROJECTS</h3>
           <div class="recent-list" id="recent-projects-list">
-            <!-- Populated dynamically -->
             <p class="empty-text">No recent projects found.</p>
           </div>
         </section>
-
         <div class="menu-hint">
           <span class="hint-key">?</span> Keyboard Shortcuts
         </div>
       </div>
     </section>
 
-    <!-- SCREEN 2: MAIN CULLING WORKSPACE -->
+    <!-- SCREEN 2: WORKSPACE -->
     <section id="workspace-screen" class="screen">
-      <!-- TOP NAVIGATION BAR -->
       <header id="top-bar">
         <div class="brand">
           <h1 class="brand-title">PHOTO SORTER</h1>
         </div>
         <div class="top-bar-actions">
-          <button id="btn-settings-workspace" class="btn" title="Open Settings">⚙ Settings</button>
           <button id="btn-back" class="btn">Back to Menu</button>
           <button id="btn-toggle-browser" class="btn active">Browser</button>
-          <button id="btn-toggle-side" class="btn icon-btn" title="Move sidebar to left/right">▶</button>
-          <button id="btn-top-restore" class="btn">Restore Checkpoint</button>
-          <button id="btn-export-xmp" class="btn" title="Write XMP sidecar files for Lightroom/Darktable">XMP</button>
-          <button id="btn-auto-grade" class="btn" title="Auto-rate unrated photos by sharpness">Auto Grade</button>
+          <button id="btn-toggle-side" class="btn icon-btn" title="Move sidebar">▶</button>
           <button id="btn-finish-export" class="btn action-btn">Finish Export</button>
         </div>
       </header>
 
-      <!-- EXPORT PROGRESS INDICATOR -->
       <div id="progress-bar-container">
         <div id="progress-bar-fill"></div>
       </div>
 
-      <!-- MAIN APP WORKSPACE (SIDEBAR + VIEWER) -->
       <div id="workspace-body">
-        
-        <!-- SIDEBAR PANEL -->
         <aside id="side-panel" class="side-panel-left">
-          
-          <!-- Search Widget -->
           <div class="sidebar-widget">
             <h4 class="widget-title">SEARCH</h4>
             <input type="text" id="search-input" placeholder="Search filename...">
           </div>
-
-          <!-- Folders Browser Widget -->
           <div class="sidebar-widget">
             <h4 class="widget-title">FOLDERS</h4>
-            <div class="tree-container" id="folder-tree">
-              <!-- Dynamically populated -->
-            </div>
+            <div class="tree-container" id="folder-tree"></div>
           </div>
-
-          <!-- Date Browser Widget -->
           <div class="sidebar-widget" id="date-widget" style="display: none;">
             <h4 class="widget-title">BY DATE</h4>
-            <div class="tree-container" id="date-tree">
-              <!-- Dynamically populated -->
-            </div>
+            <div class="tree-container" id="date-tree"></div>
           </div>
         </aside>
 
-        <!-- PHOTO VIEWER VIEWPORT -->
         <section id="viewer-container">
           <canvas id="photo-canvas"></canvas>
-
-          <!-- Rating Notification Flash Overlay -->
           <div id="flash-overlay"></div>
-
-          <!-- Absolute Floating Stats HUD -->
           <div id="stats-hud" style="display: none;"></div>
-
-          <!-- Absolute Floating Controls HUD -->
           <div class="sidebar-widget hud-widget" id="hud-container" style="display: none;">
             <h4 class="widget-title">CONTROLS</h4>
-            <div id="hud-label" class="hud-content">
-              <!-- Populated dynamically -->
-            </div>
+            <div id="hud-label" class="hud-content"></div>
           </div>
-
-          <!-- Absolute Floating Image Info Card -->
           <div class="sidebar-widget info-widget" id="info-hud" style="display: none;">
             <h4 class="widget-title">IMAGE INFO</h4>
             <div class="info-content">
@@ -144,18 +102,14 @@
         </section>
       </div>
 
-      <!-- BOTTOM FILMSTRIP -->
       <footer id="filmstrip-panel">
         <div id="filmstrip-scroll">
-          <div id="filmstrip-container">
-            <!-- Populated dynamically -->
-          </div>
+          <div id="filmstrip-container"></div>
         </div>
       </footer>
     </section>
   </main>
 
-  <!-- GLASSMORPHIC MODAL DIALOG -->
   <div id="dialog-overlay" class="dialog-overlay">
     <div class="dialog-box">
       <h2 id="dialog-title" class="dialog-title">Notification</h2>
@@ -167,55 +121,6 @@
     </div>
   </div>
 
-  <!-- SETTINGS OVERLAY -->
-  <div id="settings-overlay" class="modal-overlay" style="display: none;">
-    <div class="settings-container">
-      <header class="settings-header">
-        <h2>Application Settings</h2>
-        <button id="btn-settings-close" class="close-btn" title="Close Settings (Esc)">&times;</button>
-      </header>
-      <div class="settings-body">
-        <div class="settings-tabs">
-          <button class="settings-tab-btn active" data-tab="categories-tab">Categories</button>
-          <button class="settings-tab-btn" data-tab="keybindings-tab">Keybindings</button>
-          <button class="settings-tab-btn" data-tab="hud-tab">HUD Designer</button>
-        </div>
-        <div class="settings-tab-content">
-          <!-- Categories Tab -->
-          <div id="categories-tab" class="tab-pane active">
-            <p class="tab-desc">Configure dynamic culling categories, destination folders, and keyboard shortcuts.</p>
-            <div id="categories-list-container" class="categories-list">
-              <!-- Dynamically populated -->
-            </div>
-            <button id="btn-add-category" class="btn action-btn">+ Add Category</button>
-          </div>
-          <!-- Keybindings Tab -->
-          <div id="keybindings-tab" class="tab-pane">
-            <p class="tab-desc">Click on a shortcut key, then press any key to remap the action binding.</p>
-            <div id="keybindings-list-container" class="keybindings-list">
-              <!-- Dynamically populated -->
-            </div>
-            <div class="keybindings-footer-actions" style="margin-top: 16px; display: flex; justify-content: flex-end; width: 100%;">
-              <button id="btn-reset-keybindings" class="btn" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-weight: 500;">Reset Keybinds to Defaults</button>
-            </div>
-          </div>
-          <!-- HUD Tab -->
-          <div id="hud-tab" class="tab-pane">
-            <p class="tab-desc">Toggle which control actions appear on the HUD overlay.</p>
-            <div id="hud-list-container" class="hud-list">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-        </div>
-      </div>
-      <footer class="settings-footer">
-        <button id="btn-settings-save" class="btn action-btn">Save Changes</button>
-      </footer>
-    </div>
-  </div>
-
-
-  <!-- CHEATSHEET OVERLAY -->
   <div id="cheatsheet-overlay" class="modal-overlay" style="display: none;">
     <div class="cheatsheet-container">
       <header class="cheatsheet-header">
@@ -236,11 +141,9 @@
           <div class="cheatsheet-row"><kbd>P</kbd><span>Previous Image</span></div>
           <div class="cheatsheet-row"><kbd>Home</kbd><span>First Image</span></div>
           <div class="cheatsheet-row"><kbd>End</kbd><span>Last Image</span></div>
-          <div class="cheatsheet-row"><kbd>Ctrl+G</kbd><span>Jump to Image Number</span></div>
         </div>
         <div class="cheatsheet-group">
           <h3>Tools</h3>
-          <div class="cheatsheet-row"><kbd>C</kbd><span>Compare Mode (split-screen)</span></div>
           <div class="cheatsheet-row"><kbd>U</kbd><span>Filter Unrated Only</span></div>
           <div class="cheatsheet-row"><kbd>F</kbd><span>Toggle Fullscreen</span></div>
           <div class="cheatsheet-row"><kbd>H</kbd><span>Toggle HUD Overlay</span></div>
@@ -250,7 +153,7 @@
         <div class="cheatsheet-group">
           <h3>System</h3>
           <div class="cheatsheet-row"><kbd>Enter</kbd><span>Finish & Export</span></div>
-          <div class="cheatsheet-row"><kbd>Delete</kbd><span>Move to Trash</span></div>
+          <div class="cheatsheet-row"><kbd>Delete</kbd><span>Delete File</span></div>
           <div class="cheatsheet-row"><kbd>Escape</kbd><span>Return to Main Menu</span></div>
           <div class="cheatsheet-row"><kbd>Ctrl+Z</kbd><span>Undo Last Rating</span></div>
           <div class="cheatsheet-row"><kbd>?</kbd> or <kbd>Cmd+/</kbd><span>This Cheatsheet</span></div>
@@ -259,12 +162,7 @@
     </div>
   </div>
 
-
-  <!-- TOAST CONTAINER -->
   <div id="toast-container"></div>
-
-  <!-- JS CONTROLLERS -->
   <script type="module" src="/src/app.ts"></script>
 </body>
 </html>
-
