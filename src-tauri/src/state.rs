@@ -370,6 +370,9 @@ impl AppState {
             let cat = if img.blur_score < 150.0 { "bad" }
                       else if img.blur_score < 500.0 { "ok" }
                       else { "good" };
+            // Push each to undo stack so Ctrl+Z can reverse auto-grade
+            self.undo_stack.write().unwrap()
+                .push(crate::undo::UndoAction { path: img.path.clone(), old_rating: None });
             db.set_rating(img.id, Some(cat)).map_err(|e| e.to_string())?;
             self.results.write().unwrap().insert(img.path.clone(), cat.to_string());
             rated += 1;
