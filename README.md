@@ -37,11 +37,11 @@ No Rust or Node.js required. Download for your platform:
 
 | Platform | Download |
 |----------|----------|
-| Windows | `Photo-Sorter_3.1.0_x64-setup.exe` or `.msi` |
-| macOS (Intel) | `Photo-Sorter_3.1.0_x64.dmg` |
-| macOS (Apple Silicon) | `Photo-Sorter_3.1.0_aarch64.dmg` |
-| Linux | `Photo-Sorter_3.1.0_amd64.deb` or `.AppImage` |
-| Source | `Photo-Sorter-source-v3.1.0.zip` |
+| Windows | `Photo-Sorter_3.2.0_x64-setup.exe` or `.msi` |
+| macOS (Intel) | `Photo-Sorter_3.2.0_x64.dmg` |
+| macOS (Apple Silicon) | `Photo-Sorter_3.2.0_aarch64.dmg` |
+| Linux | `Photo-Sorter_3.2.0_amd64.deb` or `.AppImage` |
+| Source | `Photo-Sorter-source-v3.2.0.zip` |
 
 All assets are attached to the [latest release](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest).
 
