@@ -186,6 +186,7 @@ class PhotoSorterApp {
       if (e.target === e.currentTarget) this.toggleCheatsheet();
     });
     document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT') return;
       if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const overlay = document.getElementById('cheatsheet-overlay');
         if (overlay && overlay.style.display !== 'none') return;
@@ -197,7 +198,8 @@ class PhotoSorterApp {
         this.toggleCheatsheet();
       }
       if (e.key === 'Escape') {
-        document.getElementById('cheatsheet-overlay')!.style.display = 'none';
+        const el = document.getElementById('cheatsheet-overlay');
+        if (el) el.style.display = 'none';
       }
     });
   }
