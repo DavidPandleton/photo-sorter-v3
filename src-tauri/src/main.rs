@@ -73,7 +73,7 @@ fn get_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, S
     if let Some(cached) = state.image_cache.get_scaled(&path) {
         return Ok(cached);
     }
-    let decoded = load_and_scale_image(&path, 1920)
+    let decoded = load_and_scale_image(&path, constants::PREVIEW_MAX_DIM)
         .ok_or_else(|| "Failed to load image data.".to_string())?;
     state.image_cache.insert_scaled(&path, decoded.bytes.clone());
     Ok(decoded.bytes)
@@ -106,7 +106,7 @@ fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<(Vec<u
         }
         
         // Generate and cache
-        let (thumb_bytes, blur_score) = generate_thumbnail(&path, 120)
+        let (thumb_bytes, blur_score) = generate_thumbnail(&path, constants::THUMBNAIL_HEIGHT)
             .ok_or_else(|| "Failed to generate thumbnail.".to_string())?;
             
         db.save_thumbnail(record.id, &thumb_bytes).unwrap_or(());

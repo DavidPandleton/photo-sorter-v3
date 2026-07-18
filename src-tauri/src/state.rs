@@ -194,7 +194,7 @@ impl AppState {
                 if db.get_thumbnail(record.id).ok().flatten().is_some() {
                     return;
                 }
-                if let Some((thumb, blur)) = crate::image_loader::generate_thumbnail(&record.path, 120) {
+                if let Some((thumb, blur)) = crate::image_loader::generate_thumbnail(&record.path, crate::constants::THUMBNAIL_HEIGHT) {
                     db.save_thumbnail(record.id, &thumb).unwrap_or(());
                     db.set_blur_score(record.id, blur).unwrap_or(());
                 }

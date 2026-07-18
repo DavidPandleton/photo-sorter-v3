@@ -12,4 +12,10 @@ pub const SUPPORTED_EXTENSIONS: [&str; 12] = [
     "nef", "cr2", "arw", "dng", "cr3", "orf", "rw2", "pef"
 ];
 
+// Preview decode resolution — lower = faster decode on low-end hardware
+pub const PREVIEW_MAX_DIM: u32 = 1920;
+
+// Thumbnail target height for filmstrip
+pub const THUMBNAIL_HEIGHT: u32 = 120;
+
 
