@@ -239,6 +239,7 @@ impl PhotoDatabase {
                 ("menu", "Escape"),
                 ("export", "Enter"),
                 ("delete", "Delete"),
+                ("auto_grade", "A"),
             ];
             for (action, shortcut) in default_binds {
                 conn.execute(
@@ -846,6 +847,7 @@ impl PhotoDatabase {
             ("menu", "Escape"),
             ("export", "Enter"),
             ("delete", "Delete"),
+            ("auto_grade", "A"),
         ];
         for (action, shortcut) in default_binds {
             conn.execute(

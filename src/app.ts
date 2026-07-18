@@ -70,6 +70,7 @@ const ACTION_DISPLAY_NAMES: Record<string, string> = {
   menu: 'Return to Main Menu',
   export: 'Finish & Export',
   delete: 'Delete Image',
+  auto_grade: 'Auto Grade Unrated',
 };
 
 class PhotoSorterApp {
@@ -869,6 +870,7 @@ class PhotoSorterApp {
       case 'menu': void this.confirmReturnToMenu(); break;
       case 'export': this.finishSorting(); break;
       case 'delete': this.deleteCurrent(); break;
+      case 'auto_grade': void this.autoGradeUnrated(); break;
     }
   }
 
