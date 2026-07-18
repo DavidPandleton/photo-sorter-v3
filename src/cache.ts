@@ -29,25 +29,19 @@ export class ImageCacheManager {
   }
 
   evictIfNeeded(currentIdx: number, imagePaths: string[]) {
+    if (this.imageCache.size <= CACHE_LIMIT_PREVIEW &&
+        this.fullResCache.size <= CACHE_LIMIT_FULL_RES) return;
     const preloadWindowSize = PRELOAD_WINDOW_SIZE;
-    const targets = [];
-    for (let i = 1; i <= preloadWindowSize; i++) {
-      if (currentIdx + i < imagePaths.length) targets.push(imagePaths[currentIdx + i]);
+    const keep = new Set<string>();
+    for (let d = -preloadWindowSize; d <= preloadWindowSize; d++) {
+      const i = currentIdx + d;
+      if (i >= 0 && i < imagePaths.length) keep.add(imagePaths[i]);
     }
-    if (this.imageCache.size > CACHE_LIMIT_PREVIEW) {
-      const keep = new Set([imagePaths[currentIdx], ...targets]);
-      for (const key of this.imageCache.keys()) {
-        if (!keep.has(key)) {
-          this.imageCache.delete(key);
-          this.fullResCache.delete(key);
-        }
-      }
+    for (const key of this.imageCache.keys()) {
+      if (!keep.has(key)) this.imageCache.delete(key);
     }
-    if (this.fullResCache.size > CACHE_LIMIT_FULL_RES) {
-      const keep = new Set([imagePaths[currentIdx], ...targets]);
-      for (const key of this.fullResCache.keys()) {
-        if (!keep.has(key)) this.fullResCache.delete(key);
-      }
+    for (const key of this.fullResCache.keys()) {
+      if (!keep.has(key)) this.fullResCache.delete(key);
     }
   }
 
