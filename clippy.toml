@@ -1,10 +1,6 @@
 # Clippy configuration for Photo Sorter v3
 # These are opt-in restriction lints we want to enforce.
 
-# Ban certain patterns we consider harmful
-disallowed-macros = [
-    "unwrapping-unwrap-or",
-]
 # Disallow `.unwrap()` on `Option` or `Result` in production code (allow tests)
 # This is a soft warning — the codebase has known safe unwraps on locks
 # which will be migrated gradually.

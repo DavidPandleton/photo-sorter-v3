@@ -5,7 +5,7 @@ import { PhotoViewer } from './viewer';
 import { ImageCacheManager } from './cache';
 import { FilmstripBuilder } from './filmstrip';
 import { GamepadHandler } from './gamepad';
-import { COLOR_UNRATE_FLASH } from './constants';
+import { COLOR_UNRATE_FLASH, RAW_EXTENSIONS } from './constants';
 
 export interface ImageRecord {
   id: number; project_id: number; path: string; filename: string;
@@ -954,7 +954,7 @@ class PhotoSorterApp {
       document.getElementById('info-progress')!.textContent = `${this.currentIndex + 1} / ${this.imagePaths.length}`;
       document.getElementById('info-filename')!.textContent = img.filename;
       const ext = img.filename.split('.').pop()?.toUpperCase() || 'UNKNOWN';
-      const isRaw = (['NEF', 'CR2', 'ARW', 'DNG', 'CR3', 'ORF', 'RW2', 'PEF'] as string[]).includes(ext);
+      const isRaw = RAW_EXTENSIONS.includes(ext);
       document.getElementById('info-type')!.textContent = `${ext} ${isRaw ? '(RAW)' : ''}`;
       const exifLabel = document.getElementById('info-exif')!;
       if (img.camera_model) {
