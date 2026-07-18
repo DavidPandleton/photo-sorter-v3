@@ -3,8 +3,8 @@
   "version": "3.1.0",
   "identifier": "com.photosorter.v3",
   "build": {
-    "beforeDevCommand": "bun run dev",
-    "beforeBuildCommand": "bun run build",
+"beforeDevCommand": "npm run dev",
+"beforeBuildCommand": "npm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
