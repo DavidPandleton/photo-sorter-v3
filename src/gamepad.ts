@@ -32,9 +32,7 @@ export class GamepadHandler {
 
   get active() { return this._active; }
 
-  constructor(actions: GamepadActions) {
-    this.actions = actions;
-  }
+  constructor(actions: GamepadActions) { this.actions = actions; }
 
   async init() {
     try {
@@ -50,109 +48,50 @@ export class GamepadHandler {
       await listen<string>('gamepad-device', (event) => {
         this.actions.showToast(`Gamepad Connected: ${event.payload}`, 'GOOD');
       });
-    } catch (err) {
-      console.error('Failed to subscribe to gamepad events:', err);
-    }
+    } catch (err) { console.error('Failed to subscribe to gamepad events:', err); }
   }
 
   startLoop() {
     const tick = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       let activePad: Gamepad | null = null;
-
       for (const pad of gamepads) {
-        if (pad && pad.connected) {
-          activePad = pad;
-          break;
-        }
+        if (pad && pad.connected) { activePad = pad; break; }
       }
-
       if (activePad) {
         this.inactivityFrames = 0;
-
-        if (!this._active) {
-          this._active = true;
-          this.actions.updateHUD(true);
-          this.actions.showToast(`Gamepad: ${activePad.id}`, 'GOOD');
-        }
-
+        if (!this._active) { this._active = true; this.actions.updateHUD(true); this.actions.showToast(`Gamepad: ${activePad.id}`, 'GOOD'); }
         for (let i = 0; i < activePad.buttons.length; i++) {
           const pressed = activePad.buttons[i].pressed || activePad.buttons[i].value > 0.5;
           const wasPressed = this.prevButtons.get(i) ?? false;
-
-          if (pressed && !wasPressed) {
-            const code = this.mapWebButton(i, activePad);
-            if (code) this.handleInput(code, true);
-          }
+          if (pressed && !wasPressed) {       const code = this.mapWebButton(i);
+            if (code) this.handleInput(code, true); }
           this.prevButtons.set(i, pressed);
         }
-
         const lx = activePad.axes[0] ?? 0;
         const ly = activePad.axes[1] ?? 0;
         const ry = activePad.axes[3] ?? 0;
-
         let dx = 0, dy = 0;
         if (Math.abs(lx) > this.deadzone) dx = -lx * this.panSpeed;
         if (Math.abs(ly) > this.deadzone) dy = -ly * this.panSpeed;
         if (dx !== 0 || dy !== 0) this.actions.panBy(dx, dy);
-        if (Math.abs(ry) > this.deadzone) {
-          this.actions.zoomBy(1.0 - ry * this.zoomSpeed);
-        }
+        if (Math.abs(ry) > this.deadzone) { this.actions.zoomBy(1.0 - ry * this.zoomSpeed); }
       } else if (this._active) {
         this.inactivityFrames++;
-        if (this.inactivityFrames > this.INACTIVITY_TIMEOUT) {
-          this._active = false;
-          this.actions.updateHUD(false);
-          this.prevButtons.clear();
-        }
+        if (this.inactivityFrames > this.INACTIVITY_TIMEOUT) { this._active = false; this.actions.updateHUD(false); this.prevButtons.clear(); }
       }
-
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   }
 
-  private mapWebButton(index: number, pad: Gamepad): string | null {
-    if (pad.mapping === 'standard') {
-      switch (index) {
-        case 0: return 'BTN_A';
-        case 1: return 'BTN_B';
-        case 2: return 'BTN_X';
-        case 3: return 'BTN_Y';
-        case 4: return 'BTN_TL';
-        case 5: return 'BTN_TR';
-        case 6: return 'BTN_TL2';
-        case 7: return 'BTN_TR2';
-        case 8: return 'BTN_SELECT';
-        case 9: return 'BTN_START';
-        case 10: return 'BTN_THUMBL';
-        case 11: return 'BTN_THUMBR';
-        case 12: return 'DPAD_UP';
-        case 13: return 'DPAD_DOWN';
-        case 14: return 'DPAD_LEFT';
-        case 15: return 'DPAD_RIGHT';
-      }
-    } else {
-      switch (index) {
-        case 0: return 'BTN_A';
-        case 1: return 'BTN_B';
-        case 2: return 'BTN_X';
-        case 3: return 'BTN_Y';
-        case 4: return 'BTN_TL';
-        case 5: return 'BTN_TR';
-        case 6: return 'BTN_TL2';
-        case 7: return 'BTN_TR2';
-        case 8: return 'BTN_SELECT';
-        case 9: return 'BTN_START';
-        case 10: return 'BTN_THUMBL';
-        case 11: return 'BTN_THUMBR';
-        case 12: return 'DPAD_UP';
-        case 13: return 'DPAD_DOWN';
-        case 14: return 'DPAD_LEFT';
-        case 15: return 'DPAD_RIGHT';
-      }
-    }
-    return null;
+  private mapWebButton(index: number): string | null {
+    const mapping = [
+      'BTN_A', 'BTN_B', 'BTN_X', 'BTN_Y', 'BTN_TL', 'BTN_TR',
+      'BTN_TL2', 'BTN_TR2', 'BTN_SELECT', 'BTN_START', 'BTN_THUMBL', 'BTN_THUMBR',
+      'DPAD_UP', 'DPAD_DOWN', 'DPAD_LEFT', 'DPAD_RIGHT'
+    ];
+    return index < mapping.length ? mapping[index] : null;
   }
 
   private handleInput(code: string, state: boolean) {
@@ -168,12 +107,8 @@ export class GamepadHandler {
       else if (isBack) { (document.getElementById('btn-dialog-cancel') as HTMLElement)?.click(); }
       return;
     }
-
     const isWorkspace = document.getElementById('workspace-screen')?.classList.contains('active');
-    if (!isWorkspace) {
-      if (isConfirm) this.actions.selectFolder();
-      return;
-    }
+    if (!isWorkspace) { if (isConfirm) this.actions.selectFolder(); return; }
 
     if (isConfirm) this.actions.rateGood();
     else if (isBack) this.actions.rateBad();

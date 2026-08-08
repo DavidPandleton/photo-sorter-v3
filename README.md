@@ -5,7 +5,9 @@
   <img src="https://img.shields.io/badge/Rust-1.96%2B-orange" alt="Rust Version">
   <img src="https://img.shields.io/badge/Tauri-v2-teal" alt="Tauri">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/github/v/tag/DavidPandleton/photo-sorter-v3?label=version&cache=v3.1.0" alt="Version">
+  <img src="https://img.shields.io/github/v/tag/DavidPandleton/photo-sorter-v3?label=version" alt="Version">
+  <img src="https://img.shields.io/github/actions/workflow/status/DavidPandleton/photo-sorter-v3/ci.yml?label=CI" alt="CI">
+  <img src="https://img.shields.io/github/downloads/DavidPandleton/photo-sorter-v3/total?label=downloads" alt="Downloads">
 </p>
 
 <p align="center">
@@ -35,11 +37,11 @@ No Rust or Node.js required. Download for your platform:
 
 | Platform | Download |
 |----------|----------|
-| Windows | `Photo-Sorter_3.1.0_x64-setup.exe` or `.msi` |
-| macOS (Intel) | `Photo-Sorter_3.1.0_x64.dmg` |
-| macOS (Apple Silicon) | `Photo-Sorter_3.1.0_aarch64.dmg` |
-| Linux | `Photo-Sorter_3.1.0_amd64.deb` or `.AppImage` |
-| Source | `Photo-Sorter-source-v3.1.0.zip` |
+| Windows | `Photo-Sorter_3.2.0_x64-setup.exe` or `.msi` |
+| macOS (Intel) | `Photo-Sorter_3.2.0_x64.dmg` |
+| macOS (Apple Silicon) | `Photo-Sorter_3.2.0_aarch64.dmg` |
+| Linux | `Photo-Sorter_3.2.0_amd64.deb` or `.AppImage` |
+| Source | `Photo-Sorter-source-v3.2.0.zip` |
 
 All assets are attached to the [latest release](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest).
 
@@ -171,6 +173,12 @@ Photo Sorter v3 is strictly better than v2 in every way. Tested on 700+ Sony RAW
 **v3 wins on:** speed (Rust backend beats Python hands down), cross-platform (Windows/macOS/Linux), customizable keybindings, gamepad (USB/Bluetooth), compare mode, settings persistence, native trash integration, parallel thumbnail generation, modern UI, SQLite cache, focus meter.
 
 **v2:** Deprecated. Use v3.
+
+---
+
+## Contributing
+
+Found a bug or have an idea? [Open an issue](https://github.com/DavidPandleton/photo-sorter-v3/issues/new/choose) — we have templates for bug reports and feature requests. Pull requests welcome.
 
 ---
 
