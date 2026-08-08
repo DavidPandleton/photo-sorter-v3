@@ -32,10 +32,10 @@
 
 | Platform | File yang didownload |
 |----------|---------------------|
-| 🪟 **Windows** | `Photo-Sorter_3.1.0_x64-setup.exe` (installer) atau `.msi` |
-| 🍎 **macOS Intel** | `Photo-Sorter_3.1.0_x64.dmg` |
-| 🍎 **macOS Apple Silicon** (M1/M2/M3) | `Photo-Sorter_3.1.0_aarch64.dmg` |
-| 🐧 **Linux** | `Photo-Sorter_3.1.0_amd64.deb` atau `.AppImage` |
+| 🪟 **Windows** | `Photo-Sorter_3.2.0_x64-setup.exe` (installer) atau `.msi` |
+| 🍎 **macOS Intel** | `Photo-Sorter_3.2.0_x64.dmg` |
+| 🍎 **macOS Apple Silicon** (M1/M2/M3) | `Photo-Sorter_3.2.0_aarch64.dmg` |
+| 🐧 **Linux** | `Photo-Sorter_3.2.0_amd64.deb` atau `.AppImage` |
 
 **Cara download:**
 1. Buka link ini → [halaman download](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest)
