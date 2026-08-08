@@ -2,13 +2,14 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   clearScreen: false,
+  base: "./",
   server: {
     port: 5173,
     strictPort: true,
   },
   envPrefix: ["VITE_", "TAURI_"],
   build: {
-    target: "chrome105",
+    target: "chrome120",
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_DEBUG,
   },
