@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, develop]
     tags:
@@ -20,10 +21,10 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: lts/*
 
@@ -74,10 +75,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: lts/*
 
@@ -102,7 +103,7 @@ jobs:
 
       - name: Build Tauri App
         id: tauri
-        uses: tauri-apps/tauri-action@v0.6.2
+        uses: tauri-apps/tauri-action@v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -111,12 +112,10 @@ jobs:
           releaseBody: |
             **Manual culling, keyboard-fast. Zero AI.**
 
-            ### v3.1.0 — Changes
-            - **JPG performance**: Fast-path dimension check skips full decode for small images
-            - **Cross-platform**: Proper Cmd/Ctrl key handling on macOS, trash fallback, CI builds for all platforms
-            - **RAW handling**: Optimized preview extraction for non-RAW files
-            - **Info panel**: EXIF data, filename, dimensions
-            - **UI**: Better HUD, settings persistence, toast positions
+            ### v3.2.0 — Changes
+            - **Auto Grade**: One-click auto-rate all unrated photos by sharpness (blur detection). Button in workspace.
+            - **Code quality**: Remove dead clippy lint config, fix RAW_EXTENSIONS inline duplication
+            - **Under the hood**: Rust clippy-clean, TypeScript-clean, all 14 tests pass
 
             ### Downloads
             | Platform | Asset |
