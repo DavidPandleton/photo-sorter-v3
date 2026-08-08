@@ -9,7 +9,7 @@ Photo Sorter itu aplikasi desktop, **nggak butuh internet** setelah di-install, 
 ### Cara 1: Download Installer (Paling Gampang)
 
 1. Buka link ini: [halaman download Photo Sorter](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest)
-2. Nanti lu bakal liat halaman **"Releases"**. Di bagian **"Assets"**, cari file yang namanya `Photo-Sorter_3.1.0_x64-setup.exe`
+2. Nanti lu bakal liat halaman **"Releases"**. Di bagian **"Assets"**, cari file yang namanya `Photo-Sorter_3.2.0_x64-setup.exe`
 3. Klik file itu — otomatis ke-download
 4. Buka file `.exe` yang udah di-download
 5. Klik **Next** aja terus samselesai
@@ -28,8 +28,8 @@ Buat yang males install, download file `.msi` di halaman yang sama. Jalankan, la
 
 1. Buka link ini: [halaman download Photo Sorter](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest)
 2. Cari file yang cocok sama Mac lu:
-   - **Mac Intel** (Core i5/i7/i9): download yang namanya `Photo-Sorter_3.1.0_x64.dmg`
-   - **Mac Apple Silicon** (M1/M2/M3/M4): download yang `Photo-Sorter_3.1.0_aarch64.dmg`
+   - **Mac Intel** (Core i5/i7/i9): download yang namanya `Photo-Sorter_3.2.0_x64.dmg`
+   - **Mac Apple Silicon** (M1/M2/M3/M4): download yang `Photo-Sorter_3.2.0_aarch64.dmg`
 3. Klik file `.dmg` — nanti kebuka jendela baru
 4. **Drag** icon Photo Sorter ke folder **Applications**
 5. Tutup jendela installer, buka **Launchpad** atau **Applications** → klik **Photo Sorter**
@@ -44,7 +44,7 @@ Buat yang males install, download file `.msi` di halaman yang sama. Jalankan, la
 ## 🐧 Linux (Ubuntu/Debian)
 
 1. Buka link ini: [halaman download Photo Sorter](https://github.com/DavidPandleton/photo-sorter-v3/releases/latest)
-2. Cari file yang namanya `Photo-Sorter_3.1.0_amd64.deb`
+2. Cari file yang namanya `Photo-Sorter_3.2.0_amd64.deb`
 3. Klik, nanti ke-download
 4. Klik 2 kali file `.deb` — biasanya kebuka **Software Install** atau **GDebi**
 5. Klik **Install**

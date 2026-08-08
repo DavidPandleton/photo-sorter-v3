@@ -1,10 +1,10 @@
 {
   "productName": "Photo Sorter",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "identifier": "com.photosorter.v3",
   "build": {
-    "beforeDevCommand": "bun run dev",
-    "beforeBuildCommand": "bun run build",
+"beforeDevCommand": "npm run dev",
+"beforeBuildCommand": "npm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
@@ -26,6 +26,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "Photography",
+    "shortDescription": "Fast, distraction-free photo culling",
+    "longDescription": "Rate photos with 1/2/3, export, done. RAW support, gamepad. Zero AI.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
