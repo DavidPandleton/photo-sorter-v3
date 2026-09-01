@@ -432,3 +432,107 @@ pub(crate) mod test_util {
         let _ = fs::remove_dir_all(root);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::test_util::{cleanup, project_with_files};
+    use super::*;
+
+    #[test]
+    fn rate_then_undo_restores_previous_rating() {
+        let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
+        let a = root.join("a.jpg").to_string_lossy().into_owned();
+
+        state.rate_image(&a, Some("good")).unwrap();
+        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "GOOD");
+
+        // re-rate: undo must go back to GOOD, not to unrated
+        state.rate_image(&a, Some("bad")).unwrap();
+        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "BAD");
+
+        let undone = state.undo_last_rating().unwrap();
+        assert_eq!(undone.as_deref(), Some(a.as_str()));
+        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "GOOD");
+
+        // undo the first rating too -> unrated
+        state.undo_last_rating().unwrap();
+        assert!(!state.results.read().unwrap().contains_key(&a));
+        // empty stack -> Ok(None), no panic
+        assert_eq!(state.undo_last_rating().unwrap(), None);
+        cleanup(&root);
+    }
+
+    #[test]
+    fn rating_is_persisted_to_db() {
+        let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
+        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        state.rate_image(&a, Some("ok")).unwrap();
+        let (db, pid) = {
+            let db_opt = state.db.read().unwrap();
+            let pid_opt = state.project_id.read().unwrap();
+            (db_opt.as_ref().unwrap().clone(), pid_opt.unwrap())
+        };
+        let rec = db.get_image_by_path(pid, &a).unwrap().unwrap();
+        assert_eq!(rec.rating.as_deref(), Some("OK"));
+        cleanup(&root);
+    }
+
+    #[test]
+    fn rotation_wraps_mod_360_both_directions() {
+        let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
+        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        assert_eq!(state.set_rotation(&a, 1).unwrap(), 90); // cw
+        assert_eq!(state.set_rotation(&a, 1).unwrap(), 180);
+        assert_eq!(state.set_rotation(&a, 1).unwrap(), 270);
+        assert_eq!(state.set_rotation(&a, 1).unwrap(), 0); // 360 wraps to 0
+        assert_eq!(state.set_rotation(&a, -1).unwrap(), 270); // ccw below 0 wraps
+        cleanup(&root);
+    }
+
+    #[test]
+    fn star_rating_toggles_off_when_same_value() {
+        let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
+        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        assert_eq!(state.set_star_rating(&a, 3).unwrap(), 3);
+        assert_eq!(state.set_star_rating(&a, 3).unwrap(), 0); // same -> clear
+        cleanup(&root);
+    }
+
+    #[test]
+    fn load_images_walks_filters_and_ratings_survive_reload() {
+        let n = {
+            use std::sync::atomic::AtomicUsize;
+            static EXTRA: AtomicUsize = AtomicUsize::new(0);
+            EXTRA.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        };
+        let root = std::env::temp_dir().join(format!("psort_load_{}_{}", std::process::id(), n));
+        fs::create_dir_all(root.join("vacation")).unwrap();
+        fs::create_dir_all(root.join("GOOD")).unwrap();
+        fs::write(root.join("vacation/one.jpg"), b"1").unwrap();
+        fs::write(root.join("vacation/two.PNG"), b"2").unwrap(); // case-insensitive ext
+        fs::write(root.join("vacation/notes.txt"), b"3").unwrap(); // filtered out
+        fs::write(root.join("GOOD/already.jpg"), b"4").unwrap(); // category dir skipped
+
+        let state = AppState::new();
+        let count = state
+            .load_images(root.join(".db").clone(), &root.to_string_lossy())
+            .unwrap();
+        assert_eq!(count, 2, "only the two images, no txt, no GOOD/");
+        {
+            let paths = state.image_paths.read().unwrap();
+            assert!(paths.iter().any(|p| p.ends_with("one.jpg")));
+            assert!(paths.iter().any(|p| p.ends_with("two.PNG")));
+            assert!(!paths.iter().any(|p| p.contains("/GOOD/")));
+        }
+
+        // rate, then reload: the DB is the source of truth, results must come back
+        let one = root
+            .join("vacation/one.jpg")
+            .to_string_lossy()
+            .into_owned();
+        state.rate_image(&one, Some("good")).unwrap();
+        assert_eq!(state.load_images(root.join(".db").clone(), &root.to_string_lossy()).unwrap(), 2);
+        assert_eq!(state.results.read().unwrap().get(&one).unwrap(), "GOOD");
+        cleanup(&root);
+    }
+}
