@@ -47,7 +47,7 @@ pub struct Checkpoint {
 
 impl AppState {
     pub fn create_checkpoint(&self, created_folders: Vec<String>, operations: Vec<Operation>) -> Result<(), String> {
-        let root_str = self.root_folder.read().unwrap().clone();
+        let root_str = self.root_folder();
         if root_str.is_empty() {
             return Err("No active folder.".to_string());
         }
@@ -84,7 +84,7 @@ impl AppState {
     }
 
     pub fn restore_checkpoint(&self) -> Result<i32, String> {
-        let root_str = self.root_folder.read().unwrap().clone();
+        let root_str = self.root_folder();
         if root_str.is_empty() { return Err("No active folder.".to_string()); }
         let cp_path = Path::new(&root_str).join(".photosorter_checkpoint.json");
         if !cp_path.exists() { return Err("No checkpoint file found.".to_string()); }
@@ -116,19 +116,16 @@ impl AppState {
                 }
             }
         }
-        {
-            let db_opt = self.db.read().unwrap();
-            let pid_opt = self.project_id.read().unwrap();
-            if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) { db.clear_ratings(*pid).unwrap_or(()); }
+        if let Some((db, pid)) = self.db_and_pid() {
+            db.clear_ratings(pid).unwrap_or(());
         }
-        self.results.write().unwrap().clear();
         Ok(restored)
     }
 
     pub fn finish_sorting(&self) -> Result<(usize, HashMap<String, usize>), String> {
-        let results_map = self.results.read().unwrap().clone();
+        let results_map = self.get_ratings();
         if results_map.is_empty() { return Err("No images have been rated yet.".to_string()); }
-        let root_str = self.root_folder.read().unwrap().clone();
+        let root_str = self.root_folder();
         let root = Path::new(&root_str);
         let mut moved_count = 0;
         let mut newly_created = Vec::new();
@@ -180,10 +177,8 @@ impl AppState {
             }
         }
         self.create_checkpoint(newly_created, operations)?;
-        {
-            let db_opt = self.db.read().unwrap();
-            let pid_opt = self.project_id.read().unwrap();
-            if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) { db.clear_ratings(*pid).unwrap_or(()); }
+        if let Some((db, pid)) = self.db_and_pid() {
+            db.clear_ratings(pid).unwrap_or(());
         }
         self.reset();
         Ok((moved_count, summary))
@@ -251,7 +246,7 @@ mod tests {
         state.finish_sorting().unwrap();
         assert!(!root.join("a.jpg").exists());
         // finish_sorting resets state; reopening the folder is what the UI does
-        *state.root_folder.write().unwrap() = root.to_string_lossy().into_owned();
+        state.set_root_folder(&root.to_string_lossy());
 
         let restored = state.restore_checkpoint().unwrap();
         assert_eq!(restored, 2);
@@ -269,7 +264,7 @@ mod tests {
         state.rate_image(&a, Some("good")).unwrap();
         state.finish_sorting().unwrap();
         fs::write(root.join("a.jpg"), b"USER_NEW").unwrap();
-        *state.root_folder.write().unwrap() = root.to_string_lossy().into_owned();
+        state.set_root_folder(&root.to_string_lossy());
 
         let restored = state.restore_checkpoint().unwrap();
         assert_eq!(restored, 0); // skipped, not clobbered
