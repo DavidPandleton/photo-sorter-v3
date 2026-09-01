@@ -6,75 +6,18 @@ import { PhotoViewer } from './viewer';
 import { ImageCacheManager } from './cache';
 import { FilmstripBuilder } from './filmstrip';
 import { GamepadHandler } from './gamepad';
+import { COLOR_UNRATE_FLASH } from './constants';
+import type {
+  CategoryRecord, DateRecord, HudItemRecord, ImageRecord,
+  KeybindingRecord, Project, ProjectStats,
+} from './types';
 import {
-  COLOR_UNRATE_FLASH,
-  RAW_EXTENSIONS
-} from './constants';
+  ACTION_DISPLAY_NAMES, fmtShortcut, hexToRgba, renderHUDControls,
+  renderMetadataInfo, renderStatsHUD, rgbaToHex, showCustomDialog,
+  showProgressIndicator, showToast, triggerFlashNotification,
+} from './ui';
 
-export interface ImageRecord {
-  id: number; project_id: number; path: string; filename: string;
-  rating: string | null; pick: number; rotation: number; blur_score: number;
-  star_rating: number; file_size: number | null; width: number | null; height: number | null;
-  iso: number | null; aperture: string | null; shutter_speed: string | null;
-  focal_length: string | null; lens: string | null; camera_model: string | null;
-  date_taken: string | null;
-}
-
-interface DateRecord { year: string; month: string; day: string; }
-interface Project { id: number; name: string; root_path: string; created_at: string; updated_at: string; }
-interface ProjectStats { [key: string]: number; PICKED: number; }
-
-interface CategoryRecord {
-  id: number;
-  key_name: string;
-  label: string;
-  folder_name: string;
-  shortcut_key: string | null;
-  flash_color: string;
-  sort_order: number;
-}
-
-interface KeybindingRecord {
-  action_name: string;
-  shortcut_key: string;
-}
-
-// --- Cross-platform helpers ---
-const IS_MAC = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-
-function fmtShortcut(s: string): string {
-  if (!IS_MAC) return s;
-  return s.replace('Ctrl+', 'Cmd+');
-}
-
-interface HudItemRecord {
-  action_name: string;
-  visible: number;
-  sort_order: number;
-  group_name: string | null;
-}
-
-const ACTION_DISPLAY_NAMES: Record<string, string> = {
-  prev_image: 'Previous Image',
-  next_image: 'Next Image',
-  toggle_pick: 'Flag/Pick Image',
-  undo: 'Undo Last Rating',
-  unrate: 'Unrate Image',
-  rot_cw: 'Rotate Clockwise',
-  rot_ccw: 'Rotate Counter-Clockwise',
-  compare: 'Compare Mode',
-  fullscreen: 'Toggle Fullscreen',
-  hud: 'Toggle HUD Overlay',
-  info: 'Toggle Info Panel',
-  toast: 'Toggle Toast Position',
-  filter: 'Filter Unrated Only',
-  home: 'Go to First Image',
-  end: 'Go to Last Image',
-  jump: 'Jump to Image Number',
-  menu: 'Return to Main Menu',
-  export: 'Finish & Export',
-  delete: 'Delete Image',
-};
+export type { ImageRecord } from './types';
 
 class PhotoSorterApp {
   private viewer: PhotoViewer;
@@ -133,7 +76,7 @@ class PhotoSorterApp {
       panBy: (dx, dy) => this.viewer.panBy(dx, dy),
       zoomBy: (f) => this.viewer.zoomBy(f),
       updateHUD: (m) => { this.gamepadActive = m; this.updateHUDControls(); },
-      showToast: (m, s) => this.showToast(m, s),
+      showToast: (m, s) => showToast(m, s),
     });
     this.gamepad.startLoop();
     this.gamepad.init();
@@ -187,7 +130,7 @@ class PhotoSorterApp {
     if (!container) return;
     const isTop = container.classList.toggle('toast-top');
     localStorage.setItem('toast-position', isTop ? 'top' : 'bottom');
-    this.showToast(isTop ? 'Toasts moved to TOP' : 'Toasts moved to BOTTOM', 'GOOD');
+    showToast(isTop ? 'Toasts moved to TOP' : 'Toasts moved to BOTTOM', 'GOOD');
   }
 
   private async checkForStartupFolder() {
@@ -222,14 +165,14 @@ class PhotoSorterApp {
     try {
       const selected = await open({ directory: true, multiple: false, title: 'Select Photo Directory' });
       if (selected) this.loadFolder(selected);
-    } catch (err) { this.showToast('Error selecting folder: ' + err, 'BAD'); }
+    } catch (err) { showToast('Error selecting folder: ' + err, 'BAD'); }
   }
 
   private async loadFolder(folderPath: string) {
     try {
-      this.showProgressIndicator(true);
+      showProgressIndicator(true);
       const count = await invoke<number>('open_folder', { path: folderPath });
-      if (count === 0) { this.showToast('No images found or folder is empty.', 'BAD'); this.showProgressIndicator(false); return; }
+      if (count === 0) { showToast('No images found or folder is empty.', 'BAD'); showProgressIndicator(false); return; }
       this.rootFolder = folderPath;
       await this.syncImagePaths();
       document.getElementById('menu-screen')?.classList.remove('active');
@@ -239,9 +182,9 @@ class PhotoSorterApp {
       this.loadDateHierarchy();
       await this.navigateImage(0);
       this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
-      this.showToast(`Loaded ${count} images successfully!`, 'GOOD');
-    } catch (err) { this.showToast('Error loading folder: ' + err, 'BAD'); }
-    finally { this.showProgressIndicator(false); }
+      showToast(`Loaded ${count} images successfully!`, 'GOOD');
+    } catch (err) { showToast('Error loading folder: ' + err, 'BAD'); }
+    finally { showProgressIndicator(false); }
   }
 
   private async syncImagePaths() {
@@ -294,9 +237,9 @@ class PhotoSorterApp {
       await invoke('rate_image', { path, category });
       this.ratedPaths.add(path);
       this.filmstrip.updateRating(path, category);
-      this.triggerFlashNotification(flashColor);
+      triggerFlashNotification(flashColor);
       setTimeout(async () => { await this.navigateNext(); this.isProcessingRating = false; }, 100);
-    } catch (err) { this.showToast('Rating failed: ' + err, 'BAD'); this.isProcessingRating = false; }
+    } catch (err) { showToast('Rating failed: ' + err, 'BAD'); this.isProcessingRating = false; }
   }
 
   private async unrateCurrent() {
@@ -306,9 +249,9 @@ class PhotoSorterApp {
       await invoke('rate_image', { path, category: null });
       this.ratedPaths.delete(path);
       this.filmstrip.updateRating(path, null);
-      this.triggerFlashNotification(COLOR_UNRATE_FLASH);
+      triggerFlashNotification(COLOR_UNRATE_FLASH);
       this.updateStatsHUD();
-    } catch (err) { this.showToast('Unrating failed: ' + err, 'BAD'); }
+    } catch (err) { showToast('Unrating failed: ' + err, 'BAD'); }
   }
 
   private async togglePickCurrent() {
@@ -319,7 +262,7 @@ class PhotoSorterApp {
       const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
       this.viewer.setOverlays(picked, meta?.star_rating || 0);
       this.updateStatsHUD();
-    } catch (err) { this.showToast('Flagging failed: ' + err, 'BAD'); }
+    } catch (err) { showToast('Flagging failed: ' + err, 'BAD'); }
   }
 
   private async setStarsCurrent(stars: number) {
@@ -331,7 +274,7 @@ class PhotoSorterApp {
       this.viewer.setOverlays((meta?.pick || 0) === 1, activeStars);
       this.filmstrip.updateStars(path, activeStars);
       this.updateStatsHUD();
-    } catch (err) { this.showToast('Rating stars failed: ' + err, 'BAD'); }
+    } catch (err) { showToast('Rating stars failed: ' + err, 'BAD'); }
   }
 
   private async rotateCurrent(direction: number) {
@@ -342,69 +285,69 @@ class PhotoSorterApp {
       const cached = this.cache.getFromCache(path);
       if (cached) this.viewer.setImage(cached, newAngle);
       else await this.navigateImage(this.currentIndex);
-    } catch (err) { this.showToast('Rotation failed: ' + err, 'BAD'); }
+    } catch (err) { showToast('Rotation failed: ' + err, 'BAD'); }
   }
 
   private async deleteCurrent() {
     if (this.currentIndex < 0) return;
-    const confirmDelete = await this.showCustomDialog('Move to Trash', 'Permanently move this photo to the system Trash?', true);
+    const confirmDelete = await showCustomDialog('Move to Trash', 'Permanently move this photo to the system Trash?', true);
     if (!confirmDelete) return;
     try {
       const deletedPath = await invoke<string | null>('delete_current_image');
       if (deletedPath) {
-        this.showToast('Photo moved to Trash', 'BAD');
+        showToast('Photo moved to Trash', 'BAD');
         await this.syncImagePaths();
         this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
         if (this.imagePaths.length > 0) await this.navigateImage(this.currentIndex);
         else this.confirmReturnToMenu();
       }
-    } catch (err) { this.showToast('Failed to trash photo: ' + err, 'BAD'); }
+    } catch (err) { showToast('Failed to trash photo: ' + err, 'BAD'); }
   }
 
   private async undoLastRating() {
     try {
       const undonePath = await invoke<string | null>('undo_last_rating');
       if (undonePath) {
-        this.showToast('Undo completed successfully', 'GOOD');
+        showToast('Undo completed successfully', 'GOOD');
         await this.syncImagePaths();
         this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
         const idx = this.imagePaths.indexOf(undonePath);
         if (idx >= 0) await this.navigateImage(idx);
-      } else { this.showToast('No actions to undo', 'BAD'); }
-    } catch (err) { this.showToast('Undo failed: ' + err, 'BAD'); }
+      } else { showToast('No actions to undo', 'BAD'); }
+    } catch (err) { showToast('Undo failed: ' + err, 'BAD'); }
   }
 
   private async finishSorting() {
     if (this.imagePaths.length === 0) return;
     if (!confirm('Are you sure you want to finish sorting? This will move all rated photos to their category folders.')) return;
     try {
-      this.showProgressIndicator(true);
+      showProgressIndicator(true);
       const [movedCount, summary] = await invoke<[number, Record<string, number>]>('finish_sorting');
       const summaryParts = Object.entries(summary).map(([folder, count]) => `${folder}: ${count}`);
       const msg = `Export finished!\nMoved: ${movedCount} photos.\n\n${summaryParts.join(' | ')}`;
-      await this.showCustomDialog('Export Complete', msg, false);
+      await showCustomDialog('Export Complete', msg, false);
       this.returnToMenu();
-    } catch (err) { this.showToast('Export failed: ' + err, 'BAD'); }
-    finally { this.showProgressIndicator(false); }
+    } catch (err) { showToast('Export failed: ' + err, 'BAD'); }
+    finally { showProgressIndicator(false); }
   }
 
   private async restoreCheckpoint() {
     try {
-      this.showProgressIndicator(true);
+      showProgressIndicator(true);
       let root = this.rootFolder;
       if (!root) {
         const selected = await open({ directory: true, multiple: false, title: 'Select Folder containing checkpoint' });
-        if (!selected) { this.showProgressIndicator(false); return; }
+        if (!selected) { showProgressIndicator(false); return; }
         root = selected;
       }
       const count = await invoke<number>('restore_checkpoint', { root });
       if (count >= 0) {
-        this.showToast(`Restored ${count} photos from checkpoint successfully!`, 'GOOD');
+        showToast(`Restored ${count} photos from checkpoint successfully!`, 'GOOD');
         this.rootFolder = root;
         await this.loadFolder(root);
-      } else { this.showToast('No valid checkpoint found to restore.', 'BAD'); }
-    } catch (err) { this.showToast('Checkpoint restoration failed: ' + err, 'BAD'); }
-    finally { this.showProgressIndicator(false); }
+      } else { showToast('No valid checkpoint found to restore.', 'BAD'); }
+    } catch (err) { showToast('Checkpoint restoration failed: ' + err, 'BAD'); }
+    finally { showProgressIndicator(false); }
   }
 
   private async updateFilters(text: string, folder: string, date: string, mode: string) {
@@ -413,7 +356,7 @@ class PhotoSorterApp {
       await this.syncImagePaths();
       this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
       if (this.imagePaths.length > 0) await this.navigateImage(0);
-      else { this.viewer.setOverlays(false, 0); this.showToast('No photos match current filter criteria.', 'BAD'); }
+      else { this.viewer.setOverlays(false, 0); showToast('No photos match current filter criteria.', 'BAD'); }
     } catch (err) { console.error(err); }
   }
 
@@ -478,7 +421,7 @@ class PhotoSorterApp {
     if (input) {
       const num = parseInt(input);
       if (!isNaN(num) && num >= 1 && num <= this.imagePaths.length) await this.navigateImage(num - 1);
-      else await this.showCustomDialog('Invalid Number', `Please enter a number between 1 and ${this.imagePaths.length}.`, false);
+      else await showCustomDialog('Invalid Number', `Please enter a number between 1 and ${this.imagePaths.length}.`, false);
     }
   }
 
@@ -747,83 +690,26 @@ class PhotoSorterApp {
     const isUnrated = await invoke<string>('toggle_filter_mode').catch(() => 'all');
     this.filterMode = isUnrated === 'unrated' ? 'unrated' : 'all';
     this.updateFilters('', '', '', this.filterMode);
-    this.showToast(this.filterMode === 'unrated' ? 'Unrated filter ON' : 'Showing all images', 'GOOD');
+    showToast(this.filterMode === 'unrated' ? 'Unrated filter ON' : 'Showing all images', 'GOOD');
   }
 
   private updateHUDControls() {
-    const hud = document.getElementById('hud-label');
-    if (!hud) return;
-    
-    const sortedHUD = [...this.hudItems].sort((a, b) => a.sort_order - b.sort_order);
-    
-    if (this.gamepadActive) {
-      hud.innerHTML = [
-        '<span class="hud-key hud-good">[A]</span> GOOD',
-        '<span class="hud-key hud-bad">[B]</span> BAD',
-        '<span class="hud-key hud-ok">[X]</span> OK',
-        '<span class="hud-key">[LB/RB]</span> Prev/Next',
-        '<span class="hud-key">[LT/RT]</span> Rotate',
-        '<span class="hud-key">[L-STICK]</span> Pan | <span class="hud-key">[R-STICK]</span> Zoom',
-        '<span class="hud-key">[START]</span> Export | <span class="hud-key">[SELECT]</span> Menu',
-        '<span class="hud-key">[Y]</span> Reset Zoom'
-      ].join('<br>');
-    } else {
-      const rows: string[] = [];
-      
-      const activeHUD = sortedHUD.filter(h => h.visible === 1);
-      
-      activeHUD.forEach(h => {
-        const actionLabel = ACTION_DISPLAY_NAMES[h.action_name] || h.action_name;
-        const shortcut = this.keybindings.get(h.action_name) || 'None';
-          rows.push(`<span class="hud-key">[${fmtShortcut(shortcut)}]</span> ${actionLabel}`);
-      });
-      
-      this.categories.forEach(cat => {
-        if (cat.shortcut_key) {
-          const color = cat.flash_color.replace('0.4', '1.0');
-          rows.push(`<span class="hud-key" style="color: ${color}">[${cat.shortcut_key}]</span> Rate ${cat.label}`);
-        }
-      });
-      
-      hud.innerHTML = rows.join('<br>');
-    }
+    renderHUDControls({
+      gamepadActive: this.gamepadActive,
+      hudItems: this.hudItems,
+      keybindings: this.keybindings,
+      categories: this.categories,
+    });
   }
 
   private async updateStatsHUD() {
     try {
       const stats = await invoke<ProjectStats>('get_project_stats');
-      const container = document.getElementById('stats-hud');
-      if (!container) return;
-      
-      let html = `
-        <div class="stats-row highlight">
-          <span class="stats-star">★</span>
-          <span class="stats-value" id="stats-val-picked">${stats.PICKED || 0}</span>
-          <span class="stats-label">PICKED</span>
-        </div>
-        <div class="stats-divider"></div>
-      `;
-      
-      this.categories.forEach((cat) => {
-        const count = stats[cat.key_name] || 0;
-        const color = cat.flash_color.replace('0.4', '1.0');
-        html += `
-          <div class="stats-row">
-            <span class="stats-dot" style="color: ${color}">●</span>
-            <span class="stats-value">${count}</span>
-            <span class="stats-label">${cat.label.toUpperCase()}</span>
-          </div>
-        `;
+      renderStatsHUD(stats, {
+        categories: this.categories,
+        currentIndex: this.currentIndex,
+        totalImages: this.imagePaths.length,
       });
-      
-      container.innerHTML = html;
-      container.style.display = 'flex';
-      
-      if (this.imagePaths.length > 0) {
-        const pct = Math.floor(((this.currentIndex + 1) / this.imagePaths.length) * 100);
-        const fill = document.getElementById('progress-bar-fill');
-        if (fill) fill.style.width = `${pct}%`;
-      }
     } catch (err) { console.error(err); }
   }
 
@@ -831,76 +717,11 @@ class PhotoSorterApp {
     try {
       const img = await invoke<ImageRecord | null>('get_image_metadata_info', { path });
       if (!img) return;
-      document.getElementById('info-progress')!.textContent = `${this.currentIndex + 1} / ${this.imagePaths.length}`;
-      document.getElementById('info-filename')!.textContent = img.filename;
-      const ext = img.filename.split('.').pop()?.toUpperCase() || 'UNKNOWN';
-      const isRaw = RAW_EXTENSIONS.includes(ext);
-      document.getElementById('info-type')!.textContent = `${ext} ${isRaw ? '(RAW)' : ''}`;
-      const exifLabel = document.getElementById('info-exif')!;
-      if (img.camera_model) {
-        const parts: string[] = [img.camera_model];
-        if (img.iso) parts.push(`ISO ${img.iso}`);
-        if (img.aperture) parts.push(`f/${img.aperture}`);
-        if (img.shutter_speed) parts.push(`${img.shutter_speed}s`);
-        if (img.focal_length) parts.push(`${img.focal_length}mm`);
-        if (img.lens) parts.push(img.lens);
-        exifLabel.textContent = parts.join(' · ');
-      } else { exifLabel.textContent = 'Extracting EXIF...'; }
+      renderMetadataInfo(img, {
+        currentIndex: this.currentIndex,
+        totalImages: this.imagePaths.length,
+      });
     } catch (err) { console.error(err); }
-  }
-
-  private triggerFlashNotification(color: string) {
-    const flash = document.getElementById('flash-overlay')!;
-    flash.style.backgroundColor = color;
-    flash.style.opacity = '0.35';
-    setTimeout(() => { flash.style.opacity = '0'; }, 200);
-  }
-
-  private showProgressIndicator(show: boolean) {
-    const fill = document.getElementById('progress-bar-fill');
-    if (fill) {
-      fill.style.width = show ? '100%' : '0%';
-      fill.style.transition = show ? 'width 2s ease-in-out' : 'none';
-    }
-  }
-
-  private showToast(msg: string, status: 'GOOD' | 'BAD') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${status.toLowerCase()}`;
-    toast.textContent = msg;
-    container.appendChild(toast);
-    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 2000);
-  }
-
-  private showCustomDialog(title: string, message: string, showCancel = false): Promise<boolean> {
-    return new Promise((resolve) => {
-      const overlay = document.getElementById('dialog-overlay');
-      const titleEl = document.getElementById('dialog-title');
-      const msgEl = document.getElementById('dialog-message');
-      const okBtn = document.getElementById('btn-dialog-ok');
-      const cancelBtn = document.getElementById('btn-dialog-cancel');
-      if (!overlay || !titleEl || !msgEl || !okBtn || !cancelBtn) {
-        console.error('[Dialog] DOM elements missing, using console fallback');
-        console.log(`[Dialog] ${title}: ${message}`);
-        resolve(true); return;
-      }
-      titleEl.textContent = title;
-      msgEl.innerHTML = message.replace(/\n/g, '<br>');
-      cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
-      overlay.classList.add('active');
-      const cleanUp = (result: boolean) => {
-        overlay.classList.remove('active');
-        okBtn.removeEventListener('click', onOk);
-        cancelBtn.removeEventListener('click', onCancel);
-        resolve(result);
-      };
-      function onOk() { cleanUp(true); }
-      function onCancel() { cleanUp(false); }
-      okBtn.addEventListener('click', onOk);
-      cancelBtn.addEventListener('click', onCancel);
-    });
   }
 
   public async init() {
@@ -985,7 +806,7 @@ class PhotoSorterApp {
     document.getElementById('btn-reset-keybindings')?.addEventListener('click', async () => {
       if (confirm('Are you sure you want to reset all keyboard shortcuts to the system factory defaults? All your custom binds will be lost.')) {
         try {
-          this.showProgressIndicator(true);
+          showProgressIndicator(true);
           const defaultBinds = await invoke<KeybindingRecord[]>('reset_keybindings');
           this.keybindings = new Map(defaultBinds.map(b => [b.action_name, b.shortcut_key]));
           this.tempKeybindings = new Map(this.keybindings);
@@ -993,11 +814,11 @@ class PhotoSorterApp {
           this.renderSettingsKeybindings();
           this.updateHUDControls();
           
-          this.showToast('Keybindings restored to defaults!', 'GOOD');
+          showToast('Keybindings restored to defaults!', 'GOOD');
         } catch (err) {
-          this.showToast('Failed to reset keybindings: ' + err, 'BAD');
+          showToast('Failed to reset keybindings: ' + err, 'BAD');
         } finally {
-          this.showProgressIndicator(false);
+          showProgressIndicator(false);
         }
       }
     });
@@ -1045,7 +866,7 @@ class PhotoSorterApp {
         <input type="text" class="cat-label" value="${cat.label}" placeholder="Category Name">
         <input type="text" class="cat-folder" value="${cat.folder_name}" placeholder="Folder Name">
         <button class="keybinding-btn cat-shortcut">${cat.shortcut_key || 'None'}</button>
-        <input type="color" class="cat-color" value="${this.rgbaToHex(cat.flash_color)}">
+        <input type="color" class="cat-color" value="${rgbaToHex(cat.flash_color)}">
         <button class="btn-delete-cat" title="Delete Category">&times;</button>
       `;
       
@@ -1072,7 +893,7 @@ class PhotoSorterApp {
       const colorInput = row.querySelector('.cat-color') as HTMLInputElement;
       colorInput.addEventListener('input', (e) => {
         const hex = (e.target as HTMLInputElement).value;
-        this.tempCategories[index].flash_color = this.hexToRgba(hex, 0.4);
+        this.tempCategories[index].flash_color = hexToRgba(hex, 0.4);
       });
       
       const deleteBtn = row.querySelector('.btn-delete-cat') as HTMLButtonElement;
@@ -1164,7 +985,7 @@ class PhotoSorterApp {
 
   private async saveSettings() {
     try {
-      this.showProgressIndicator(true);
+      showProgressIndicator(true);
       
       const originalKeys = new Set(this.categories.map(c => c.key_name));
       const tempKeys = new Set(this.tempCategories.map(c => c.key_name));
@@ -1205,30 +1026,13 @@ class PhotoSorterApp {
       this.updateHUDControls();
       
       this.toggleSettingsModal();
-      this.showToast('Settings saved successfully!', 'GOOD');
+      showToast('Settings saved successfully!', 'GOOD');
       
     } catch (err) {
-      this.showToast('Failed to save settings: ' + err, 'BAD');
+      showToast('Failed to save settings: ' + err, 'BAD');
     } finally {
-      this.showProgressIndicator(false);
+      showProgressIndicator(false);
     }
-  }
-
-  private rgbaToHex(rgba: string): string {
-    if (rgba.startsWith('#')) return rgba.substring(0, 7);
-    const match = rgba.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
-    if (!match) return '#ffffff';
-    const r = parseInt(match[1]);
-    const g = parseInt(match[2]);
-    const b = parseInt(match[3]);
-    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-  }
-
-  private hexToRgba(hex: string, alpha: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 }
 
