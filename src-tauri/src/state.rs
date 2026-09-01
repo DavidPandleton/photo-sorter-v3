@@ -504,7 +504,7 @@ impl AppState {
         db.get_image_by_path(pid, path).ok().flatten()
     }
 
-    pub fn set_exif_for_record(&self, record_id: i64, meta: &crate::exif::ExifData) {
+    pub fn set_exif_for_record(&self, record_id: i64, meta: &crate::exif::ExifMetadata) {
         if let Some(db) = self.inner.lock().unwrap().db.clone() {
             let rot_val = meta.orientation.unwrap_or(0);
             db.set_exif_data(
