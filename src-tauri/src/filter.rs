@@ -73,7 +73,9 @@ mod tests {
             ("vac/img_2.JPG", b"2"),
             ("other/img_3.jpg", b"3"),
         ]);
-        state.set_filter_values("", "vac", "", "all");
+        // folder filter is an absolute path prefix (what the tree UI sends)
+        let vac = root.join("Vac").to_string_lossy().into_owned();
+        state.set_filter_values("", &vac, "", "all");
         state.apply_filters();
         let paths = state.image_paths();
         assert_eq!(paths.len(), 2, "both case variants of vac/ match");
@@ -90,6 +92,7 @@ mod tests {
     #[test]
     fn filter_clamps_cursor_when_results_shrink() {
         let (state, root) = project_with_files(&[("a.jpg", b"A"), ("b.jpg", b"B"), ("c.jpg", b"C")]);
+        state.apply_filters(); // populate image_paths from the DB
         state.set_current_index(2).unwrap(); // last image
         let a = root.join("a.jpg").to_string_lossy().into_owned();
         state.rate_image(&a, Some("good")).unwrap();
