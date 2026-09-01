@@ -432,7 +432,7 @@ impl AppState {
         };
         let path = Path::new(&path_str);
         if path.exists() && trash::delete(path).is_err() {
-            std::fs::remove_file(path).map_err(|e| format!("Failed to delete file: {}", e))?;
+            std::fs::remove_file(path).map_err(|e| AppError::msg(format!("Failed to delete file: {}", e)))?;
         }
         // The row survives sync until the next folder load; just drop the rating.
         if let Some((db, pid)) = self.db_and_pid() {

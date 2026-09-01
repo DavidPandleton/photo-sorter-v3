@@ -1,4 +1,4 @@
-use crate::error::AppError;
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 
 #[derive(Debug, Clone)]
