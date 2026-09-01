@@ -96,7 +96,7 @@ export function showCustomDialog(title: string, message: string, showCancel = fa
       resolve(true); return;
     }
     titleEl.textContent = title;
-    msgEl.innerHTML = message.replace(/\n/g, '<br>');
+    msgEl.textContent = message;
     cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
     overlay.classList.add('active');
     const cleanUp = (result: boolean) => {
@@ -109,6 +109,47 @@ export function showCustomDialog(title: string, message: string, showCancel = fa
     function onCancel() { cleanUp(false); }
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// Text-entry variant of showCustomDialog (replaces native prompt(), bug #17).
+export function showPromptDialog(title: string, message: string, placeholder = ''): Promise<string | null> {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('dialog-overlay');
+    const titleEl = document.getElementById('dialog-title');
+    const msgEl = document.getElementById('dialog-message');
+    const okBtn = document.getElementById('btn-dialog-ok');
+    const cancelBtn = document.getElementById('btn-dialog-cancel');
+    const actions = document.querySelector('.dialog-actions');
+    if (!overlay || !titleEl || !msgEl || !okBtn || !cancelBtn || !actions) {
+      resolve(null); return;
+    }
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    cancelBtn.style.display = 'inline-block';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'dialog-input';
+    input.placeholder = placeholder;
+    actions.parentElement?.insertBefore(input, actions);
+    input.focus();
+
+    overlay.classList.add('active');
+    const cleanUp = (result: string | null) => {
+      overlay.classList.remove('active');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onEnter);
+      input.remove();
+      resolve(result);
+    };
+    function onOk() { cleanUp(input.value); }
+    function onCancel() { cleanUp(null); }
+    function onEnter(e: KeyboardEvent) { if (e.key === 'Enter') { e.preventDefault(); cleanUp(input.value); } }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onEnter);
   });
 }
 

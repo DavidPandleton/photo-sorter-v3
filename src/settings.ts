@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { CategoryRecord, HudItemRecord, KeybindingRecord } from './types';
 import {
   ACTION_DISPLAY_NAMES, escapeHtml, fmtShortcut, hexToRgba, rgbaToHex,
-  showProgressIndicator, showToast,
+  showCustomDialog, showProgressIndicator, showToast,
 } from './ui';
 
 export interface SettingsHost {
@@ -88,7 +88,7 @@ export class SettingsModal {
     document.getElementById('btn-settings-save')?.addEventListener('click', () => this.save());
 
     document.getElementById('btn-reset-keybindings')?.addEventListener('click', async () => {
-      if (confirm('Are you sure you want to reset all keyboard shortcuts to the system factory defaults? All your custom binds will be lost.')) {
+      if (await showCustomDialog('Reset Keybindings', 'Are you sure you want to reset all keyboard shortcuts to the system factory defaults? All your custom binds will be lost.', true)) {
         try {
           showProgressIndicator(true);
           const defaultBinds = await invoke<KeybindingRecord[]>('reset_keybindings');
@@ -197,8 +197,8 @@ export class SettingsModal {
       });
 
       const deleteBtn = row.querySelector('.btn-delete-cat') as HTMLButtonElement;
-      deleteBtn.addEventListener('click', () => {
-        if (confirm(`Are you sure you want to delete category "${cat.label}"? All images rated with this category will be reset to unrated.`)) {
+      deleteBtn.addEventListener('click', async () => {
+        if (await showCustomDialog('Delete Category', `Are you sure you want to delete category "${cat.label}"? All images rated with this category will be reset to unrated.`, true)) {
           this.tempCategories.splice(index, 1);
           this.renderCategories();
         }

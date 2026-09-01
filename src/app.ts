@@ -15,7 +15,7 @@ import type {
 } from './types';
 import {
   renderHUDControls, renderMetadataInfo, renderStatsHUD,
-  showCustomDialog, showProgressIndicator, showToast, triggerFlashNotification,
+  showCustomDialog, showProgressIndicator, showPromptDialog, showToast, triggerFlashNotification,
   toggleFullscreen, toggleHUD, toggleInfoPanel,
 } from './ui';
 import { buildCombo, getActionFromCombo } from './keyboard';
@@ -351,7 +351,7 @@ class PhotoSorterApp {
 
   private async finishSorting() {
     if (this.imagePaths.length === 0) return;
-    if (!confirm('Are you sure you want to finish sorting? This will move all rated photos to their category folders.')) return;
+    if (!await showCustomDialog('Finish Sorting', 'Are you sure you want to finish sorting? This will move all rated photos to their category folders.', true)) return;
     try {
       showProgressIndicator(true);
       const [movedCount, summary] = await invoke<[number, Record<string, number>]>('finish_sorting');
@@ -449,7 +449,7 @@ class PhotoSorterApp {
 
   private async jumpToImageNumber() {
     if (this.imagePaths.length === 0) return;
-    const input = prompt(`Jump to image number (1 to ${this.imagePaths.length}):`);
+    const input = await showPromptDialog('Jump to Image', `Enter an image number (1 to ${this.imagePaths.length}):`, 'Image number');
     if (input) {
       const num = parseInt(input);
       if (!isNaN(num) && num >= 1 && num <= this.imagePaths.length) await this.navigateImage(num - 1);
@@ -457,8 +457,8 @@ class PhotoSorterApp {
     }
   }
 
-  private confirmReturnToMenu() {
-    const ans = confirm('Are you sure you want to exit to the main menu?');
+  private async confirmReturnToMenu() {
+    const ans = await showCustomDialog('Exit to Menu', 'Are you sure you want to exit to the main menu?', true);
     if (ans) this.returnToMenu();
   }
 
@@ -476,6 +476,9 @@ class PhotoSorterApp {
   private initKeyboardBinds() {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT') return;
+      // Modal guard (bug #17): while a dialog or the settings overlay is open,
+      // culling hotkeys must not fire behind it.
+      if (document.querySelector('.dialog-overlay.active, .modal-overlay[style*="flex"]')) return;
 
       const { combo, comboAlt } = buildCombo(e);
 
