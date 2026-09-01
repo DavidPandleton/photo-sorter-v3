@@ -419,11 +419,12 @@ impl AppState {
     pub fn delete_current_image(&self) -> Result<Option<String>, String> {
         let path_str = {
             let mut g = self.inner.lock().unwrap();
-            if g.current_index < 0 || g.current_index as usize >= g.image_paths.len() {
+            let idx = g.current_index as usize;
+            if g.current_index < 0 || idx >= g.image_paths.len() {
                 return Ok(None);
             }
-            let p = g.image_paths.remove(g.current_index as usize);
-            if g.current_index as usize >= g.image_paths.len() {
+            let p = g.image_paths.remove(idx);
+            if idx >= g.image_paths.len() {
                 g.current_index = (g.image_paths.len() as i32 - 1).max(0);
             }
             p
