@@ -255,7 +255,7 @@ fn toggle_filter_mode(state: State<'_, AppState>) -> AppResult<String> {
 fn get_recent_projects(app: tauri::AppHandle) -> AppResult<Vec<photo_sorter_v3::database::Project>> {
     let db_path = get_db_path(&app);
     let db = photo_sorter_v3::database::PhotoDatabase::new(db_path)?;
-    db.get_recent_projects()
+    Ok(db.get_recent_projects()?)
 }
 
 #[tauri::command]
