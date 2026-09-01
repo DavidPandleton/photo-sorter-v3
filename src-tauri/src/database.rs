@@ -996,5 +996,115 @@ mod tests {
         assert_eq!(picked.len(), 1);
         let _ = std::fs::remove_file(&db_path);
     }
+
+    #[test]
+    fn test_rotation_and_blur_persist() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_rotation(img.id, 270).unwrap();
+        db.set_blur_score(img.id, 42.5).unwrap();
+        let rec = db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap();
+        assert_eq!(rec.rotation, 270);
+        assert_eq!(rec.blur_score, 42.5);
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_exif_date_queries_and_hierarchy() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let a = seed_image(&db, pid, "/test/a.jpg");
+        let b = seed_image(&db, pid, "/test/b.jpg");
+        seed_image(&db, pid, "/test/no-date.jpg"); // stays NULL, must be excluded
+        db.set_exif_data(a.id, Some(400), Some("f/2.8"), Some("1/250"), Some("50mm"),
+            Some("50mm prime"), Some("Body X"), Some("2025-06-15 10:00"), None).unwrap();
+        db.set_exif_data(b.id, None, None, None, None, None, None,
+            Some("2025-06-16 09:00"), Some(90)).unwrap(); // rotation branch
+
+        let rec = db.get_image_by_path(pid, "/test/a.jpg").unwrap().unwrap();
+        assert_eq!(rec.iso, Some(400));
+        assert_eq!(rec.aperture.as_deref(), Some("f/2.8"));
+        assert_eq!(rec.camera_model.as_deref(), Some("Body X"));
+
+        let day = db.get_images_by_date(pid, "2025-06-15").unwrap();
+        assert_eq!(day.len(), 1);
+        assert_eq!(day[0].path, "/test/a.jpg");
+        let month = db.get_images_by_date(pid, "2025-06").unwrap();
+        assert_eq!(month.len(), 2);
+
+        let hier = db.get_date_hierarchy(pid).unwrap();
+        assert_eq!(hier.len(), 2);
+        assert_eq!((hier[0].year.as_str(), hier[0].month.as_str(), hier[0].day.as_str()),
+            ("2025", "06", "16")); // DESC order
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_thumbnail_roundtrip_and_replace() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        assert_eq!(db.get_thumbnail(img.id).unwrap(), None);
+        db.save_thumbnail(img.id, &[1, 2, 3]).unwrap();
+        assert_eq!(db.get_thumbnail(img.id).unwrap(), Some(vec![1, 2, 3]));
+        db.save_thumbnail(img.id, &[9]).unwrap(); // INSERT OR REPLACE, not duplicate
+        assert_eq!(db.get_thumbnail(img.id).unwrap(), Some(vec![9]));
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_category_crud_resets_matching_ratings() {
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test").unwrap();
+        let img = seed_image(&db, pid, "/test/img.jpg");
+        db.set_rating(img.id, Some("keeper")).unwrap();
+
+        db.save_category(CategoryRecord {
+            id: 0, key_name: "keeper".into(), label: "Keeper".into(),
+            folder_name: "KEEP".into(), shortcut_key: Some("K".into()),
+            flash_color: "#fff".into(), sort_order: 9,
+        }).unwrap();
+        let cats = db.get_categories().unwrap();
+        assert!(cats.iter().any(|c| c.key_name == "keeper" && c.folder_name == "KEEP"));
+
+        db.delete_category("keeper").unwrap();
+        let rec = db.get_image_by_path(pid, "/test/img.jpg").unwrap().unwrap();
+        assert_eq!(rec.rating, None); // ratings of deleted category wiped
+        assert!(!db.get_categories().unwrap().iter().any(|c| c.key_name == "keeper"));
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_keybinding_save_and_reset() {
+        let (db, db_path) = setup_db();
+        db.save_keybinding(KeybindingRecord { action_name: "undo".into(), shortcut_key: "U".into() }).unwrap();
+        let binds = db.get_keybindings().unwrap();
+        assert_eq!(binds.iter().find(|b| b.action_name == "undo").unwrap().shortcut_key, "U");
+        db.reset_keybindings().unwrap();
+        let binds = db.get_keybindings().unwrap();
+        assert_eq!(binds.iter().find(|b| b.action_name == "undo").unwrap().shortcut_key, "Ctrl+Z");
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_hud_items_and_widgets_roundtrip() {
+        let (db, db_path) = setup_db();
+        db.save_hud_items(vec![
+            HudItemRecord { action_name: "undo".into(), visible: 1, sort_order: 0, group_name: None },
+            HudItemRecord { action_name: "pick".into(), visible: 0, sort_order: 1, group_name: Some("main".into()) },
+        ]).unwrap();
+        let items = db.get_hud_items().unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[1].group_name.as_deref(), Some("main"));
+
+        db.save_hud_widgets(vec![HudWidgetRecord {
+            name: "histogram".into(), visible: 1, pos_x: 10.5, pos_y: 20.25, scale: 1.0, opacity: 0.8,
+        }]).unwrap();
+        let w = db.get_hud_widgets().unwrap();
+        assert_eq!(w.len(), 1);
+        assert_eq!(w[0].pos_y, 20.25);
+        let _ = std::fs::remove_file(&db_path);
+    }
 }
 
