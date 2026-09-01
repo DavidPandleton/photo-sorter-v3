@@ -95,7 +95,7 @@ export class BrowserPanel {
         const dayNode = this.createDateNode(d.day, dayText, '☀️');
         monthsMap[mKey].appendChild(dayNode);
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error('Failed to load date hierarchy:', err); }
   }
 
   private createDateNode(name: string, filterValue: string, iconChar: string): HTMLElement {

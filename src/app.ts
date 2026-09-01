@@ -389,7 +389,7 @@ class PhotoSorterApp {
       this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
       if (this.imagePaths.length > 0) await this.navigateImage(0);
       else { this.viewer.setOverlays(false, 0); showToast('No photos match current filter criteria.', 'BAD'); }
-    } catch (err) { console.error(err); }
+    } catch (err) { showToast('Filter failed: ' + err, 'BAD'); }
   }
 
   private async navigateNext() {
@@ -433,7 +433,7 @@ class PhotoSorterApp {
       const rot = meta?.rotation || 0;
       img.onload = () => { this.viewer.setCompareImage(img, rot); URL.revokeObjectURL(url); };
       img.src = url;
-    } catch (err) { console.error(err); }
+    } catch (err) { showToast('Compare load failed: ' + err, 'BAD'); }
   }
 
   private async toggleCompareMode() {
@@ -577,7 +577,7 @@ class PhotoSorterApp {
         currentIndex: this.currentIndex,
         totalImages: this.imagePaths.length,
       });
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error('Failed to update stats HUD:', err); }
   }
 
   private async updateMetadataInfo(path: string) {
@@ -588,7 +588,7 @@ class PhotoSorterApp {
         currentIndex: this.currentIndex,
         totalImages: this.imagePaths.length,
       });
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error('Failed to update metadata panel:', err); }
   }
 
   public async init() {
