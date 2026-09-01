@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tauri::{State, Manager};
+use photo_sorter_v3::error::{AppError, AppResult};
 use photo_sorter_v3::state::AppState;
 use photo_sorter_v3::database::{ImageRecord, DateRecord};
 use photo_sorter_v3::image_loader::{load_and_scale_image, load_image_unscaled, generate_thumbnail, encode_thumb_response};
@@ -20,91 +20,89 @@ fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
 // --- Tauri Commands ---
 
 #[tauri::command]
-fn open_folder(app: tauri::AppHandle, state: State<'_, AppState>, path: String) -> Result<usize, String> {
+fn open_folder(app: tauri::AppHandle, state: State<'_, AppState>, path: String) -> AppResult<usize> {
     let db_path = get_db_path(&app);
     state.load_images(db_path, &path)
 }
 
 #[tauri::command]
-fn rate_image(state: State<'_, AppState>, path: String, category: Option<String>) -> Result<(), String> {
+fn rate_image(state: State<'_, AppState>, path: String, category: Option<String>) -> AppResult<()> {
     state.rate_image(&path, category.as_deref())
 }
 
 #[tauri::command]
-fn set_star_rating(state: State<'_, AppState>, path: String, stars: i32) -> Result<i32, String> {
+fn set_star_rating(state: State<'_, AppState>, path: String, stars: i32) -> AppResult<i32> {
     state.set_star_rating(&path, stars)
 }
 
 #[tauri::command]
-fn set_rotation(state: State<'_, AppState>, path: String, direction: i32) -> Result<i32, String> {
+fn set_rotation(state: State<'_, AppState>, path: String, direction: i32) -> AppResult<i32> {
     state.set_rotation(&path, direction)
 }
 
 #[tauri::command]
-fn toggle_pick(state: State<'_, AppState>, path: String) -> Result<bool, String> {
+fn toggle_pick(state: State<'_, AppState>, path: String) -> AppResult<bool> {
     state.toggle_pick(&path)
 }
 
 #[tauri::command]
-fn delete_current_image(state: State<'_, AppState>) -> Result<Option<String>, String> {
+fn delete_current_image(state: State<'_, AppState>) -> AppResult<Option<String>> {
     state.delete_current_image()
 }
 
 #[tauri::command]
-fn undo_last_rating(state: State<'_, AppState>) -> Result<Option<String>, String> {
+fn undo_last_rating(state: State<'_, AppState>) -> AppResult<Option<String>> {
     state.undo_last_rating()
 }
 
 #[tauri::command]
-fn finish_sorting(state: State<'_, AppState>) -> Result<(usize, HashMap<String, usize>), String> {
+fn finish_sorting(state: State<'_, AppState>) -> AppResult<(usize, HashMap<String, usize>)> {
     state.finish_sorting()
 }
 
 #[tauri::command]
-fn restore_checkpoint(state: State<'_, AppState>, root: Option<String>) -> Result<i32, String> {
+fn restore_checkpoint(state: State<'_, AppState>, root: Option<String>) -> AppResult<i32> {
     if let Some(ref p) = root {
-        *state.root_folder.write().unwrap() = p.clone();
+        state.set_root_folder(p);
     }
     state.restore_checkpoint()
 }
 
 #[tauri::command]
-fn get_image_data(state: State<'_, AppState>, path: String) -> Result<tauri::ipc::Response, String> {
+fn get_image_data(state: State<'_, AppState>, path: String) -> AppResult<tauri::ipc::Response> {
     if let Some(cached) = state.image_cache.get_scaled(&path) {
         return Ok(tauri::ipc::Response::new(cached));
     }
     let decoded = load_and_scale_image(&path, 1920)
-        .ok_or_else(|| "Failed to load image data.".to_string())?;
+        .ok_or_else(|| AppError::msg("Failed to load image data."))?;
     state.image_cache.insert_scaled(&path, decoded.bytes.clone());
     Ok(tauri::ipc::Response::new(decoded.bytes))
 }
 
 #[tauri::command]
-fn get_full_image_data(state: State<'_, AppState>, path: String) -> Result<tauri::ipc::Response, String> {
+fn get_full_image_data(state: State<'_, AppState>, path: String) -> AppResult<tauri::ipc::Response> {
     if let Some(cached) = state.image_cache.get_fullres(&path) {
         return Ok(tauri::ipc::Response::new(cached));
     }
     let decoded = load_image_unscaled(&path)
-        .ok_or_else(|| "Failed to load full resolution image.".to_string())?;
+        .ok_or_else(|| AppError::msg("Failed to load full resolution image."))?;
     state.image_cache.insert_fullres(&path, decoded.bytes.clone());
     Ok(tauri::ipc::Response::new(decoded.bytes))
 }
 
 #[tauri::command]
-fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<tauri::ipc::Response, String> {
+fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> AppResult<tauri::ipc::Response> {
     // Snapshot the DB handle + record under the lock, then release it before
     // generating so thumbnail work never blocks other state.db readers.
     let (db, record_id, cached_blob, cached_blur) = {
-        let db_opt = state.db.read().unwrap();
-        let pid_opt = state.project_id.read().unwrap();
-        let (db, pid) = match (db_opt.as_ref(), pid_opt.as_ref()) {
-            (Some(db), Some(pid)) => (Arc::clone(db), *pid),
-            _ => return Err("No active database session.".to_string()),
+        let (db, pid) = match state.db_and_pid() {
+            Some(pair) => pair,
+            None => return Err(AppError::msg("No active database session.")),
         };
         let record = db.get_image_by_path(pid, &path)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Image record not found.".to_string())?;
-        let cached = db.get_thumbnail(record.id).map_err(|e| e.to_string())?;
+            ?
+            .ok_or_else(|| AppError::msg("Image record not found."))?;
+        let cached = db.get_thumbnail(record.id)?;
         (db, record.id, cached, record.blur_score)
     };
 
@@ -112,7 +110,7 @@ fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<tauri:
         Some(blob) => (blob, cached_blur),
         None => {
             let (bytes, score) = generate_thumbnail(&path, 120)
-                .ok_or_else(|| "Failed to generate thumbnail.".to_string())?;
+                .ok_or_else(|| AppError::msg("Failed to generate thumbnail."))?;
             db.save_thumbnail(record_id, &bytes).unwrap_or(());
             db.set_blur_score(record_id, score).unwrap_or(());
             (bytes, score)
@@ -123,8 +121,8 @@ fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<tauri:
 }
 
 #[tauri::command]
-fn get_project_stats(state: State<'_, AppState>) -> Result<HashMap<String, usize>, String> {
-    let results_map = state.results.read().unwrap();
+fn get_project_stats(state: State<'_, AppState>) -> AppResult<HashMap<String, usize>> {
+    let results_map = state.get_ratings();
     let mut stats = HashMap::new();
     
     let cats = state.get_categories().unwrap_or_default();
@@ -146,30 +144,21 @@ fn get_project_stats(state: State<'_, AppState>) -> Result<HashMap<String, usize
         }
     }
     
-    // Add PICKED count
-    let db_opt = state.db.read().unwrap();
-    let pid_opt = state.project_id.read().unwrap();
-    let mut picked_count = 0;
-    if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-        if let Ok(records) = db.get_picked_images(*pid) {
-            picked_count = records.len();
-        }
-    }
-    stats.insert("PICKED".to_string(), picked_count);
+    stats.insert("PICKED".to_string(), state.get_picked_count());
     
     Ok(stats)
 }
 
+/// Path -> rating map straight from the DB. The frontend syncs its
+/// ratedPaths set from this on folder load (KB bug #5).
 #[tauri::command]
-fn get_date_hierarchy(state: State<'_, AppState>) -> Result<Vec<DateRecord>, String> {
-    let db_opt = state.db.read().unwrap();
-    let pid_opt = state.project_id.read().unwrap();
-    
-    if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-        db.get_date_hierarchy(*pid).map_err(|e| e.to_string())
-    } else {
-        Ok(Vec::new())
-    }
+fn get_ratings(state: State<'_, AppState>) -> AppResult<HashMap<String, String>> {
+    Ok(state.get_ratings())
+}
+
+#[tauri::command]
+fn get_date_hierarchy(state: State<'_, AppState>) -> AppResult<Vec<DateRecord>> {
+    state.get_date_hierarchy()
 }
 
 #[tauri::command]
@@ -179,81 +168,39 @@ fn set_filters(
     folder: String,
     date: String,
     mode: String,
-) -> Result<(), String> {
-    {
-        *state.filter_text.write().unwrap() = text;
-        *state.filter_folder.write().unwrap() = folder;
-        *state.filter_date.write().unwrap() = date;
-        *state.filter_mode.write().unwrap() = mode;
-    }
+) -> AppResult<()> {
+    state.set_filter_values(&text, &folder, &date, &mode);
     state.apply_filters();
     Ok(())
 }
 
 #[tauri::command]
-fn get_image_paths(state: State<'_, AppState>) -> Result<Vec<String>, String> {
-    Ok(state.image_paths.read().unwrap().clone())
+fn get_image_paths(state: State<'_, AppState>) -> AppResult<Vec<String>> {
+    Ok(state.image_paths())
 }
 
 #[tauri::command]
-fn get_current_index(state: State<'_, AppState>) -> Result<i32, String> {
-    Ok(*state.current_index.read().unwrap())
+fn get_current_index(state: State<'_, AppState>) -> AppResult<i32> {
+    Ok(state.current_index())
 }
 
 #[tauri::command]
-fn set_current_index(state: State<'_, AppState>, index: i32) -> Result<(), String> {
-    let paths = state.image_paths.read().unwrap();
-    if index >= 0 && index < paths.len() as i32 {
-        *state.current_index.write().unwrap() = index;
-        
-        // Asynchronously pre-fetch and extract EXIF if missing
-        let path = paths[index as usize].clone();
-        let db_opt = state.db.read().unwrap();
-        let pid_opt = state.project_id.read().unwrap();
-        
-        if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-            if let Ok(Some(record)) = db.get_image_by_path(*pid, &path) {
-                if record.camera_model.is_none() {
-                    // Extract in a background thread to prevent culling UI lag
-                    let db_clone = Arc::clone(db);
-                    let record_id = record.id;
-                    std::thread::spawn(move || {
-                        if let Some(meta) = extract_exif(&path) {
-                            db_clone.set_exif_data(
-                                record_id,
-                                meta.iso,
-                                meta.aperture.as_deref(),
-                                meta.shutter_speed.as_deref(),
-                                meta.focal_length.as_deref(),
-                                meta.lens.as_deref(),
-                                meta.camera_model.as_deref(),
-                                meta.date_taken.as_deref(),
-                                meta.orientation,
-                            ).unwrap_or(());
-                        }
-                    });
-                }
-            }
-        }
-        Ok(())
-    } else {
-        Err("Index out of bounds.".to_string())
-    }
-}
-
-#[tauri::command]
-fn get_image_metadata_info(state: State<'_, AppState>, path: String) -> Result<Option<ImageRecord>, String> {
-    let db_opt = state.db.read().unwrap();
-    let pid_opt = state.project_id.read().unwrap();
-    
-    if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-        let mut record = db.get_image_by_path(*pid, &path).map_err(|e| e.to_string())?;
-        if let Some(ref mut rec) = record {
-            if rec.camera_model.is_none() {
-                if let Some(meta) = extract_exif(&path) {
-                    let rot_val = meta.orientation.unwrap_or(0);
+fn set_current_index(state: State<'_, AppState>, index: i32) -> AppResult<()> {
+    let path = match state.set_current_index(index)? {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+    // Asynchronously pre-fetch and extract EXIF if missing
+    if let Some(record) = state.record_for_path(&path) {
+        if record.camera_model.is_none() {
+            // Extract in a background thread to prevent culling UI lag.
+            // State<'_, AppState> is not 'static, so hand the thread the DB Arc.
+            let db = state.db_arc();
+            let record_id = record.id;
+            std::thread::spawn(move || {
+                if let (Some(db), Some(meta)) = (db, extract_exif(&path)) {
                     db.set_exif_data(
-                        rec.id,
+                        record_id,
                         meta.iso,
                         meta.aperture.as_deref(),
                         meta.shutter_speed.as_deref(),
@@ -261,103 +208,98 @@ fn get_image_metadata_info(state: State<'_, AppState>, path: String) -> Result<O
                         meta.lens.as_deref(),
                         meta.camera_model.as_deref(),
                         meta.date_taken.as_deref(),
-                        Some(rot_val),
+                        meta.orientation,
                     ).unwrap_or(());
-                    
-                    // Update returned record fields
-                    rec.iso = meta.iso;
-                    rec.aperture = meta.aperture.clone();
-                    rec.shutter_speed = meta.shutter_speed.clone();
-                    rec.focal_length = meta.focal_length.clone();
-                    rec.lens = meta.lens.clone();
-                    rec.camera_model = meta.camera_model.clone();
-                    rec.date_taken = meta.date_taken.clone();
-                    rec.rotation = rot_val;
-                    
-                    // Update the in-memory AppState.rotations map if rotation is non-zero
-                    if rot_val != 0 {
-                        state.rotations.write().unwrap().insert(path.clone(), rot_val);
-                    }
                 }
-            }
+            });
         }
-        Ok(record)
-    } else {
-        Ok(None)
     }
+    Ok(())
 }
 
 #[tauri::command]
-fn toggle_filter_mode(state: State<'_, AppState>) -> Result<String, String> {
-    let new_mode = {
-        let mut mode = state.filter_mode.write().unwrap();
-        let new = if mode.as_str() == "unrated" { "all".to_string() } else { "unrated".to_string() };
-        *mode = new.clone();
-        new
+fn get_image_metadata_info(state: State<'_, AppState>, path: String) -> AppResult<Option<ImageRecord>> {
+    let mut record = match state.record_for_path(&path) {
+        Some(r) => r,
+        None => return Ok(None),
     };
-    state.apply_filters();
-    Ok(new_mode)
+    if record.camera_model.is_none() {
+        if let Some(meta) = extract_exif(&path) {
+            let rot_val = meta.orientation.unwrap_or(0);
+            state.set_exif_for_record(record.id, &meta);
+
+            // Update returned record fields
+            record.iso = meta.iso;
+            record.aperture = meta.aperture;
+            record.shutter_speed = meta.shutter_speed;
+            record.focal_length = meta.focal_length;
+            record.lens = meta.lens;
+            record.camera_model = meta.camera_model;
+            record.date_taken = meta.date_taken;
+            record.rotation = rot_val;
+        }
+    }
+    Ok(Some(record))
 }
 
 #[tauri::command]
-fn get_recent_projects(app: tauri::AppHandle) -> Result<Vec<photo_sorter_v3::database::Project>, String> {
+fn toggle_filter_mode(state: State<'_, AppState>) -> AppResult<String> {
+    let new = if state.filter_mode() == "unrated" { "all".to_string() } else { "unrated".to_string() };
+    let (text, folder, date, _) = state.filter_values();
+    state.set_filter_values(&text, &folder, &date, &new);
+    state.apply_filters();
+    Ok(new)
+}
+
+#[tauri::command]
+fn get_recent_projects(app: tauri::AppHandle) -> AppResult<Vec<photo_sorter_v3::database::Project>> {
     let db_path = get_db_path(&app);
-    let db = photo_sorter_v3::database::PhotoDatabase::new(db_path).map_err(|e| e.to_string())?;
-    db.get_recent_projects().map_err(|e| e.to_string())
+    let db = photo_sorter_v3::database::PhotoDatabase::new(db_path)?;
+    db.get_recent_projects()
 }
 
 #[tauri::command]
 fn get_startup_folder(state: State<'_, AppState>) -> Option<String> {
-    state.startup_folder.read().unwrap().clone()
+    state.startup_folder()
 }
 
 #[tauri::command]
-fn get_categories(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::CategoryRecord>, String> {
+fn get_categories(state: State<'_, AppState>) -> AppResult<Vec<photo_sorter_v3::database::CategoryRecord>> {
     state.get_categories()
 }
 
 #[tauri::command]
-fn save_category(state: State<'_, AppState>, cat: photo_sorter_v3::database::CategoryRecord) -> Result<(), String> {
+fn save_category(state: State<'_, AppState>, cat: photo_sorter_v3::database::CategoryRecord) -> AppResult<()> {
     state.save_category(cat)
 }
 
 #[tauri::command]
-fn delete_category(state: State<'_, AppState>, key_name: String) -> Result<(), String> {
+fn delete_category(state: State<'_, AppState>, key_name: String) -> AppResult<()> {
     state.delete_category(&key_name)
 }
 
 #[tauri::command]
-fn get_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::KeybindingRecord>, String> {
+fn get_keybindings(state: State<'_, AppState>) -> AppResult<Vec<photo_sorter_v3::database::KeybindingRecord>> {
     state.get_keybindings()
 }
 
 #[tauri::command]
-fn save_keybinding(state: State<'_, AppState>, bind: photo_sorter_v3::database::KeybindingRecord) -> Result<(), String> {
+fn save_keybinding(state: State<'_, AppState>, bind: photo_sorter_v3::database::KeybindingRecord) -> AppResult<()> {
     state.save_keybinding(bind)
 }
 
 #[tauri::command]
-fn get_hud_items(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::HudItemRecord>, String> {
+fn get_hud_items(state: State<'_, AppState>) -> AppResult<Vec<photo_sorter_v3::database::HudItemRecord>> {
     state.get_hud_items()
 }
 
 #[tauri::command]
-fn save_hud_items(state: State<'_, AppState>, items: Vec<photo_sorter_v3::database::HudItemRecord>) -> Result<(), String> {
+fn save_hud_items(state: State<'_, AppState>, items: Vec<photo_sorter_v3::database::HudItemRecord>) -> AppResult<()> {
     state.save_hud_items(items)
 }
 
 #[tauri::command]
-fn get_hud_widgets(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::HudWidgetRecord>, String> {
-    state.get_hud_widgets()
-}
-
-#[tauri::command]
-fn save_hud_widgets(state: State<'_, AppState>, widgets: Vec<photo_sorter_v3::database::HudWidgetRecord>) -> Result<(), String> {
-    state.save_hud_widgets(widgets)
-}
-
-#[tauri::command]
-fn reset_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::KeybindingRecord>, String> {
+fn reset_keybindings(state: State<'_, AppState>) -> AppResult<Vec<photo_sorter_v3::database::KeybindingRecord>> {
     state.reset_keybindings()?;
     state.get_keybindings()
 }
@@ -381,7 +323,7 @@ fn main() {
 
     let state = AppState::new();
     if let Some(folder) = startup_folder {
-        *state.startup_folder.write().unwrap() = Some(folder);
+        state.set_startup_folder(folder);
     }
 
     tauri::Builder::default()
@@ -396,7 +338,7 @@ fn main() {
             let state = app.state::<AppState>();
             match photo_sorter_v3::database::PhotoDatabase::new(db_path) {
                 Ok(db) => {
-                    *state.db.write().unwrap() = Some(Arc::new(db));
+                    state.init_db(db);
                 }
                 Err(e) => {
                     eprintln!("Failed to initialize database: {}", e);
@@ -419,6 +361,7 @@ fn main() {
             get_full_image_data,
             get_thumbnail_data,
             get_project_stats,
+            get_ratings,
             get_date_hierarchy,
             set_filters,
             get_image_paths,
@@ -435,8 +378,6 @@ fn main() {
             save_keybinding,
             get_hud_items,
             save_hud_items,
-            get_hud_widgets,
-            save_hud_widgets,
             reset_keybindings
         ])
         .run(tauri::generate_context!())

@@ -218,6 +218,10 @@ class PhotoSorterApp {
   private async syncImagePaths() {
     this.imagePaths = await invoke<string[]>('get_image_paths');
     this.currentIndex = await invoke<number>('get_current_index');
+    // Hydrate ratedPaths from SQLite (bug #5): fresh sessions used to skip
+    // already-rated photos wrongly in unrated-mode navigation.
+    const ratings = await invoke<Record<string, string>>('get_ratings');
+    this.ratedPaths = new Set(Object.keys(ratings));
   }
 
   private async navigateImage(index: number) {

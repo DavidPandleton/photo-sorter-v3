@@ -2,8 +2,22 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
 use serde::{Serialize, Deserialize};
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use crate::constants;
+
+/// Hex sha1 of a file; empty string on read failure (never blocks a move).
+fn sha1_of(path: &Path) -> String {
+    use sha1::{Digest, Sha1};
+    match fs::read(path) {
+        Ok(bytes) => {
+            let mut hasher = Sha1::new();
+            hasher.update(&bytes);
+            hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
+        }
+        Err(_) => String::new(),
+    }
+}
 
 /// If the export target already exists, pick "name (1).ext", "name (2).ext"...
 /// Never overwrite an existing file: the whole point of the checkpoint is
@@ -46,10 +60,10 @@ pub struct Checkpoint {
 }
 
 impl AppState {
-    pub fn create_checkpoint(&self, created_folders: Vec<String>, operations: Vec<Operation>) -> Result<(), String> {
-        let root_str = self.root_folder.read().unwrap().clone();
+    pub fn create_checkpoint(&self, created_folders: Vec<String>, operations: Vec<Operation>) -> AppResult<()> {
+        let root_str = self.root_folder();
         if root_str.is_empty() {
-            return Err("No active folder.".to_string());
+            return Err(AppError::msg("No active folder."));
         }
         let cp_path = Path::new(&root_str).join(".photosorter_checkpoint.json");
         let mut cp_data = Checkpoint {
@@ -76,20 +90,20 @@ impl AppState {
                 }
             }
         }
-        let json_str = serde_json::to_string_pretty(&cp_data).map_err(|e| e.to_string())?;
+        let json_str = serde_json::to_string_pretty(&cp_data)?;
         let tmp_path = cp_path.with_extension("json.tmp");
-        fs::write(&tmp_path, json_str).map_err(|e| e.to_string())?;
-        fs::rename(tmp_path, cp_path).map_err(|e| e.to_string())?;
+        fs::write(&tmp_path, json_str)?;
+        fs::rename(tmp_path, cp_path)?;
         Ok(())
     }
 
-    pub fn restore_checkpoint(&self) -> Result<i32, String> {
-        let root_str = self.root_folder.read().unwrap().clone();
-        if root_str.is_empty() { return Err("No active folder.".to_string()); }
+    pub fn restore_checkpoint(&self) -> AppResult<i32> {
+        let root_str = self.root_folder();
+        if root_str.is_empty() { return Err(AppError::msg("No active folder.")); }
         let cp_path = Path::new(&root_str).join(".photosorter_checkpoint.json");
-        if !cp_path.exists() { return Err("No checkpoint file found.".to_string()); }
-        let content = fs::read_to_string(&cp_path).map_err(|e| e.to_string())?;
-        let cp_data: Checkpoint = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        if !cp_path.exists() { return Err(AppError::msg("No checkpoint file found.")); }
+        let content = fs::read_to_string(&cp_path)?;
+        let cp_data: Checkpoint = serde_json::from_str(&content)?;
         let mut restored = 0;
         if cp_data.version == "2.0" {
             for op in &cp_data.operations {
@@ -100,12 +114,17 @@ impl AppState {
                     // user put a new file there after exporting, skip instead
                     // of silently destroying it.
                     if orig.exists() { continue; }
+                    // Integrity gate (docs/checkpoint.md promised this for
+                    // real now): a recorded sha1 that no longer matches the
+                    // exported file means something touched it post-export.
+                    // Leave it where it is rather than restoring corrupt data.
+                    if !op.sha1.is_empty() && sha1_of(exp) != op.sha1 { continue; }
                     let parent = orig.parent().unwrap();
                     fs::create_dir_all(parent).unwrap_or(());
                     if fs::rename(exp, orig).is_ok() { restored += 1; }
                 }
             }
-        } else { return Err("Unsupported checkpoint version. Must be 2.0".to_string()); }
+        } else { return Err(AppError::msg("Unsupported checkpoint version. Must be 2.0")); }
         let mut folders = cp_data.created_folders.clone();
         folders.sort_by_key(|b| std::cmp::Reverse(b.len()));
         for folder in folders {
@@ -116,19 +135,16 @@ impl AppState {
                 }
             }
         }
-        {
-            let db_opt = self.db.read().unwrap();
-            let pid_opt = self.project_id.read().unwrap();
-            if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) { db.clear_ratings(*pid).unwrap_or(()); }
+        if let Some((db, pid)) = self.db_and_pid() {
+            db.clear_ratings(pid).unwrap_or(());
         }
-        self.results.write().unwrap().clear();
         Ok(restored)
     }
 
-    pub fn finish_sorting(&self) -> Result<(usize, HashMap<String, usize>), String> {
-        let results_map = self.results.read().unwrap().clone();
-        if results_map.is_empty() { return Err("No images have been rated yet.".to_string()); }
-        let root_str = self.root_folder.read().unwrap().clone();
+    pub fn finish_sorting(&self) -> AppResult<(usize, HashMap<String, usize>)> {
+        let results_map = self.get_ratings();
+        if results_map.is_empty() { return Err(AppError::msg("No images have been rated yet.")); }
+        let root_str = self.root_folder();
         let root = Path::new(&root_str);
         let mut moved_count = 0;
         let mut newly_created = Vec::new();
@@ -152,7 +168,7 @@ impl AppState {
             let target_path = root.join(&folder_name).join(rel_path);
             let target_dir = target_path.parent().unwrap();
             if !target_dir.exists() {
-                fs::create_dir_all(target_dir).map_err(|e| e.to_string())?;
+                fs::create_dir_all(target_dir)?;
                 let rel_target_dir = target_dir.strip_prefix(root).unwrap();
                 let mut accum = PathBuf::new();
                 for comp in rel_target_dir.components() {
@@ -162,6 +178,7 @@ impl AppState {
                 }
             }
             let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+            let sha1 = sha1_of(path); // before the move, while the source is in place
             let target_path = unique_target(target_path);
             let move_ok = fs::rename(path, &target_path).is_ok()
                 || (fs::copy(path, &target_path).is_ok() && fs::remove_file(path).is_ok());
@@ -175,15 +192,13 @@ impl AppState {
                     category: folder_name,
                     status: "completed".to_string(),
                     size,
-                    sha1: String::new(),
+                    sha1,
                 });
             }
         }
         self.create_checkpoint(newly_created, operations)?;
-        {
-            let db_opt = self.db.read().unwrap();
-            let pid_opt = self.project_id.read().unwrap();
-            if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) { db.clear_ratings(*pid).unwrap_or(()); }
+        if let Some((db, pid)) = self.db_and_pid() {
+            db.clear_ratings(pid).unwrap_or(());
         }
         self.reset();
         Ok((moved_count, summary))
@@ -251,7 +266,7 @@ mod tests {
         state.finish_sorting().unwrap();
         assert!(!root.join("a.jpg").exists());
         // finish_sorting resets state; reopening the folder is what the UI does
-        *state.root_folder.write().unwrap() = root.to_string_lossy().into_owned();
+        state.set_root_folder(&root.to_string_lossy());
 
         let restored = state.restore_checkpoint().unwrap();
         assert_eq!(restored, 2);
@@ -269,12 +284,33 @@ mod tests {
         state.rate_image(&a, Some("good")).unwrap();
         state.finish_sorting().unwrap();
         fs::write(root.join("a.jpg"), b"USER_NEW").unwrap();
-        *state.root_folder.write().unwrap() = root.to_string_lossy().into_owned();
+        state.set_root_folder(&root.to_string_lossy());
 
         let restored = state.restore_checkpoint().unwrap();
         assert_eq!(restored, 0); // skipped, not clobbered
         assert_eq!(read(&root.join("a.jpg")), b"USER_NEW");
         assert!(root.join("GOOD/a.jpg").exists()); // exported copy still there
+        cleanup(&root);
+    }
+
+    #[test]
+    fn restore_skips_files_tampered_after_export() {
+        // sha1 integrity gate: if the exported file changed on disk since
+        // finish_sorting, restore must leave it alone instead of putting a
+        // corrupted file back at the original path.
+        let (state, root) = project_with_files(&[("a.jpg", b"AAA"), ("b.jpg", b"BBB")]);
+        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let b = root.join("b.jpg").to_string_lossy().into_owned();
+        state.rate_image(&a, Some("good")).unwrap();
+        state.rate_image(&b, Some("good")).unwrap();
+        state.finish_sorting().unwrap();
+        fs::write(root.join("GOOD/a.jpg"), b"CORRUPTED").unwrap();
+        state.set_root_folder(&root.to_string_lossy());
+
+        let restored = state.restore_checkpoint().unwrap();
+        assert_eq!(restored, 1, "only the untouched b.jpg comes back");
+        assert!(!root.join("a.jpg").exists());
+        assert_eq!(read(&root.join("b.jpg")), b"BBB");
         cleanup(&root);
     }
 

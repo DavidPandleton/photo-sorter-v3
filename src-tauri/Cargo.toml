@@ -22,5 +22,7 @@ image = { version = "0.25.1", default-features = false, features = ["jpeg", "png
 rayon = "1.10.0"
 trash = "5.1.1"
 chrono = "0.4"
+sha1 = "0.10"
+thiserror = "1"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
