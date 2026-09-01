@@ -46,6 +46,9 @@ jobs:
       - name: TypeScript & Vite Build Check
         run: npm run build
 
+      - name: Frontend Unit Tests
+        run: npm test
+
       - name: Rust Lint (Clippy)
         run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
