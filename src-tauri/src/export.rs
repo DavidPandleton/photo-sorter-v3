@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
 use serde::{Serialize, Deserialize};
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use crate::constants;
 
@@ -59,10 +60,10 @@ pub struct Checkpoint {
 }
 
 impl AppState {
-    pub fn create_checkpoint(&self, created_folders: Vec<String>, operations: Vec<Operation>) -> Result<(), String> {
+    pub fn create_checkpoint(&self, created_folders: Vec<String>, operations: Vec<Operation>) -> AppResult<()> {
         let root_str = self.root_folder();
         if root_str.is_empty() {
-            return Err("No active folder.".to_string());
+            return Err(AppError::msg("No active folder."));
         }
         let cp_path = Path::new(&root_str).join(".photosorter_checkpoint.json");
         let mut cp_data = Checkpoint {
@@ -89,20 +90,20 @@ impl AppState {
                 }
             }
         }
-        let json_str = serde_json::to_string_pretty(&cp_data).map_err(|e| e.to_string())?;
+        let json_str = serde_json::to_string_pretty(&cp_data)?;
         let tmp_path = cp_path.with_extension("json.tmp");
-        fs::write(&tmp_path, json_str).map_err(|e| e.to_string())?;
-        fs::rename(tmp_path, cp_path).map_err(|e| e.to_string())?;
+        fs::write(&tmp_path, json_str)?;
+        fs::rename(tmp_path, cp_path)?;
         Ok(())
     }
 
-    pub fn restore_checkpoint(&self) -> Result<i32, String> {
+    pub fn restore_checkpoint(&self) -> AppResult<i32> {
         let root_str = self.root_folder();
-        if root_str.is_empty() { return Err("No active folder.".to_string()); }
+        if root_str.is_empty() { return Err(AppError::msg("No active folder.")); }
         let cp_path = Path::new(&root_str).join(".photosorter_checkpoint.json");
-        if !cp_path.exists() { return Err("No checkpoint file found.".to_string()); }
-        let content = fs::read_to_string(&cp_path).map_err(|e| e.to_string())?;
-        let cp_data: Checkpoint = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        if !cp_path.exists() { return Err(AppError::msg("No checkpoint file found.")); }
+        let content = fs::read_to_string(&cp_path)?;
+        let cp_data: Checkpoint = serde_json::from_str(&content)?;
         let mut restored = 0;
         if cp_data.version == "2.0" {
             for op in &cp_data.operations {
@@ -123,7 +124,7 @@ impl AppState {
                     if fs::rename(exp, orig).is_ok() { restored += 1; }
                 }
             }
-        } else { return Err("Unsupported checkpoint version. Must be 2.0".to_string()); }
+        } else { return Err(AppError::msg("Unsupported checkpoint version. Must be 2.0")); }
         let mut folders = cp_data.created_folders.clone();
         folders.sort_by_key(|b| std::cmp::Reverse(b.len()));
         for folder in folders {
@@ -140,9 +141,9 @@ impl AppState {
         Ok(restored)
     }
 
-    pub fn finish_sorting(&self) -> Result<(usize, HashMap<String, usize>), String> {
+    pub fn finish_sorting(&self) -> AppResult<(usize, HashMap<String, usize>)> {
         let results_map = self.get_ratings();
-        if results_map.is_empty() { return Err("No images have been rated yet.".to_string()); }
+        if results_map.is_empty() { return Err(AppError::msg("No images have been rated yet.")); }
         let root_str = self.root_folder();
         let root = Path::new(&root_str);
         let mut moved_count = 0;
@@ -167,7 +168,7 @@ impl AppState {
             let target_path = root.join(&folder_name).join(rel_path);
             let target_dir = target_path.parent().unwrap();
             if !target_dir.exists() {
-                fs::create_dir_all(target_dir).map_err(|e| e.to_string())?;
+                fs::create_dir_all(target_dir)?;
                 let rel_target_dir = target_dir.strip_prefix(root).unwrap();
                 let mut accum = PathBuf::new();
                 for comp in rel_target_dir.components() {

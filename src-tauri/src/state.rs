@@ -4,6 +4,7 @@ use std::fs;
 use std::sync::{Arc, Mutex, RwLock};
 use rayon::prelude::*;
 use crate::database::PhotoDatabase;
+use crate::error::{AppError, AppResult};
 use crate::undo::UndoAction;
 use crate::constants;
 
@@ -175,10 +176,10 @@ impl AppState {
     }
 
     /// Sets the cursor and returns the newly selected path.
-    pub fn set_current_index(&self, index: i32) -> Result<Option<String>, String> {
+    pub fn set_current_index(&self, index: i32) -> AppResult<Option<String>> {
         let mut g = self.inner.lock().unwrap();
         if index < 0 || index >= g.image_paths.len() as i32 {
-            return Err("Index out of bounds.".to_string());
+            return Err(AppError::msg("Index out of bounds."));
         }
         g.current_index = index;
         Ok(Some(g.image_paths[index as usize].clone()))
@@ -223,14 +224,14 @@ impl AppState {
         self.inner.lock().unwrap().undo_stack.pop();
     }
 
-    fn with_db_pid<T>(&self, f: impl FnOnce(&Arc<PhotoDatabase>, i64) -> Result<T, String>) -> Result<T, String> {
-        let (db, pid) = self.db_and_pid().ok_or_else(|| "No active project database found.".to_string())?;
+    fn with_db_pid<T>(&self, f: impl FnOnce(&Arc<PhotoDatabase>, i64) -> AppResult<T>) -> AppResult<T> {
+        let (db, pid) = self.db_and_pid().ok_or_else(|| AppError::msg("No active project database found."))?;
         f(&db, pid)
     }
 
-    fn with_db<T>(&self, f: impl FnOnce(&Arc<PhotoDatabase>) -> Result<T, String>) -> Result<T, String> {
+    fn with_db<T>(&self, f: impl FnOnce(&Arc<PhotoDatabase>) -> AppResult<T>) -> AppResult<T> {
         let db = { self.inner.lock().unwrap().db.clone() }
-            .ok_or_else(|| "No active database connection.".to_string())?;
+            .ok_or_else(|| AppError::msg("No active database connection."))?;
         f(&db)
     }
 
@@ -275,14 +276,14 @@ impl AppState {
             .unwrap_or(0)
     }
 
-    pub fn rate_image(&self, path: &str, category: Option<&str>) -> Result<(), String> {
+    pub fn rate_image(&self, path: &str, category: Option<&str>) -> AppResult<()> {
         self.with_db_pid(|db, pid| {
             let record = db
                 .get_image_by_path(pid, path)
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| "Image not found.".to_string())?;
+                ?
+                .ok_or_else(|| AppError::msg("Image not found."))?;
             let old_val = record.rating.clone();
-            db.set_rating(record.id, category).map_err(|e| e.to_string())?;
+            db.set_rating(record.id, category)?;
             // Undo is pushed only after the write succeeded: a failed DB
             // update no longer leaves a ghost entry (KB bug #4).
             self.inner.lock().unwrap().undo_stack.push(UndoAction {
@@ -293,50 +294,50 @@ impl AppState {
         })
     }
 
-    pub fn set_star_rating(&self, path: &str, stars: i32) -> Result<i32, String> {
+    pub fn set_star_rating(&self, path: &str, stars: i32) -> AppResult<i32> {
         self.with_db_pid(|db, pid| {
             let record = db
                 .get_image_by_path(pid, path)
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| "Image not found.".to_string())?;
+                ?
+                .ok_or_else(|| AppError::msg("Image not found."))?;
             let new_stars = if record.star_rating == stars { 0 } else { stars };
-            db.set_star_rating(record.id, new_stars).map_err(|e| e.to_string())?;
+            db.set_star_rating(record.id, new_stars)?;
             Ok(new_stars)
         })
     }
 
-    pub fn set_rotation(&self, path: &str, direction: i32) -> Result<i32, String> {
+    pub fn set_rotation(&self, path: &str, direction: i32) -> AppResult<i32> {
         self.with_db_pid(|db, pid| {
             let record = db
                 .get_image_by_path(pid, path)
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| "Image not found.".to_string())?;
+                ?
+                .ok_or_else(|| AppError::msg("Image not found."))?;
             let new_rot = (record.rotation + direction * 90).rem_euclid(360);
-            db.set_rotation(record.id, new_rot).map_err(|e| e.to_string())?;
+            db.set_rotation(record.id, new_rot)?;
             Ok(new_rot)
         })
     }
 
-    pub fn toggle_pick(&self, path: &str) -> Result<bool, String> {
+    pub fn toggle_pick(&self, path: &str) -> AppResult<bool> {
         self.with_db_pid(|db, pid| {
             let record = db
                 .get_image_by_path(pid, path)
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| "Image not found.".to_string())?;
+                ?
+                .ok_or_else(|| AppError::msg("Image not found."))?;
             let new_val = record.pick == 0;
-            db.set_pick(record.id, new_val).map_err(|e| e.to_string())?;
+            db.set_pick(record.id, new_val)?;
             Ok(new_val)
         })
     }
 
     // --- Folder loading ---
 
-    pub fn load_images(&self, db_path: PathBuf, root: &str) -> Result<usize, String> {
+    pub fn load_images(&self, db_path: PathBuf, root: &str) -> AppResult<usize> {
         self.reset();
         let path = PathBuf::from(root);
         let root_abs = path
             .canonicalize()
-            .map_err(|e| e.to_string())?
+            ?
             .to_string_lossy()
             .into_owned()
             .replace('\\', "/");
@@ -367,7 +368,7 @@ impl AppState {
         }
         walk_dir(Path::new(&root_abs), Path::new(&root_abs), &mut paths, &exts);
         if paths.is_empty() {
-            return Err("No supported images found in directory.".to_string());
+            return Err(AppError::msg("No supported images found in directory."));
         }
         paths.sort();
         for p in &mut paths {
@@ -376,11 +377,11 @@ impl AppState {
 
         let db_arc = match self.inner.lock().unwrap().db.clone() {
             Some(db) => db,
-            None => Arc::new(PhotoDatabase::new(db_path).map_err(|e| e.to_string())?),
+            None => Arc::new(PhotoDatabase::new(db_path)?),
         };
 
-        let pid = db_arc.get_or_create_project(&root_abs).map_err(|e| e.to_string())?;
-        db_arc.sync_images(pid, &paths).map_err(|e| e.to_string())?;
+        let pid = db_arc.get_or_create_project(&root_abs)?;
+        db_arc.sync_images(pid, &paths)?;
 
         {
             let mut g = self.inner.lock().unwrap();
@@ -416,7 +417,7 @@ impl AppState {
         });
     }
 
-    pub fn delete_current_image(&self) -> Result<Option<String>, String> {
+    pub fn delete_current_image(&self) -> AppResult<Option<String>> {
         let path_str = {
             let mut g = self.inner.lock().unwrap();
             let idx = g.current_index as usize;
@@ -444,43 +445,43 @@ impl AppState {
 
     // --- Thin DB passthroughs (categories, keybindings, HUD) ---
 
-    pub fn get_categories(&self) -> Result<Vec<crate::database::CategoryRecord>, String> {
-        self.with_db(|db| db.get_categories().map_err(|e| e.to_string()))
+    pub fn get_categories(&self) -> AppResult<Vec<crate::database::CategoryRecord>> {
+        self.with_db(|db| db.get_categories().map_err(AppError::from))
     }
 
-    pub fn save_category(&self, cat: crate::database::CategoryRecord) -> Result<(), String> {
-        self.with_db(|db| db.save_category(cat).map_err(|e| e.to_string()))
+    pub fn save_category(&self, cat: crate::database::CategoryRecord) -> AppResult<()> {
+        self.with_db(|db| db.save_category(cat).map_err(AppError::from))
     }
 
-    pub fn delete_category(&self, key_name: &str) -> Result<(), String> {
+    pub fn delete_category(&self, key_name: &str) -> AppResult<()> {
         // Ratings live in the DB only now, so deleting a category needs no
         // in-memory reload: delete_category already NULLs matching rows.
-        self.with_db(|db| db.delete_category(key_name).map_err(|e| e.to_string()))
+        self.with_db(|db| db.delete_category(key_name).map_err(AppError::from))
     }
 
-    pub fn get_keybindings(&self) -> Result<Vec<crate::database::KeybindingRecord>, String> {
-        self.with_db(|db| db.get_keybindings().map_err(|e| e.to_string()))
+    pub fn get_keybindings(&self) -> AppResult<Vec<crate::database::KeybindingRecord>> {
+        self.with_db(|db| db.get_keybindings().map_err(AppError::from))
     }
 
-    pub fn save_keybinding(&self, bind: crate::database::KeybindingRecord) -> Result<(), String> {
-        self.with_db(|db| db.save_keybinding(bind).map_err(|e| e.to_string()))
+    pub fn save_keybinding(&self, bind: crate::database::KeybindingRecord) -> AppResult<()> {
+        self.with_db(|db| db.save_keybinding(bind).map_err(AppError::from))
     }
 
-    pub fn get_hud_items(&self) -> Result<Vec<crate::database::HudItemRecord>, String> {
-        self.with_db(|db| db.get_hud_items().map_err(|e| e.to_string()))
+    pub fn get_hud_items(&self) -> AppResult<Vec<crate::database::HudItemRecord>> {
+        self.with_db(|db| db.get_hud_items().map_err(AppError::from))
     }
 
-    pub fn save_hud_items(&self, items: Vec<crate::database::HudItemRecord>) -> Result<(), String> {
-        self.with_db(|db| db.save_hud_items(items).map_err(|e| e.to_string()))
+    pub fn save_hud_items(&self, items: Vec<crate::database::HudItemRecord>) -> AppResult<()> {
+        self.with_db(|db| db.save_hud_items(items).map_err(AppError::from))
     }
 
-    pub fn reset_keybindings(&self) -> Result<(), String> {
-        self.with_db(|db| db.reset_keybindings().map_err(|e| e.to_string()))
+    pub fn reset_keybindings(&self) -> AppResult<()> {
+        self.with_db(|db| db.reset_keybindings().map_err(AppError::from))
     }
 
-    pub fn get_date_hierarchy(&self) -> Result<Vec<crate::database::DateRecord>, String> {
+    pub fn get_date_hierarchy(&self) -> AppResult<Vec<crate::database::DateRecord>> {
         match self.db_and_pid() {
-            Some((db, pid)) => db.get_date_hierarchy(pid).map_err(|e| e.to_string()),
+            Some((db, pid)) => db.get_date_hierarchy(pid).map_err(AppError::from),
             None => Ok(Vec::new()),
         }
     }
