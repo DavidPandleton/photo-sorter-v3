@@ -683,7 +683,9 @@ input, button {
   align-items: center;
 }
 
-/* Thumbnail Item Card */
+/* Thumbnail Item Card
+   width + container gap (12px) = THUMB_ITEM_WIDTH in src/constants.ts.
+   Change both together or virtual scroll drifts (bug #16). */
 .thumbnail-item {
   width: 150px;
   height: 100%;
@@ -847,6 +849,22 @@ input, button {
   font-size: 14px;
   line-height: 1.6;
   margin-bottom: 24px;
+}
+
+.dialog-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--text-primary, #e5e7eb);
+  font-size: 14px;
+  outline: none;
+}
+.dialog-input:focus {
+  border-color: var(--accent-teal, #2dd4bf);
 }
 
 .dialog-actions {

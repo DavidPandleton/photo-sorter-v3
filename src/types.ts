@@ -4,7 +4,7 @@
 export interface ImageRecord {
   id: number; project_id: number; path: string; filename: string;
   rating: string | null; pick: number; rotation: number; blur_score: number;
-  star_rating: number; file_size: number | null; width: number | null; height: number | null;
+  star_rating: number;
   iso: number | null; aperture: string | null; shutter_speed: string | null;
   focal_length: string | null; lens: string | null; camera_model: string | null;
   date_taken: string | null;

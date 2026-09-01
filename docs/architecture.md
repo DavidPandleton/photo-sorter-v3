@@ -7,21 +7,28 @@ Photo Sorter v3 is built on **Tauri v2** with a **Rust** backend and **Vite + Ty
 ## Core Components
 
 ### `AppState` (Rust — `state.rs`)
-Thread-safe global state manager behind `RwLock`:
+Thread-safe global state behind a single `Mutex<Inner>` (accessors are the
+only way in/out; SQLite is the sole source of truth for ratings/rotations):
 - Image paths, current index, filter state
-- Results map (rating per path), rotations map
 - Undo stack for ctrl+z
 - DB connection (Arc-shared)
 - **`ImageCache`** — LRU cache for decoded image bytes (30 scaled, 10 full-res)
 - Project ID, startup folder
+- Errors flow as `AppError` (thiserror), serialized as plain strings over IPC
 
-### `PhotoSorterApp` (TS — `app.ts`)
-Main frontend orchestrator:
-- IPC command dispatch to Rust backend
-- Keyboard event listener (customizable keybindings)
-- Folder/date trees, search, HUD toggles
-- Settings modal (categories, keybindings, HUD visibility)
-- Filmstrip rebuild, cache preloader trigger
+### Frontend modules (TS — `src/`)
+`app.ts` is the orchestrator (PhotoSorterApp: state, navigation, rating,
+lifecycle); UI concerns live in dedicated modules:
+- `settings.ts` — SettingsModal (categories, keybindings, HUD tabs) behind a
+  SettingsHost callback interface
+- `browser.ts` — BrowserPanel (folder tree, date hierarchy, panel toggles)
+- `keyboard.ts` — pure combo parsing (buildCombo, getActionFromCombo)
+- `ui.ts` — pure DOM widgets: toast, dialog/prompt, progress, flash, HUD/stats/
+  metadata renderers, color helpers
+- `types.ts` — backend record interfaces mirrored from Rust
+- `viewer.ts` — canvas renderer; `filmstrip.ts` — virtual scroll; `cache.ts` —
+  frontend LRU; `gamepad.ts` — Web Gamepad API polling; `ipc.ts` — raw-bytes
+  invoke helpers
 
 ### `PhotoViewer` (TS — `viewer.ts`)
 HTML5 Canvas 2D renderer:

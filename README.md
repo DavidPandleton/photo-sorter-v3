@@ -124,8 +124,8 @@ For developers who want to compile or contribute:
 ```bash
 git clone https://github.com/DavidPandleton/photo-sorter-v3.git
 cd photo-sorter-v3
-bun install
-bun run tauri build
+npm install
+npm run tauri build
 ```
 
 Binary output: `src-tauri/target/release/photo-sorter-v3` (or `.exe` on Windows).

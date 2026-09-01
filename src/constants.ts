@@ -20,6 +20,11 @@ export const CACHE_LIMIT_PREVIEW = 15;
 export const CACHE_LIMIT_FULL_RES = 5;
 export const PRELOAD_WINDOW_SIZE = 5;
 
+// Filmstrip virtual-scroll geometry. Must match .thumbnail-item width +
+// #filmstrip-container gap in style.css (150 + 12 = 162). Bug #16: these
+// were magic numbers in filmstrip.ts, silently drifting from CSS.
+export const THUMB_ITEM_WIDTH = 162;
+
 export const GAMEPAD_DEADZONE = 0.25;
 export const GAMEPAD_PAN_SPEED = 10;
 export const GAMEPAD_ZOOM_SPEED = 0.02;
