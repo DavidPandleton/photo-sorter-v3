@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
 import { PhotoViewer } from './viewer';
+import { invokeImageData } from './ipc';
 import { CACHE_LIMIT_PREVIEW, CACHE_LIMIT_FULL_RES, PRELOAD_WINDOW_SIZE } from './constants';
 
 export class ImageCacheManager {
@@ -62,9 +62,8 @@ export class ImageCacheManager {
     for (const path of targets) {
       if (this.imageCache.has(path) || this.activePreloadRequests.has(path)) continue;
       this.activePreloadRequests.add(path);
-      invoke<number[]>('get_image_data', { path })
-        .then((bytes) => {
-          const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      invokeImageData(path, 'get_image_data')
+        .then((blob) => {
           const url = URL.createObjectURL(blob);
           const img = new Image();
           img.onload = () => {
@@ -81,8 +80,7 @@ export class ImageCacheManager {
   async loadFullResolution(path: string, viewer: PhotoViewer, currentIdx: number, imagePaths: string[]) {
     if (this.fullResCache.has(path)) return;
     try {
-      const bytes = await invoke<number[]>('get_full_image_data', { path });
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const blob = await invokeImageData(path, 'get_full_image_data');
       const url = URL.createObjectURL(blob);
       const img = new Image();
       img.onload = () => {

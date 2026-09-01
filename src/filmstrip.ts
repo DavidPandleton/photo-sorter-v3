@@ -1,5 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
+import { invokeThumbnailData } from './ipc';
+import { THUMB_ITEM_WIDTH } from './constants';
 import type { ImageRecord } from './app';
+
+// Pure virtual-scroll window math: which indices are visible for the given
+// scroll position, plus a buffer of off-screen items on each side.
+export function visibleRange(scrollLeft: number, viewW: number, total: number, itemWidth = THUMB_ITEM_WIDTH, buffer = 4): [number, number] {
+  const startIdx = Math.max(0, Math.floor(scrollLeft / itemWidth) - buffer);
+  const endIdx = Math.min(total, Math.ceil((scrollLeft + viewW) / itemWidth) + buffer);
+  return [startIdx, endIdx];
+}
 
 export class FilmstripBuilder {
   private queue: Array<() => Promise<void>> = [];
@@ -111,13 +121,11 @@ export class FilmstripBuilder {
   private loadVisibleThumbnails() {
     if (!this.scrollContainer || !this.container) return;
 
-    const itemWidth = 162;
-    const buffer = 4;
-    const scrollLeft = this.scrollContainer.scrollLeft;
-    const viewW = this.scrollContainer.clientWidth;
-
-    const startIdx = Math.max(0, Math.floor(scrollLeft / itemWidth) - buffer);
-    const endIdx = Math.min(this.allPaths.length, Math.ceil((scrollLeft + viewW) / itemWidth) + buffer);
+    const [startIdx, endIdx] = visibleRange(
+      this.scrollContainer.scrollLeft,
+      this.scrollContainer.clientWidth,
+      this.allPaths.length,
+    );
 
     for (let i = startIdx; i < endIdx; i++) {
       if (this.loadedIndices.has(i)) continue;
@@ -132,8 +140,7 @@ export class FilmstripBuilder {
 
   private async loadThumbnail(path: string, thumbItem: HTMLElement): Promise<void> {
     try {
-      const [bytes, blurScore] = await invoke<[number[], number]>('get_thumbnail_data', { path });
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const { blob, blurScore } = await invokeThumbnailData(path);
       const url = URL.createObjectURL(blob);
       const img = document.createElement('img');
       img.className = 'thumb-img';

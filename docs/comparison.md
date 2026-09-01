@@ -42,21 +42,23 @@ v3 punya fondasi yang solid secara arsitektur (**kode lebih rapi, performa nativ
 | `Del` | Delete (trash) | ✅ | ✅ |
 | `U` | Filter unrated | ✅ | ✅ |
 | `Arrow Up/Down` | Rotate CW/CCW | ✅ | ✅ |
-| `C` | Compare mode | ✅ | ❌ (stub exists, not wired) |
-| `F` | Fullscreen | ✅ | ❌ |
-| `H` | Toggle HUD | ✅ | ❌ |
-| `I` | Toggle info panel | ✅ | ❌ |
-| `Home` / `End` | First / Last image | ✅ | ❌ |
-| `Ctrl+G` | Jump to image number | ✅ | ❌ |
-| `Escape` | Return to menu | ✅ | ❌ |
-| `Ctrl+O` | Open folder | ✅ | ❌ |
-| `Ctrl+Q` | Exit | ✅ | ❌ |
-| `Ctrl++/-` | Zoom in/out | ✅ | ❌ (stub in viewer.ts) |
-| `Ctrl+0` | Reset zoom | ✅ | ❌ (dbl-click only) |
-| `R` / `Shift+R` | Rotate | ✅ | ⚠️ (Arrow Up/Down only) |
-| `Enter` | Export | ✅ | ⚠️ (button only) |
+| `C` | Compare mode | ✅ | ✅ |
+| `F` | Fullscreen | ✅ | ✅ |
+| `H` | Toggle HUD | ✅ | ✅ |
+| `I` | Toggle info panel | ✅ | ✅ |
+| `Home` / `End` | First / Last image | ✅ | ✅ |
+| `Ctrl+G` | Jump to image number | ✅ | ✅ |
+| `Escape` | Return to menu | ✅ | ✅ |
+| `Ctrl+O` | Open folder | ✅ | ❌ (menu button only) |
+| `Ctrl+Q` | Exit | ✅ | ❌ (menu button only) |
+| `Ctrl++/-` | Zoom in/out | ✅ | ✅ |
+| `Ctrl+0` | Reset zoom | ✅ | ✅ |
+| `R` / `Shift+R` | Rotate | ✅ | ⚠️ (Arrow Up/Down default; R bindable in Settings) |
+| `Enter` | Export | ✅ | ✅ |
 
-**Score: 14/24 keyboard shortcuts match**
+**Score: 21/24 keyboard shortcuts match** (all remappable actions bound by
+default; only Ctrl+O/Ctrl+Q unbound, and every action is user-rebindable via
+the Settings keybinding editor - something v2 never had)
 
 ---
 
@@ -97,19 +99,19 @@ v3 punya fondasi yang solid secara arsitektur (**kode lebih rapi, performa nativ
 
 | Area | v2 | v3 |
 |---|---|---|
-| Library | `inputs` (Python) | `gilrs` (optional feature) |
-| A / X / B = Rate | ✅ | ❌ |
-| LB/RB = Prev/Next | ✅ | ❌ |
-| LT/RT = Rotate | ✅ | ❌ |
-| Left stick = Pan | ✅ | ❌ |
-| Right stick Y = Zoom | ✅ | ❌ |
-| Start = Export | ✅ | ❌ |
-| Select = Menu | ✅ | ❌ |
-| Auto-detect connect/disconnect | ✅ | ❌ |
-| Auto-switch HUD gamepad/keyboard | ✅ | ❌ |
-| Dialog navigation with D-Pad | ✅ | ❌ |
+| Library | `inputs` (Python) | Web Gamepad API |
+| A / X / B = Rate | ✅ | ✅ |
+| LB/RB = Prev/Next | ✅ | ✅ |
+| LT/RT = Rotate | ✅ | ✅ |
+| Left stick = Pan | ✅ | ✅ |
+| Right stick Y = Zoom | ✅ | ✅ |
+| Start = Export | ✅ | ✅ |
+| Select = Menu | ✅ | ✅ |
+| Auto-detect connect/disconnect | ✅ | ✅ |
+| Auto-switch HUD gamepad/keyboard | ✅ | ✅ |
+| Dialog navigation with D-Pad | ✅ | ✅ |
 
-**Score: 0/11 gamepad features in v3** (optional crate exists, not wired)
+**Score: 11/11 gamepad features in v3** (Web Gamepad API, no native dependency)
 
 ---
 
@@ -188,7 +190,7 @@ v3 punya fondasi yang solid secara arsitektur (**kode lebih rapi, performa nativ
 | Performance | 6/10 | 10/10 | v3 |
 | Keyboard shortcuts | 24/24 | 14/24 | v2 |
 | UI polish | 8/10 | 7/10 | v2 |
-| Gamepad support | 11/11 | 0/11 | v2 |
+| Gamepad support | 11/11 | 11/11 | tie (v3 via Web API, no native dep) |
 | Image features | 9/10 | 7/10 | v2 |
 | Export system | 9/10 | 6/10 | v2 |
 | Distribution | 5/10 | 9/10 | v3 |
@@ -209,7 +211,7 @@ Priority fix utk Blanc/Violet:
 1. Compare mode (C) — kode sudah ada di viewer.ts, tinggal wiring
 2. Fullscreen (F) — gampang via window.toggleMaximize()
 3. Zoom keyboard + pinch — viewer.ts sudah punya onWheel, tinggal tambah keyboard
-4. Gamepad — gilrs crate udah ready, tinggal wiring ke Tauri events
+4. Gamepad: done via Web Gamepad API (src/gamepad.ts), no native crate needed
 5. Home/End, Escape, Enter, Ctrl+G — pure event listener, no backend needed
 6. EXIF orientation rotation — image crate bisa baca orientation
 7. Safe cross-filesystem move — ganti fs::rename dengan copy+delete pattern
