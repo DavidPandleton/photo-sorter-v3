@@ -58,11 +58,11 @@ Once your environment is validated, you can run the app in live development mode
 
 1. **Install JavaScript dependencies:**
    ```bash
-   bun install   # or: npm install
+   npm install
    ```
 2. **Run Tauri hot-reload shell:**
    ```bash
-   bun run tauri dev   # or: npm run tauri dev
+   npm run tauri dev
    ```
 
 *Note: Tauri compiles the Rust backend engine in debug mode, spins up the Vite dev server, and links them through the safe IPC bridge.*
@@ -74,7 +74,7 @@ Once your environment is validated, you can run the app in live development mode
 To compile a highly optimized release binary and generate standalone platform installers:
 
 ```bash
-bun run tauri build   # or: npm run tauri build
+npm run tauri build
 ```
 
 The resulting installers will be placed in the `/src-tauri/target/release/bundle/` folder:

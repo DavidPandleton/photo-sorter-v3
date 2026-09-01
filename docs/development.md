@@ -73,7 +73,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 ### Running Frontend Type Checks
 To verify that the TypeScript compiler produces clean types with zero unused imports or variable mismatches:
 ```bash
-bun run build
+npm run build
 # or: tsc --noEmit
 ```
 
@@ -92,7 +92,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 ### ⚡ JavaScript/TypeScript Format
 Ensure the web assets maintain styling and code formatting rules:
 ```bash
-bun run build
+npm run build
 ```
 
 ---

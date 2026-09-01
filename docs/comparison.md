@@ -42,21 +42,23 @@ v3 punya fondasi yang solid secara arsitektur (**kode lebih rapi, performa nativ
 | `Del` | Delete (trash) | ✅ | ✅ |
 | `U` | Filter unrated | ✅ | ✅ |
 | `Arrow Up/Down` | Rotate CW/CCW | ✅ | ✅ |
-| `C` | Compare mode | ✅ | ❌ (stub exists, not wired) |
-| `F` | Fullscreen | ✅ | ❌ |
-| `H` | Toggle HUD | ✅ | ❌ |
-| `I` | Toggle info panel | ✅ | ❌ |
-| `Home` / `End` | First / Last image | ✅ | ❌ |
-| `Ctrl+G` | Jump to image number | ✅ | ❌ |
-| `Escape` | Return to menu | ✅ | ❌ |
-| `Ctrl+O` | Open folder | ✅ | ❌ |
-| `Ctrl+Q` | Exit | ✅ | ❌ |
-| `Ctrl++/-` | Zoom in/out | ✅ | ❌ (stub in viewer.ts) |
-| `Ctrl+0` | Reset zoom | ✅ | ❌ (dbl-click only) |
-| `R` / `Shift+R` | Rotate | ✅ | ⚠️ (Arrow Up/Down only) |
-| `Enter` | Export | ✅ | ⚠️ (button only) |
+| `C` | Compare mode | ✅ | ✅ |
+| `F` | Fullscreen | ✅ | ✅ |
+| `H` | Toggle HUD | ✅ | ✅ |
+| `I` | Toggle info panel | ✅ | ✅ |
+| `Home` / `End` | First / Last image | ✅ | ✅ |
+| `Ctrl+G` | Jump to image number | ✅ | ✅ |
+| `Escape` | Return to menu | ✅ | ✅ |
+| `Ctrl+O` | Open folder | ✅ | ❌ (menu button only) |
+| `Ctrl+Q` | Exit | ✅ | ❌ (menu button only) |
+| `Ctrl++/-` | Zoom in/out | ✅ | ✅ |
+| `Ctrl+0` | Reset zoom | ✅ | ✅ |
+| `R` / `Shift+R` | Rotate | ✅ | ⚠️ (Arrow Up/Down default; R bindable in Settings) |
+| `Enter` | Export | ✅ | ✅ |
 
-**Score: 14/24 keyboard shortcuts match**
+**Score: 21/24 keyboard shortcuts match** (all remappable actions bound by
+default; only Ctrl+O/Ctrl+Q unbound, and every action is user-rebindable via
+the Settings keybinding editor - something v2 never had)
 
 ---
 
@@ -188,7 +190,7 @@ v3 punya fondasi yang solid secara arsitektur (**kode lebih rapi, performa nativ
 | Performance | 6/10 | 10/10 | v3 |
 | Keyboard shortcuts | 24/24 | 14/24 | v2 |
 | UI polish | 8/10 | 7/10 | v2 |
-| Gamepad support | 11/11 | 0/11 | v2 |
+| Gamepad support | 11/11 | 11/11 | tie (v3 via Web API, no native dep) |
 | Image features | 9/10 | 7/10 | v2 |
 | Export system | 9/10 | 6/10 | v2 |
 | Distribution | 5/10 | 9/10 | v3 |
