@@ -474,14 +474,6 @@ impl AppState {
         self.with_db(|db| db.save_hud_items(items).map_err(|e| e.to_string()))
     }
 
-    pub fn get_hud_widgets(&self) -> Result<Vec<crate::database::HudWidgetRecord>, String> {
-        self.with_db(|db| db.get_hud_widgets().map_err(|e| e.to_string()))
-    }
-
-    pub fn save_hud_widgets(&self, widgets: Vec<crate::database::HudWidgetRecord>) -> Result<(), String> {
-        self.with_db(|db| db.save_hud_widgets(widgets).map_err(|e| e.to_string()))
-    }
-
     pub fn reset_keybindings(&self) -> Result<(), String> {
         self.with_db(|db| db.reset_keybindings().map_err(|e| e.to_string()))
     }

@@ -5,6 +5,19 @@ use serde::{Serialize, Deserialize};
 use crate::state::AppState;
 use crate::constants;
 
+/// Hex sha1 of a file; empty string on read failure (never blocks a move).
+fn sha1_of(path: &Path) -> String {
+    use sha1::{Digest, Sha1};
+    match fs::read(path) {
+        Ok(bytes) => {
+            let mut hasher = Sha1::new();
+            hasher.update(&bytes);
+            hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
+        }
+        Err(_) => String::new(),
+    }
+}
+
 /// If the export target already exists, pick "name (1).ext", "name (2).ext"...
 /// Never overwrite an existing file: the whole point of the checkpoint is
 /// that export is reversible, and clobbering destroys unrelated data.
@@ -100,6 +113,11 @@ impl AppState {
                     // user put a new file there after exporting, skip instead
                     // of silently destroying it.
                     if orig.exists() { continue; }
+                    // Integrity gate (docs/checkpoint.md promised this for
+                    // real now): a recorded sha1 that no longer matches the
+                    // exported file means something touched it post-export.
+                    // Leave it where it is rather than restoring corrupt data.
+                    if !op.sha1.is_empty() && sha1_of(exp) != op.sha1 { continue; }
                     let parent = orig.parent().unwrap();
                     fs::create_dir_all(parent).unwrap_or(());
                     if fs::rename(exp, orig).is_ok() { restored += 1; }
@@ -159,6 +177,7 @@ impl AppState {
                 }
             }
             let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+            let sha1 = sha1_of(path); // before the move, while the source is in place
             let target_path = unique_target(target_path);
             let move_ok = fs::rename(path, &target_path).is_ok()
                 || (fs::copy(path, &target_path).is_ok() && fs::remove_file(path).is_ok());
@@ -172,7 +191,7 @@ impl AppState {
                     category: folder_name,
                     status: "completed".to_string(),
                     size,
-                    sha1: String::new(),
+                    sha1,
                 });
             }
         }
@@ -270,6 +289,27 @@ mod tests {
         assert_eq!(restored, 0); // skipped, not clobbered
         assert_eq!(read(&root.join("a.jpg")), b"USER_NEW");
         assert!(root.join("GOOD/a.jpg").exists()); // exported copy still there
+        cleanup(&root);
+    }
+
+    #[test]
+    fn restore_skips_files_tampered_after_export() {
+        // sha1 integrity gate: if the exported file changed on disk since
+        // finish_sorting, restore must leave it alone instead of putting a
+        // corrupted file back at the original path.
+        let (state, root) = project_with_files(&[("a.jpg", b"AAA"), ("b.jpg", b"BBB")]);
+        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let b = root.join("b.jpg").to_string_lossy().into_owned();
+        state.rate_image(&a, Some("good")).unwrap();
+        state.rate_image(&b, Some("good")).unwrap();
+        state.finish_sorting().unwrap();
+        fs::write(root.join("GOOD/a.jpg"), b"CORRUPTED").unwrap();
+        state.set_root_folder(&root.to_string_lossy());
+
+        let restored = state.restore_checkpoint().unwrap();
+        assert_eq!(restored, 1, "only the untouched b.jpg comes back");
+        assert!(!root.join("a.jpg").exists());
+        assert_eq!(read(&root.join("b.jpg")), b"BBB");
         cleanup(&root);
     }
 

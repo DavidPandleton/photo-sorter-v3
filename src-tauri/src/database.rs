@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
 
-const SCHEMA_VERSION: i32 = 4;
+const SCHEMA_VERSION: i32 = 5;
 
 const SCHEMA_SQL: &str = "
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -28,10 +28,6 @@ CREATE TABLE IF NOT EXISTS images (
     rotation INTEGER DEFAULT 0,
     blur_score REAL DEFAULT 0.0,
     star_rating INTEGER DEFAULT 0,
-    file_size INTEGER,
-    file_hash TEXT,
-    width INTEGER,
-    height INTEGER,
     iso INTEGER,
     aperture TEXT,
     shutter_speed TEXT,
@@ -73,15 +69,6 @@ CREATE TABLE IF NOT EXISTS hud_items (
     group_name TEXT
 );
 
-CREATE TABLE IF NOT EXISTS hud_widgets (
-    name TEXT PRIMARY KEY,
-    visible INTEGER DEFAULT 1,
-    pos_x REAL NOT NULL,
-    pos_y REAL NOT NULL,
-    scale REAL DEFAULT 1.0,
-    opacity REAL DEFAULT 1.0
-);
-
 CREATE INDEX IF NOT EXISTS idx_images_project ON images(project_id);
 CREATE INDEX IF NOT EXISTS idx_images_rating ON images(rating);
 CREATE INDEX IF NOT EXISTS idx_images_path ON images(path);
@@ -108,10 +95,6 @@ pub struct ImageRecord {
     pub rotation: i32,
     pub blur_score: f64,
     pub star_rating: i32,
-    pub file_size: Option<i64>,
-    pub file_hash: Option<String>,
-    pub width: Option<i32>,
-    pub height: Option<i32>,
     pub iso: Option<i32>,
     pub aperture: Option<String>,
     pub shutter_speed: Option<String>,
@@ -121,6 +104,35 @@ pub struct ImageRecord {
     pub date_taken: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// Explicit column list + named mapping: positional row.get(0..21) silently
+/// broke whenever the schema changed (structural bug #16).
+const IMAGE_COLS: &str = "id, project_id, path, filename, rating, pick, \
+rotation, blur_score, star_rating, iso, aperture, shutter_speed, \
+focal_length, lens, camera_model, date_taken, created_at, updated_at";
+
+fn map_image_row(row: &rusqlite::Row) -> Result<ImageRecord> {
+    Ok(ImageRecord {
+        id: row.get("id")?,
+        project_id: row.get("project_id")?,
+        path: row.get("path")?,
+        filename: row.get("filename")?,
+        rating: row.get("rating")?,
+        pick: row.get("pick")?,
+        rotation: row.get("rotation")?,
+        blur_score: row.get("blur_score")?,
+        star_rating: row.get("star_rating")?,
+        iso: row.get("iso")?,
+        aperture: row.get("aperture")?,
+        shutter_speed: row.get("shutter_speed")?,
+        focal_length: row.get("focal_length")?,
+        lens: row.get("lens")?,
+        camera_model: row.get("camera_model")?,
+        date_taken: row.get("date_taken")?,
+        created_at: row.get("created_at")?,
+        updated_at: row.get("updated_at")?,
+    })
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -155,15 +167,6 @@ pub struct HudItemRecord {
     pub group_name: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HudWidgetRecord {
-    pub name: String,
-    pub visible: i32,
-    pub pos_x: f64,
-    pub pos_y: f64,
-    pub scale: f64,
-    pub opacity: f64,
-}
 
 pub struct PhotoDatabase {
     conn: Mutex<Connection>,
@@ -275,22 +278,19 @@ impl PhotoDatabase {
             }
         }
 
-        let widget_count: i64 = conn.query_row("SELECT COUNT(*) FROM hud_widgets", [], |r| r.get(0)).unwrap_or(0);
-        if widget_count == 0 {
-            let default_widgets = vec![
-                ("controls_hud", 1, 2.0, 50.0, 1.0, 0.95),
-                ("info_hud", 1, 75.0, 10.0, 1.0, 0.95),
-                ("stats_hud", 1, 40.0, 85.0, 1.0, 0.95),
-            ];
-            for (name, visible, pos_x, pos_y, scale, opacity) in default_widgets {
-                conn.execute(
-                    "INSERT OR IGNORE INTO hud_widgets (name, visible, pos_x, pos_y, scale, opacity) VALUES (?, ?, ?, ?, ?, ?)",
-                    params![name, visible, pos_x, pos_y, scale, opacity],
-                )?;
+        // Versioned migrations (KB bug #20: SCHEMA_VERSION was decorative).
+        // v4 -> v5: hud_widgets was a dead feature (no frontend caller) and
+        // file_size/file_hash/width/height were never written. SQLite drops
+        // are irreversible, so this only runs once per DB (guarded by version).
+        if current_ver < 5 {
+            if current_ver > 0 {
+                conn.execute_batch("DROP TABLE IF EXISTS hud_widgets;")?;
+                // Pre-v4 databases may lack some columns: tolerate "no such
+                // column" per statement instead of aborting the migration.
+                for col in ["file_size", "file_hash", "width", "height"] {
+                    let _ = conn.execute(&format!("ALTER TABLE images DROP COLUMN {}", col), []);
+                }
             }
-        }
-
-        if current_ver < SCHEMA_VERSION {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
                 params![SCHEMA_VERSION],
@@ -401,67 +401,15 @@ impl PhotoDatabase {
 
     pub fn get_image_by_path(&self, project_id: i64, path: &str) -> Result<Option<ImageRecord>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT * FROM images WHERE project_id = ? AND path = ?")?;
-        let record = stmt
-            .query_row(params![project_id, path], |row| {
-                Ok(ImageRecord {
-                    id: row.get(0)?,
-                    project_id: row.get(1)?,
-                    path: row.get(2)?,
-                    filename: row.get(3)?,
-                    rating: row.get(4)?,
-                    pick: row.get(5)?,
-                    rotation: row.get(6)?,
-                    blur_score: row.get(7)?,
-                    star_rating: row.get(8)?,
-                    file_size: row.get(9)?,
-                    file_hash: row.get(10)?,
-                    width: row.get(11)?,
-                    height: row.get(12)?,
-                    iso: row.get(13)?,
-                    aperture: row.get(14)?,
-                    shutter_speed: row.get(15)?,
-                    focal_length: row.get(16)?,
-                    lens: row.get(17)?,
-                    camera_model: row.get(18)?,
-                    date_taken: row.get(19)?,
-                    created_at: row.get(20)?,
-                    updated_at: row.get(21)?,
-                })
-            })
-            .ok();
+        let mut stmt = conn.prepare(&format!("SELECT {} FROM images WHERE project_id = ? AND path = ?", IMAGE_COLS))?;
+        let record = stmt.query_row(params![project_id, path], map_image_row).ok();
         Ok(record)
     }
 
     pub fn get_images(&self, project_id: i64) -> Result<Vec<ImageRecord>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT * FROM images WHERE project_id = ? ORDER BY filename")?;
-        let rows = stmt.query_map(params![project_id], |row| {
-            Ok(ImageRecord {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                path: row.get(2)?,
-                filename: row.get(3)?,
-                rating: row.get(4)?,
-                pick: row.get(5)?,
-                rotation: row.get(6)?,
-                blur_score: row.get(7)?,
-                star_rating: row.get(8)?,
-                file_size: row.get(9)?,
-                file_hash: row.get(10)?,
-                width: row.get(11)?,
-                height: row.get(12)?,
-                iso: row.get(13)?,
-                aperture: row.get(14)?,
-                shutter_speed: row.get(15)?,
-                focal_length: row.get(16)?,
-                lens: row.get(17)?,
-                camera_model: row.get(18)?,
-                date_taken: row.get(19)?,
-                created_at: row.get(20)?,
-                updated_at: row.get(21)?,
-            })
-        })?;
+        let mut stmt = conn.prepare(&format!("SELECT {} FROM images WHERE project_id = ? ORDER BY filename", IMAGE_COLS))?;
+        let rows = stmt.query_map(params![project_id], map_image_row)?;
         
         let mut list = Vec::new();
         for r in rows {
@@ -566,33 +514,8 @@ impl PhotoDatabase {
 
     pub fn get_picked_images(&self, project_id: i64) -> Result<Vec<ImageRecord>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT * FROM images WHERE project_id = ? AND pick = 1 ORDER BY filename")?;
-        let rows = stmt.query_map(params![project_id], |row| {
-            Ok(ImageRecord {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                path: row.get(2)?,
-                filename: row.get(3)?,
-                rating: row.get(4)?,
-                pick: row.get(5)?,
-                rotation: row.get(6)?,
-                blur_score: row.get(7)?,
-                star_rating: row.get(8)?,
-                file_size: row.get(9)?,
-                file_hash: row.get(10)?,
-                width: row.get(11)?,
-                height: row.get(12)?,
-                iso: row.get(13)?,
-                aperture: row.get(14)?,
-                shutter_speed: row.get(15)?,
-                focal_length: row.get(16)?,
-                lens: row.get(17)?,
-                camera_model: row.get(18)?,
-                date_taken: row.get(19)?,
-                created_at: row.get(20)?,
-                updated_at: row.get(21)?,
-            })
-        })?;
+        let mut stmt = conn.prepare(&format!("SELECT {} FROM images WHERE project_id = ? AND pick = 1 ORDER BY filename", IMAGE_COLS))?;
+        let rows = stmt.query_map(params![project_id], map_image_row)?;
         
         let mut list = Vec::new();
         for r in rows {
@@ -604,33 +527,8 @@ impl PhotoDatabase {
     pub fn get_images_by_date(&self, project_id: i64, date_prefix: &str) -> Result<Vec<ImageRecord>> {
         let conn = self.conn.lock().unwrap();
         let pattern = format!("{}%", date_prefix);
-        let mut stmt = conn.prepare("SELECT * FROM images WHERE project_id = ? AND date_taken LIKE ? ORDER BY date_taken")?;
-        let rows = stmt.query_map(params![project_id, pattern], |row| {
-            Ok(ImageRecord {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                path: row.get(2)?,
-                filename: row.get(3)?,
-                rating: row.get(4)?,
-                pick: row.get(5)?,
-                rotation: row.get(6)?,
-                blur_score: row.get(7)?,
-                star_rating: row.get(8)?,
-                file_size: row.get(9)?,
-                file_hash: row.get(10)?,
-                width: row.get(11)?,
-                height: row.get(12)?,
-                iso: row.get(13)?,
-                aperture: row.get(14)?,
-                shutter_speed: row.get(15)?,
-                focal_length: row.get(16)?,
-                lens: row.get(17)?,
-                camera_model: row.get(18)?,
-                date_taken: row.get(19)?,
-                created_at: row.get(20)?,
-                updated_at: row.get(21)?,
-            })
-        })?;
+        let mut stmt = conn.prepare(&format!("SELECT {} FROM images WHERE project_id = ? AND date_taken LIKE ? ORDER BY date_taken", IMAGE_COLS))?;
+        let rows = stmt.query_map(params![project_id, pattern], map_image_row)?;
         
         let mut list = Vec::new();
         for r in rows {
@@ -800,41 +698,6 @@ impl PhotoDatabase {
             tx.execute(
                 "INSERT INTO hud_items (action_name, visible, sort_order, group_name) VALUES (?, ?, ?, ?)",
                 params![item.action_name, item.visible, item.sort_order, item.group_name],
-            )?;
-        }
-        tx.commit()?;
-        Ok(())
-    }
-
-    // --- HUD Widgets ---
-    pub fn get_hud_widgets(&self) -> Result<Vec<HudWidgetRecord>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT name, visible, pos_x, pos_y, scale, opacity FROM hud_widgets")?;
-        let rows = stmt.query_map([], |row| {
-            Ok(HudWidgetRecord {
-                name: row.get(0)?,
-                visible: row.get(1)?,
-                pos_x: row.get(2)?,
-                pos_y: row.get(3)?,
-                scale: row.get(4)?,
-                opacity: row.get(5)?,
-            })
-        })?;
-        
-        let mut list = Vec::new();
-        for r in rows {
-            list.push(r?);
-        }
-        Ok(list)
-    }
-
-    pub fn save_hud_widgets(&self, widgets: Vec<HudWidgetRecord>) -> Result<()> {
-        let mut conn = self.conn.lock().unwrap();
-        let tx = conn.transaction()?;
-        for widget in widgets {
-            tx.execute(
-                "INSERT OR REPLACE INTO hud_widgets (name, visible, pos_x, pos_y, scale, opacity) VALUES (?, ?, ?, ?, ?, ?)",
-                params![widget.name, widget.visible, widget.pos_x, widget.pos_y, widget.scale, widget.opacity],
             )?;
         }
         tx.commit()?;
@@ -1093,7 +956,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hud_items_and_widgets_roundtrip() {
+    fn test_hud_items_roundtrip() {
         let (db, db_path) = setup_db();
         db.save_hud_items(vec![
             HudItemRecord { action_name: "undo".into(), visible: 1, sort_order: 0, group_name: None },
@@ -1102,15 +965,6 @@ mod tests {
         let items = db.get_hud_items().unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[1].group_name.as_deref(), Some("main"));
-
-        db.save_hud_widgets(vec![HudWidgetRecord {
-            name: "histogram".into(), visible: 1, pos_x: 10.5, pos_y: 20.25, scale: 1.0, opacity: 0.8,
-        }]).unwrap();
-        // save_hud_widgets upserts per name; seeded defaults stay in the table
-        let w = db.get_hud_widgets().unwrap();
-        let hist = w.iter().find(|x| x.name == "histogram").expect("histogram widget saved");
-        assert_eq!(hist.pos_y, 20.25);
-        assert_eq!(hist.opacity, 0.8);
         let _ = std::fs::remove_file(&db_path);
     }
 }

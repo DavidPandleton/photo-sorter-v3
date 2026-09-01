@@ -23,6 +23,7 @@ rayon = "1.10.0"
 trash = "5.1.1"
 gilrs = { version = "0.10.2", optional = true }
 chrono = "0.4"
+sha1 = "0.10"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
 

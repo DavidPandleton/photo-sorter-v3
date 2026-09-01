@@ -298,16 +298,6 @@ fn save_hud_items(state: State<'_, AppState>, items: Vec<photo_sorter_v3::databa
 }
 
 #[tauri::command]
-fn get_hud_widgets(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::HudWidgetRecord>, String> {
-    state.get_hud_widgets()
-}
-
-#[tauri::command]
-fn save_hud_widgets(state: State<'_, AppState>, widgets: Vec<photo_sorter_v3::database::HudWidgetRecord>) -> Result<(), String> {
-    state.save_hud_widgets(widgets)
-}
-
-#[tauri::command]
 fn reset_keybindings(state: State<'_, AppState>) -> Result<Vec<photo_sorter_v3::database::KeybindingRecord>, String> {
     state.reset_keybindings()?;
     state.get_keybindings()
@@ -390,8 +380,6 @@ fn main() {
             save_keybinding,
             get_hud_items,
             save_hud_items,
-            get_hud_widgets,
-            save_hud_widgets,
             reset_keybindings
         ])
         .run(tauri::generate_context!())
