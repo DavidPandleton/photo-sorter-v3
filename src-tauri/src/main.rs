@@ -192,11 +192,14 @@ fn set_current_index(state: State<'_, AppState>, index: i32) -> AppResult<()> {
     };
     // Asynchronously pre-fetch and extract EXIF if missing
     if let Some(record) = state.record_for_path(&path) {
-        if record.camera_model.is_none() {
+        if record.camera_model.is_none() && state.claim_exif(record.id) {
             // Extract in a background thread to prevent culling UI lag.
             // State<'_, AppState> is not 'static, so hand the thread the DB Arc.
+            // claim_exif dedups: rapid re-navigation on the same record no
+            // longer spawns duplicate extractions (KB bug #7).
             let db = state.db_arc();
             let record_id = record.id;
+            let exif_guard = state.exif_tracker();
             std::thread::spawn(move || {
                 if let (Some(db), Some(meta)) = (db, extract_exif(&path)) {
                     db.set_exif_data(
@@ -209,8 +212,10 @@ fn set_current_index(state: State<'_, AppState>, index: i32) -> AppResult<()> {
                         meta.camera_model.as_deref(),
                         meta.date_taken.as_deref(),
                         meta.orientation,
-                    ).unwrap_or(());
+                    )
+                    .unwrap_or(());
                 }
+                exif_guard.lock().unwrap().remove(&record_id);
             });
         }
     }

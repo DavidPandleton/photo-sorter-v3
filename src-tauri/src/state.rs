@@ -117,8 +117,15 @@ struct Inner {
     startup_folder: Option<String>,
 }
 
+/// Record ids with an EXIF extraction thread in flight (KB bug #7:
+/// set_current_index used to spawn unbounded duplicate threads).
+/// Shared Arc so the spawned thread can release its claim without
+/// holding AppState itself.
+type ExifInFlight = Arc<Mutex<HashSet<i64>>>;
+
 pub struct AppState {
     inner: Mutex<Inner>,
+    exif_in_flight: ExifInFlight,
     pub image_cache: ImageCache,
 }
 
@@ -138,6 +145,7 @@ impl AppState {
                 project_id: None,
                 startup_folder: None,
             }),
+            exif_in_flight: Arc::new(Mutex::new(HashSet::new())),
             image_cache: ImageCache::new(),
         }
     }
@@ -418,21 +426,32 @@ impl AppState {
     }
 
     pub fn delete_current_image(&self) -> AppResult<Option<String>> {
-        let path_str = {
-            let mut g = self.inner.lock().unwrap();
+        let (path_str, idx) = {
+            let g = self.inner.lock().unwrap();
             let idx = g.current_index as usize;
             if g.current_index < 0 || idx >= g.image_paths.len() {
                 return Ok(None);
             }
-            let p = g.image_paths.remove(idx);
-            if idx >= g.image_paths.len() {
+            (g.image_paths[idx].clone(), idx)
+        };
+        // No fs::remove_file fallback: if the trash fails, leave the file
+        // alone and tell the user (KB bug #9: silent permanent delete while
+        // the toast claimed "moved to Trash"). The path list is only mutated
+        // after the delete succeeds, so a failure keeps the image visible.
+        if Path::new(&path_str).exists() {
+            trash::delete(&path_str)
+                .map_err(|e| AppError::msg(format!("Failed to move to trash: {}", e)))?;
+        }
+        {
+            let mut g = self.inner.lock().unwrap();
+            // Re-check: the index may have moved between the two locks.
+            let idx = g.image_paths.iter().position(|p| p == &path_str).unwrap_or(idx);
+            if idx < g.image_paths.len() {
+                g.image_paths.remove(idx);
+            }
+            if g.current_index as usize >= g.image_paths.len() {
                 g.current_index = (g.image_paths.len() as i32 - 1).max(0);
             }
-            p
-        };
-        let path = Path::new(&path_str);
-        if path.exists() && trash::delete(path).is_err() {
-            std::fs::remove_file(path).map_err(|e| AppError::msg(format!("Failed to delete file: {}", e)))?;
         }
         // The row survives sync until the next folder load; just drop the rating.
         if let Some((db, pid)) = self.db_and_pid() {
@@ -491,6 +510,15 @@ impl AppState {
             Some((db, pid)) => db.get_picked_images(pid).map(|r| r.len()).unwrap_or(0),
             None => 0,
         }
+    }
+
+    /// Claim a record for EXIF extraction; false if a thread already runs.
+    pub fn claim_exif(&self, record_id: i64) -> bool {
+        self.exif_in_flight.lock().unwrap().insert(record_id)
+    }
+
+    pub fn exif_tracker(&self) -> ExifInFlight {
+        Arc::clone(&self.exif_in_flight)
     }
 
     pub fn record_for_path(&self, path: &str) -> Option<crate::database::ImageRecord> {
