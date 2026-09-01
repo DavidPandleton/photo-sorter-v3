@@ -186,45 +186,25 @@ fn get_current_index(state: State<'_, AppState>) -> AppResult<i32> {
 
 #[tauri::command]
 fn set_current_index(state: State<'_, AppState>, index: i32) -> AppResult<()> {
-    let path = match state.set_current_index(index)? {
-        Some(p) => p,
-        None => return Ok(()),
-    };
-    // Asynchronously pre-fetch and extract EXIF if missing
-    if let Some(record) = state.record_for_path(&path) {
-        if record.camera_model.is_none() {
-            // Extract in a background thread to prevent culling UI lag.
-            // State<'_, AppState> is not 'static, so hand the thread the DB Arc.
-            let db = state.db_arc();
-            let record_id = record.id;
-            std::thread::spawn(move || {
-                if let (Some(db), Some(meta)) = (db, extract_exif(&path)) {
-                    db.set_exif_data(
-                        record_id,
-                        meta.iso,
-                        meta.aperture.as_deref(),
-                        meta.shutter_speed.as_deref(),
-                        meta.focal_length.as_deref(),
-                        meta.lens.as_deref(),
-                        meta.camera_model.as_deref(),
-                        meta.date_taken.as_deref(),
-                        meta.orientation,
-                    ).unwrap_or(());
-                }
-            });
-        }
-    }
+    // EXIF extraction happens in get_image_metadata_info (async, right after
+    // navigation). The old background-thread prefetch here raced it: every
+    // navigation spawned an unbounded, undeduped thread that re-extracted the
+    // same file (KB bug #7/#8).
+    state.set_current_index(index)?;
     Ok(())
 }
 
 #[tauri::command]
-fn get_image_metadata_info(state: State<'_, AppState>, path: String) -> AppResult<Option<ImageRecord>> {
+async fn get_image_metadata_info(state: State<'_, AppState>, path: String) -> AppResult<Option<ImageRecord>> {
     let mut record = match state.record_for_path(&path) {
         Some(r) => r,
         None => return Ok(None),
     };
     if record.camera_model.is_none() {
-        if let Some(meta) = extract_exif(&path) {
+        // Runs on the async runtime, off the IPC/UI thread (KB bug #8:
+        // extraction used to block the sync IPC path here while a duplicate
+        // copy raced in a spawned thread from set_current_index).
+        if let Some(meta) = tauri::async_runtime::spawn_blocking(move || extract_exif(&path)).await.ok().flatten() {
             let rot_val = meta.orientation.unwrap_or(0);
             state.set_exif_for_record(record.id, &meta);
 
