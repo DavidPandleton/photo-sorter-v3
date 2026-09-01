@@ -443,16 +443,18 @@ mod tests {
         let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
         let a = root.join("a.jpg").to_string_lossy().into_owned();
 
+        // results/DB store the raw category key_name; only export maps it to
+        // the uppercase folder name.
         state.rate_image(&a, Some("good")).unwrap();
-        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "GOOD");
+        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "good");
 
-        // re-rate: undo must go back to GOOD, not to unrated
+        // re-rate: undo must go back to good, not to unrated
         state.rate_image(&a, Some("bad")).unwrap();
-        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "BAD");
+        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "bad");
 
         let undone = state.undo_last_rating().unwrap();
         assert_eq!(undone.as_deref(), Some(a.as_str()));
-        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "GOOD");
+        assert_eq!(state.results.read().unwrap().get(&a).unwrap(), "good");
 
         // undo the first rating too -> unrated
         state.undo_last_rating().unwrap();
@@ -473,7 +475,7 @@ mod tests {
             (db_opt.as_ref().unwrap().clone(), pid_opt.unwrap())
         };
         let rec = db.get_image_by_path(pid, &a).unwrap().unwrap();
-        assert_eq!(rec.rating.as_deref(), Some("OK"));
+        assert_eq!(rec.rating.as_deref(), Some("ok"));
         cleanup(&root);
     }
 
@@ -532,7 +534,7 @@ mod tests {
             .into_owned();
         state.rate_image(&one, Some("good")).unwrap();
         assert_eq!(state.load_images(root.join(".db").clone(), &root.to_string_lossy()).unwrap(), 2);
-        assert_eq!(state.results.read().unwrap().get(&one).unwrap(), "GOOD");
+        assert_eq!(state.results.read().unwrap().get(&one).unwrap(), "good");
         cleanup(&root);
     }
 }
