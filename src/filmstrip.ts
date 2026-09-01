@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { invokeThumbnailData } from './ipc';
+import { THUMB_ITEM_WIDTH } from './constants';
 import type { ImageRecord } from './app';
 
 export class FilmstripBuilder {
@@ -112,7 +113,7 @@ export class FilmstripBuilder {
   private loadVisibleThumbnails() {
     if (!this.scrollContainer || !this.container) return;
 
-    const itemWidth = 162;
+    const itemWidth = THUMB_ITEM_WIDTH;
     const buffer = 4;
     const scrollLeft = this.scrollContainer.scrollLeft;
     const viewW = this.scrollContainer.clientWidth;

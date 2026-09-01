@@ -683,7 +683,9 @@ input, button {
   align-items: center;
 }
 
-/* Thumbnail Item Card */
+/* Thumbnail Item Card
+   width + container gap (12px) = THUMB_ITEM_WIDTH in src/constants.ts.
+   Change both together or virtual scroll drifts (bug #16). */
 .thumbnail-item {
   width: 150px;
   height: 100%;
