@@ -148,6 +148,13 @@ fn get_project_stats(state: State<'_, AppState>) -> Result<HashMap<String, usize
     Ok(stats)
 }
 
+/// Path -> rating map straight from the DB. The frontend syncs its
+/// ratedPaths set from this on folder load (KB bug #5).
+#[tauri::command]
+fn get_ratings(state: State<'_, AppState>) -> Result<HashMap<String, String>, String> {
+    Ok(state.get_ratings())
+}
+
 #[tauri::command]
 fn get_date_hierarchy(state: State<'_, AppState>) -> Result<Vec<DateRecord>, String> {
     state.get_date_hierarchy()
@@ -366,6 +373,7 @@ fn main() {
             get_full_image_data,
             get_thumbnail_data,
             get_project_stats,
+            get_ratings,
             get_date_hierarchy,
             set_filters,
             get_image_paths,
