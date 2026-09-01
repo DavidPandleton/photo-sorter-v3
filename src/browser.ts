@@ -21,14 +21,17 @@ export class BrowserPanel {
     const container = document.getElementById('folder-tree');
     if (!container) return;
     container.innerHTML = '';
-    const rootName = rootPath.split(/[/\\]/).pop() || rootPath;
+    // imagePaths are slash-normalized in the DB; rootPath may carry Windows
+    // backslashes, which would break the substring/accum math below (bug #3).
+    rootPath = rootPath.replace(/\\/g, '/');
+    const rootName = rootPath.split('/').pop() || rootPath;
     const rootNode = this.createTreeNode(rootName, rootPath, true);
     container.appendChild(rootNode);
 
     const directories = new Set<string>();
     for (const p of imagePaths) {
       const relative = p.substring(rootPath.length + 1);
-      const parts = relative.split(/[/\\]/); parts.pop();
+      const parts = relative.split('/'); parts.pop();
       let accum = rootPath;
       for (const part of parts) { accum = accum + '/' + part; directories.add(accum); }
     }

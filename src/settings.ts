@@ -4,7 +4,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { CategoryRecord, HudItemRecord, KeybindingRecord } from './types';
 import {
-  ACTION_DISPLAY_NAMES, fmtShortcut, hexToRgba, rgbaToHex,
+  ACTION_DISPLAY_NAMES, escapeHtml, fmtShortcut, hexToRgba, rgbaToHex,
   showProgressIndicator, showToast,
 } from './ui';
 
@@ -163,9 +163,9 @@ export class SettingsModal {
       const row = document.createElement('div');
       row.className = 'category-row';
       row.innerHTML = `
-        <input type="text" class="cat-label" value="${cat.label}" placeholder="Category Name">
-        <input type="text" class="cat-folder" value="${cat.folder_name}" placeholder="Folder Name">
-        <button class="keybinding-btn cat-shortcut">${cat.shortcut_key || 'None'}</button>
+        <input type="text" class="cat-label" value="${escapeHtml(cat.label)}" placeholder="Category Name">
+        <input type="text" class="cat-folder" value="${escapeHtml(cat.folder_name)}" placeholder="Folder Name">
+        <button class="keybinding-btn cat-shortcut">${escapeHtml(cat.shortcut_key || 'None')}</button>
         <input type="color" class="cat-color" value="${rgbaToHex(cat.flash_color)}">
         <button class="btn-delete-cat" title="Delete Category">&times;</button>
       `;
@@ -220,8 +220,8 @@ export class SettingsModal {
       const shortcut = this.tempKeybindings.get(actionName) || 'None';
 
       row.innerHTML = `
-        <span class="keybinding-label">${label}</span>
-        <button class="keybinding-btn bind-btn" data-action="${actionName}">${fmtShortcut(shortcut)}</button>
+        <span class="keybinding-label">${escapeHtml(label)}</span>
+        <button class="keybinding-btn bind-btn" data-action="${actionName}">${escapeHtml(fmtShortcut(shortcut))}</button>
       `;
 
       const bindBtn = row.querySelector('.bind-btn') as HTMLButtonElement;
@@ -248,11 +248,11 @@ export class SettingsModal {
 
       const actionLabel = ACTION_DISPLAY_NAMES[item.action_name] || item.action_name;
       const checked = item.visible === 1 ? 'checked' : '';
-      const groupText = item.group_name ? `<span class="hud-item-group">${item.group_name}</span>` : '';
+      const groupText = item.group_name ? `<span class="hud-item-group">${escapeHtml(item.group_name)}</span>` : '';
 
       row.innerHTML = `
         <input type="checkbox" class="hud-item-checkbox" ${checked}>
-        <span class="hud-item-label">${actionLabel}</span>
+        <span class="hud-item-label">${escapeHtml(actionLabel)}</span>
         ${groupText}
       `;
 

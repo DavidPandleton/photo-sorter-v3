@@ -116,8 +116,15 @@ class PhotoSorterApp {
     document.getElementById('btn-top-restore')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-finish-export')?.addEventListener('click', () => this.finishSorting());
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
+    let searchTimer: number | undefined;
     searchInput?.addEventListener('input', (e) => {
-      this.updateFilters((e.target as HTMLInputElement).value, '', '', '');
+      // Debounce: each keystroke otherwise triggers a full DB reload +
+      // filmstrip rebuild + navigate(0) (bug #18).
+      const value = (e.target as HTMLInputElement).value;
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => {
+        this.updateFilters(value, '', '', '');
+      }, 250);
     });
   }
 

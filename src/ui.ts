@@ -35,6 +35,10 @@ export const ACTION_DISPLAY_NAMES: Record<string, string> = {
   delete: 'Delete Image',
 };
 
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export function rgbaToHex(rgba: string): string {
   if (rgba.startsWith('#')) return rgba.substring(0, 7);
   const match = rgba.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
@@ -157,13 +161,13 @@ export function renderHUDControls(ctx: HudContext) {
     activeHUD.forEach(h => {
       const actionLabel = ACTION_DISPLAY_NAMES[h.action_name] || h.action_name;
       const shortcut = ctx.keybindings.get(h.action_name) || 'None';
-        rows.push(`<span class="hud-key">[${fmtShortcut(shortcut)}]</span> ${actionLabel}`);
+        rows.push(`<span class="hud-key">[${escapeHtml(fmtShortcut(shortcut))}]</span> ${escapeHtml(actionLabel)}`);
     });
 
     ctx.categories.forEach(cat => {
       if (cat.shortcut_key) {
         const color = cat.flash_color.replace('0.4', '1.0');
-        rows.push(`<span class="hud-key" style="color: ${color}">[${cat.shortcut_key}]</span> Rate ${cat.label}`);
+        rows.push(`<span class="hud-key" style="color: ${color}">[${escapeHtml(cat.shortcut_key)}]</span> Rate ${escapeHtml(cat.label)}`);
       }
     });
 
@@ -197,7 +201,7 @@ export function renderStatsHUD(stats: ProjectStats, ctx: StatsContext) {
       <div class="stats-row">
         <span class="stats-dot" style="color: ${color}">●</span>
         <span class="stats-value">${count}</span>
-        <span class="stats-label">${cat.label.toUpperCase()}</span>
+        <span class="stats-label">${escapeHtml(cat.label.toUpperCase())}</span>
       </div>
     `;
   });
