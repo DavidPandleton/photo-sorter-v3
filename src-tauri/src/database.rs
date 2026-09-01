@@ -1014,9 +1014,14 @@ mod tests {
     fn test_exif_date_queries_and_hierarchy() {
         let (db, db_path) = setup_db();
         let pid = db.get_or_create_project("/test").unwrap();
-        let a = seed_image(&db, pid, "/test/a.jpg");
-        let b = seed_image(&db, pid, "/test/b.jpg");
-        seed_image(&db, pid, "/test/no-date.jpg"); // stays NULL, must be excluded
+        // sync_images replaces the whole set, so seed all paths in ONE call
+        db.sync_images(pid, &[
+            "/test/a.jpg".to_string(),
+            "/test/b.jpg".to_string(),
+            "/test/no-date.jpg".to_string(),
+        ]).unwrap();
+        let a = db.get_image_by_path(pid, "/test/a.jpg").unwrap().unwrap();
+        let b = db.get_image_by_path(pid, "/test/b.jpg").unwrap().unwrap();
         db.set_exif_data(a.id, Some(400), Some("f/2.8"), Some("1/250"), Some("50mm"),
             Some("50mm prime"), Some("Body X"), Some("2025-06-15 10:00"), None).unwrap();
         db.set_exif_data(b.id, None, None, None, None, None, None,
@@ -1101,9 +1106,11 @@ mod tests {
         db.save_hud_widgets(vec![HudWidgetRecord {
             name: "histogram".into(), visible: 1, pos_x: 10.5, pos_y: 20.25, scale: 1.0, opacity: 0.8,
         }]).unwrap();
+        // save_hud_widgets upserts per name; seeded defaults stay in the table
         let w = db.get_hud_widgets().unwrap();
-        assert_eq!(w.len(), 1);
-        assert_eq!(w[0].pos_y, 20.25);
+        let hist = w.iter().find(|x| x.name == "histogram").expect("histogram widget saved");
+        assert_eq!(hist.pos_y, 20.25);
+        assert_eq!(hist.opacity, 0.8);
         let _ = std::fs::remove_file(&db_path);
     }
 }
