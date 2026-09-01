@@ -117,6 +117,21 @@ export interface HudContext {
   categories: CategoryRecord[];
 }
 
+export function toggleFullscreen(): void {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
+}
+
+export function toggleHUD(): void {
+  const hud = document.getElementById('hud-container');
+  if (hud) hud.style.display = hud.style.display === 'none' ? 'flex' : 'none';
+}
+
+export function toggleInfoPanel(): void {
+  const info = document.getElementById('info-hud');
+  if (info) info.style.display = info.style.display === 'none' ? 'flex' : 'none';
+}
+
 export function renderHUDControls(ctx: HudContext) {
   const hud = document.getElementById('hud-label');
   if (!hud) return;

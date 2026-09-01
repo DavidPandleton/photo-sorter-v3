@@ -16,7 +16,9 @@ import type {
 import {
   renderHUDControls, renderMetadataInfo, renderStatsHUD,
   showCustomDialog, showProgressIndicator, showToast, triggerFlashNotification,
+  toggleFullscreen, toggleHUD, toggleInfoPanel,
 } from './ui';
+import { buildCombo, getActionFromCombo } from './keyboard';
 
 export type { ImageRecord } from './types';
 
@@ -90,7 +92,7 @@ class PhotoSorterApp {
       resetZoom: () => this.viewer.resetZoom(),
       returnToMenu: () => this.confirmReturnToMenu(),
       finishSorting: () => this.finishSorting(),
-      toggleHUD: () => this.toggleHUD(),
+      toggleHUD: () => toggleHUD(),
       selectFolder: () => this.selectFolder(),
       panBy: (dx, dy) => this.viewer.panBy(dx, dy),
       zoomBy: (f) => this.viewer.zoomBy(f),
@@ -463,17 +465,9 @@ class PhotoSorterApp {
   private initKeyboardBinds() {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT') return;
-      
-      let combo = '';
-      if (e.ctrlKey || e.metaKey) combo += 'Ctrl+';
-      if (e.altKey) combo += 'Alt+';
-      if (e.shiftKey) combo += 'Shift+';
-      
-      let key = e.key;
-      if (key === ' ') key = 'Space';
-      if (key.length === 1) key = key.toUpperCase();
-      combo += key;
-      
+
+      const { combo, comboAlt } = buildCombo(e);
+
       // If settings remapper is recording a key binding:
       if (this.settings.isRecording) {
         e.preventDefault();
@@ -500,15 +494,6 @@ class PhotoSorterApp {
         this.setStarsCurrent(parseInt(e.key));
         return;
       }
-      
-      // Build alternate combo (Meta+ variant for macOS)
-      let comboAlt: string | undefined;
-      if (e.ctrlKey || e.metaKey) {
-        const mod = e.metaKey ? 'Meta+' : 'Ctrl+';
-        if (combo.startsWith('Ctrl+')) {
-          comboAlt = mod + combo.slice(5);
-        }
-      }
 
       // Check dynamic categories shortcut key bindings
       for (const cat of this.categories) {
@@ -520,23 +505,14 @@ class PhotoSorterApp {
           return;
         }
       }
-      
+
       // Lookup remapped actions in keybindings
-      const action = this.getActionFromCombo(combo) || (comboAlt ? this.getActionFromCombo(comboAlt) : null);
+      const action = getActionFromCombo(this.keybindings, combo) || (comboAlt ? getActionFromCombo(this.keybindings, comboAlt) : null);
       if (action) {
         if (action === 'toggle_pick') e.preventDefault(); // prevent scrolling spacebar
         this.executeAction(action);
       }
     });
-  }
-
-  private getActionFromCombo(combo: string): string | null {
-    for (const [action, shortcut] of this.keybindings.entries()) {
-      if (shortcut.toUpperCase() === combo.toUpperCase()) {
-        return action;
-      }
-    }
-    return null;
   }
 
   private executeAction(action: string) {
@@ -549,9 +525,9 @@ class PhotoSorterApp {
       case 'rot_cw': this.rotateCurrent(1); break;
       case 'rot_ccw': this.rotateCurrent(-1); break;
       case 'compare': this.toggleCompareMode(); break;
-      case 'fullscreen': this.toggleFullscreen(); break;
-      case 'hud': this.toggleHUD(); break;
-      case 'info': this.toggleInfoPanel(); break;
+      case 'fullscreen': toggleFullscreen(); break;
+      case 'hud': toggleHUD(); break;
+      case 'info': toggleInfoPanel(); break;
       case 'toast': this.toggleToastPosition(); break;
       case 'filter': this.toggleFilterMode(); break;
       case 'home': this.navigateImage(0); break;
@@ -561,21 +537,6 @@ class PhotoSorterApp {
       case 'export': this.finishSorting(); break;
       case 'delete': this.deleteCurrent(); break;
     }
-  }
-
-  private toggleFullscreen() {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
-    else document.exitFullscreen().catch(() => {});
-  }
-
-  private toggleHUD() {
-    const hud = document.getElementById('hud-container');
-    if (hud) hud.style.display = hud.style.display === 'none' ? 'flex' : 'none';
-  }
-
-  private toggleInfoPanel() {
-    const info = document.getElementById('info-hud');
-    if (info) info.style.display = info.style.display === 'none' ? 'flex' : 'none';
   }
 
   private async toggleFilterMode() {
