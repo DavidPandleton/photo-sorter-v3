@@ -12,6 +12,6 @@
 Rules: git add per-file (NEVER -A), pull --ff-only before starting, merge via PR not shared checkout.
 
 ## Session mailbox (direct A<->B channel, no user relay)
-~/.hermes/mailbox/photo-sorter/ — A writes from-A.md, reads from-B.md; B vice versa.
+~/.hermes/mailbox/photo-sorter/ - A writes from-A.md, reads from-B.md; B vice versa.
 Check at session start, before big commits, and on any scope conflict. Append-only, ACK by reply.
 Protocol: PROTOCOL.md in that dir.

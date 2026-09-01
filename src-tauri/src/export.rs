@@ -235,7 +235,7 @@ mod tests {
     #[test]
     fn finish_sorting_never_clobbers_existing_target() {
         // A GOOD/a.jpg already exists (from a prior export). Exporting a new
-        // a.jpg must NOT overwrite it — the old file is someone's keeper.
+        // a.jpg must NOT overwrite it: the old file is someone's keeper.
         let (state, root) = project_with_files(&[("a.jpg", b"NEW")]);
         fs::create_dir_all(root.join("GOOD")).unwrap();
         fs::write(root.join("GOOD/a.jpg"), b"OLD").unwrap();
