@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { invokeThumbnailData } from './ipc';
 import type { ImageRecord } from './app';
 
 export class FilmstripBuilder {
@@ -132,8 +133,7 @@ export class FilmstripBuilder {
 
   private async loadThumbnail(path: string, thumbItem: HTMLElement): Promise<void> {
     try {
-      const [bytes, blurScore] = await invoke<[number[], number]>('get_thumbnail_data', { path });
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const { blob, blurScore } = await invokeThumbnailData(path);
       const url = URL.createObjectURL(blob);
       const img = document.createElement('img');
       img.className = 'thumb-img';

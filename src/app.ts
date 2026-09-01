@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invokeImageData } from './ipc';
 import { PhotoViewer } from './viewer';
 import { ImageCacheManager } from './cache';
 import { FilmstripBuilder } from './filmstrip';
@@ -270,8 +271,7 @@ class PhotoSorterApp {
         this.viewer.setOverlays((meta?.pick || 0) === 1, meta?.star_rating || 0);
         return;
       }
-      const bytes = await invoke<number[]>('get_image_data', { path });
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const blob = await invokeImageData(path, 'get_image_data');
       const url = URL.createObjectURL(blob);
       const img = new Image();
       img.onload = async () => {
@@ -451,8 +451,7 @@ class PhotoSorterApp {
     this.compareIndex = targetIdx;
     const path = this.imagePaths[targetIdx];
     try {
-      const bytes = await invoke<number[]>('get_image_data', { path });
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+      const blob = await invokeImageData(path, 'get_image_data');
       const url = URL.createObjectURL(blob);
       const img = new Image();
       const meta = await invoke<ImageRecord | null>('get_image_metadata_info', { path });

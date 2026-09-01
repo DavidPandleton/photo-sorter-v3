@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tauri::{State, Manager};
 use photo_sorter_v3::state::AppState;
 use photo_sorter_v3::database::{ImageRecord, DateRecord};
-use photo_sorter_v3::image_loader::{load_and_scale_image, load_image_unscaled, generate_thumbnail};
+use photo_sorter_v3::image_loader::{load_and_scale_image, load_image_unscaled, generate_thumbnail, encode_thumb_response};
 use photo_sorter_v3::exif::extract_exif;
 use photo_sorter_v3::constants;
 
@@ -69,53 +69,57 @@ fn restore_checkpoint(state: State<'_, AppState>, root: Option<String>) -> Resul
 }
 
 #[tauri::command]
-fn get_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
+fn get_image_data(state: State<'_, AppState>, path: String) -> Result<tauri::ipc::Response, String> {
     if let Some(cached) = state.image_cache.get_scaled(&path) {
-        return Ok(cached);
+        return Ok(tauri::ipc::Response::new(cached));
     }
     let decoded = load_and_scale_image(&path, 1920)
         .ok_or_else(|| "Failed to load image data.".to_string())?;
     state.image_cache.insert_scaled(&path, decoded.bytes.clone());
-    Ok(decoded.bytes)
+    Ok(tauri::ipc::Response::new(decoded.bytes))
 }
 
 #[tauri::command]
-fn get_full_image_data(state: State<'_, AppState>, path: String) -> Result<Vec<u8>, String> {
+fn get_full_image_data(state: State<'_, AppState>, path: String) -> Result<tauri::ipc::Response, String> {
     if let Some(cached) = state.image_cache.get_fullres(&path) {
-        return Ok(cached);
+        return Ok(tauri::ipc::Response::new(cached));
     }
     let decoded = load_image_unscaled(&path)
         .ok_or_else(|| "Failed to load full resolution image.".to_string())?;
     state.image_cache.insert_fullres(&path, decoded.bytes.clone());
-    Ok(decoded.bytes)
+    Ok(tauri::ipc::Response::new(decoded.bytes))
 }
 
 #[tauri::command]
-fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<(Vec<u8>, f64), String> {
-    let db_opt = state.db.read().unwrap();
-    let pid_opt = state.project_id.read().unwrap();
-    
-    if let (Some(db), Some(pid)) = (db_opt.as_ref(), pid_opt.as_ref()) {
-        let record = db.get_image_by_path(*pid, &path)
+fn get_thumbnail_data(state: State<'_, AppState>, path: String) -> Result<tauri::ipc::Response, String> {
+    // Snapshot the DB handle + record under the lock, then release it before
+    // generating so thumbnail work never blocks other state.db readers.
+    let (db, record_id, cached_blob, cached_blur) = {
+        let db_opt = state.db.read().unwrap();
+        let pid_opt = state.project_id.read().unwrap();
+        let (db, pid) = match (db_opt.as_ref(), pid_opt.as_ref()) {
+            (Some(db), Some(pid)) => (Arc::clone(db), *pid),
+            _ => return Err("No active database session.".to_string()),
+        };
+        let record = db.get_image_by_path(pid, &path)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "Image record not found.".to_string())?;
-            
-        // Check SQLite cache first
-        if let Ok(Some(cached_blob)) = db.get_thumbnail(record.id) {
-            return Ok((cached_blob, record.blur_score));
+        let cached = db.get_thumbnail(record.id).map_err(|e| e.to_string())?;
+        (db, record.id, cached, record.blur_score)
+    };
+
+    let (thumb_bytes, blur_score) = match cached_blob {
+        Some(blob) => (blob, cached_blur),
+        None => {
+            let (bytes, score) = generate_thumbnail(&path, 120)
+                .ok_or_else(|| "Failed to generate thumbnail.".to_string())?;
+            db.save_thumbnail(record_id, &bytes).unwrap_or(());
+            db.set_blur_score(record_id, score).unwrap_or(());
+            (bytes, score)
         }
-        
-        // Generate and cache
-        let (thumb_bytes, blur_score) = generate_thumbnail(&path, 120)
-            .ok_or_else(|| "Failed to generate thumbnail.".to_string())?;
-            
-        db.save_thumbnail(record.id, &thumb_bytes).unwrap_or(());
-        db.set_blur_score(record.id, blur_score).unwrap_or(());
-        
-        Ok((thumb_bytes, blur_score))
-    } else {
-        Err("No active database session.".to_string())
-    }
+    };
+
+    Ok(tauri::ipc::Response::new(encode_thumb_response(thumb_bytes, blur_score)))
 }
 
 #[tauri::command]

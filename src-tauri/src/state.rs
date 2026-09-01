@@ -396,3 +396,39 @@ impl AppState {
         } else { Err("No active database connection.".to_string()) }
     }
 }
+
+#[cfg(test)]
+pub(crate) mod test_util {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    /// A temp project root with the given files (rel path -> content) plus a
+    /// database wired into a fresh AppState. Deliberately bypasses
+    /// load_images so no background thumbnail thread races the assertions.
+    pub fn project_with_files(files: &[(&str, &[u8])]) -> (AppState, PathBuf) {
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let root = std::env::temp_dir().join(format!("psort_test_{}_{}", std::process::id(), n));
+        fs::create_dir_all(&root).unwrap();
+        let mut paths = Vec::new();
+        for (name, content) in files {
+            let p = root.join(name);
+            if let Some(parent) = p.parent() { fs::create_dir_all(parent).unwrap(); }
+            fs::write(&p, content).unwrap();
+            paths.push(p.to_string_lossy().into_owned());
+        }
+        let db = PhotoDatabase::new(root.join(".test.db")).unwrap();
+        let pid = db.get_or_create_project(&root.to_string_lossy()).unwrap();
+        db.sync_images(pid, &paths).unwrap();
+        let state = AppState::new();
+        *state.db.write().unwrap() = Some(Arc::new(db));
+        *state.project_id.write().unwrap() = Some(pid);
+        *state.root_folder.write().unwrap() = root.to_string_lossy().into_owned();
+        (state, root)
+    }
+
+    pub fn cleanup(root: &Path) {
+        let _ = fs::remove_dir_all(root);
+    }
+}
