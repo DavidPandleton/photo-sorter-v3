@@ -401,7 +401,18 @@ impl AppState {
 
     fn spawn_thumbnail_generation(&self) {
         let Some((db, pid)) = self.db_and_pid() else { return };
+        // KB bug #6: the batch used to queue every read/write behind the UI's
+        // single Mutex<Connection>, so 'WAL parallel speed' was an illusion
+        // and the filmstrip stuttered while a folder indexed. The batch now
+        // opens its OWN connection to the same file: WAL readers never block
+        // each other, and the rare writer-writer clash resolves via
+        // busy_timeout. init_db on the second handle is idempotent.
+        let path = db.path().to_path_buf();
         std::thread::spawn(move || {
+            let db = match PhotoDatabase::new(&path) {
+                Ok(d) => d,
+                Err(_) => return,
+            };
             let records = match db.get_images(pid) {
                 Ok(r) => r,
                 Err(_) => return,
