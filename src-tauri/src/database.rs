@@ -178,7 +178,8 @@ impl PhotoDatabase {
         let parent = db_path.as_ref().parent().unwrap();
         std::fs::create_dir_all(parent).unwrap_or(());
         
-        let conn = Connection::open(db_path)?;
+        let conn = Connection::open(&db_path)?;
+        let db_path = db_path.as_ref().to_path_buf();
         
         // WAL mode for parallel speed; busy_timeout so a second connection
         // (e.g. the thumbnail batch writer, KB bug #6) waits out the rare
