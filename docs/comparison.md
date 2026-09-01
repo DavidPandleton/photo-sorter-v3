@@ -97,19 +97,19 @@ v3 punya fondasi yang solid secara arsitektur (**kode lebih rapi, performa nativ
 
 | Area | v2 | v3 |
 |---|---|---|
-| Library | `inputs` (Python) | `gilrs` (optional feature) |
-| A / X / B = Rate | ✅ | ❌ |
-| LB/RB = Prev/Next | ✅ | ❌ |
-| LT/RT = Rotate | ✅ | ❌ |
-| Left stick = Pan | ✅ | ❌ |
-| Right stick Y = Zoom | ✅ | ❌ |
-| Start = Export | ✅ | ❌ |
-| Select = Menu | ✅ | ❌ |
-| Auto-detect connect/disconnect | ✅ | ❌ |
-| Auto-switch HUD gamepad/keyboard | ✅ | ❌ |
-| Dialog navigation with D-Pad | ✅ | ❌ |
+| Library | `inputs` (Python) | Web Gamepad API |
+| A / X / B = Rate | ✅ | ✅ |
+| LB/RB = Prev/Next | ✅ | ✅ |
+| LT/RT = Rotate | ✅ | ✅ |
+| Left stick = Pan | ✅ | ✅ |
+| Right stick Y = Zoom | ✅ | ✅ |
+| Start = Export | ✅ | ✅ |
+| Select = Menu | ✅ | ✅ |
+| Auto-detect connect/disconnect | ✅ | ✅ |
+| Auto-switch HUD gamepad/keyboard | ✅ | ✅ |
+| Dialog navigation with D-Pad | ✅ | ✅ |
 
-**Score: 0/11 gamepad features in v3** (optional crate exists, not wired)
+**Score: 11/11 gamepad features in v3** (Web Gamepad API, no native dependency)
 
 ---
 
@@ -209,7 +209,7 @@ Priority fix utk Blanc/Violet:
 1. Compare mode (C) — kode sudah ada di viewer.ts, tinggal wiring
 2. Fullscreen (F) — gampang via window.toggleMaximize()
 3. Zoom keyboard + pinch — viewer.ts sudah punya onWheel, tinggal tambah keyboard
-4. Gamepad — gilrs crate udah ready, tinggal wiring ke Tauri events
+4. Gamepad: done via Web Gamepad API (src/gamepad.ts), no native crate needed
 5. Home/End, Escape, Enter, Ctrl+G — pure event listener, no backend needed
 6. EXIF orientation rotation — image crate bisa baca orientation
 7. Safe cross-filesystem move — ganti fs::rename dengan copy+delete pattern

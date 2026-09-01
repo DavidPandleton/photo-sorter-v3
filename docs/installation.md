@@ -86,12 +86,4 @@ The resulting installers will be placed in the `/src-tauri/target/release/bundle
 
 ## 🎮 Gamepad Controller Build
 
-To compile the application with full gamepad support (PlayStation, Xbox, and generic controllers) using the native Rust `gilrs` framework:
-
-```bash
-# Development Mode
-bun run tauri dev -- --features gamepad
-
-# Production Installer
-bun run tauri build -- --features gamepad
-```
+Gamepad support is built into every build via the Web Gamepad API. No special flags needed. Connect a PlayStation, Xbox, or generic controller and it works out of the box.

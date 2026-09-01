@@ -99,11 +99,11 @@ bun run build
 
 ## 🎮 Gamepad Integrations
 
-Tauri compiles with an optional conditional feature flag for gamepad support, drawing input events from the `gilrs` native framework.
+Gamepad input runs entirely in the frontend via the Web Gamepad API.
 
-- Gamepad code is located in `src-tauri/src/gamepad.rs` and `src/gamepad.ts`.
-- It registers an asynchronous system thread during app startup to poll connected hardware.
-- It translates analog joystick vectors to sub-pixel canvas offsets for panning, and trigger values to exponential zoom scales.
+- Gamepad code is located in `src/gamepad.ts`.
+- A `requestAnimationFrame` loop polls connected hardware each frame.
+- It translates analog joystick vectors to sub-pixel canvas offsets for panning, and trigger values to rotate actions.
 
 ---
 

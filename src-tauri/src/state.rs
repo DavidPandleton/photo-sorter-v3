@@ -117,15 +117,9 @@ struct Inner {
     startup_folder: Option<String>,
 }
 
-/// Record ids with an EXIF extraction thread in flight (KB bug #7:
-/// set_current_index used to spawn unbounded duplicate threads).
-/// Shared Arc so the spawned thread can release its claim without
-/// holding AppState itself.
-type ExifInFlight = Arc<Mutex<HashSet<i64>>>;
 
 pub struct AppState {
     inner: Mutex<Inner>,
-    exif_in_flight: ExifInFlight,
     pub image_cache: ImageCache,
 }
 
@@ -145,7 +139,6 @@ impl AppState {
                 project_id: None,
                 startup_folder: None,
             }),
-            exif_in_flight: Arc::new(Mutex::new(HashSet::new())),
             image_cache: ImageCache::new(),
         }
     }
@@ -512,14 +505,6 @@ impl AppState {
         }
     }
 
-    /// Claim a record for EXIF extraction; false if a thread already runs.
-    pub fn claim_exif(&self, record_id: i64) -> bool {
-        self.exif_in_flight.lock().unwrap().insert(record_id)
-    }
-
-    pub fn exif_tracker(&self) -> ExifInFlight {
-        Arc::clone(&self.exif_in_flight)
-    }
 
     pub fn record_for_path(&self, path: &str) -> Option<crate::database::ImageRecord> {
         let (db, pid) = self.db_and_pid()?;
