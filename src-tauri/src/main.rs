@@ -189,7 +189,8 @@ fn set_current_index(state: State<'_, AppState>, index: i32) -> AppResult<()> {
     // EXIF extraction happens in get_image_metadata_info (async, right after
     // navigation). The old background-thread prefetch here raced it: every
     // navigation spawned an unbounded, undeduped thread that re-extracted the
-    // same file (KB bug #7/#8).
+    // same file (KB bug #7/#8). A's async spawn_blocking design supersedes
+    // B's claim_exif dedup: no prefetch thread means nothing to dedup.
     state.set_current_index(index)?;
     Ok(())
 }

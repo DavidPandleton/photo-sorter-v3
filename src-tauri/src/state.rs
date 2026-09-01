@@ -117,6 +117,7 @@ struct Inner {
     startup_folder: Option<String>,
 }
 
+
 pub struct AppState {
     inner: Mutex<Inner>,
     pub image_cache: ImageCache,
@@ -418,21 +419,32 @@ impl AppState {
     }
 
     pub fn delete_current_image(&self) -> AppResult<Option<String>> {
-        let path_str = {
-            let mut g = self.inner.lock().unwrap();
+        let (path_str, idx) = {
+            let g = self.inner.lock().unwrap();
             let idx = g.current_index as usize;
             if g.current_index < 0 || idx >= g.image_paths.len() {
                 return Ok(None);
             }
-            let p = g.image_paths.remove(idx);
-            if idx >= g.image_paths.len() {
+            (g.image_paths[idx].clone(), idx)
+        };
+        // No fs::remove_file fallback: if the trash fails, leave the file
+        // alone and tell the user (KB bug #9: silent permanent delete while
+        // the toast claimed "moved to Trash"). The path list is only mutated
+        // after the delete succeeds, so a failure keeps the image visible.
+        if Path::new(&path_str).exists() {
+            trash::delete(&path_str)
+                .map_err(|e| AppError::msg(format!("Failed to move to trash: {}", e)))?;
+        }
+        {
+            let mut g = self.inner.lock().unwrap();
+            // Re-check: the index may have moved between the two locks.
+            let idx = g.image_paths.iter().position(|p| p == &path_str).unwrap_or(idx);
+            if idx < g.image_paths.len() {
+                g.image_paths.remove(idx);
+            }
+            if g.current_index as usize >= g.image_paths.len() {
                 g.current_index = (g.image_paths.len() as i32 - 1).max(0);
             }
-            p
-        };
-        let path = Path::new(&path_str);
-        if path.exists() && trash::delete(path).is_err() {
-            std::fs::remove_file(path).map_err(|e| AppError::msg(format!("Failed to delete file: {}", e)))?;
         }
         // The row survives sync until the next folder load; just drop the rating.
         if let Some((db, pid)) = self.db_and_pid() {
@@ -492,6 +504,7 @@ impl AppState {
             None => 0,
         }
     }
+
 
     pub fn record_for_path(&self, path: &str) -> Option<crate::database::ImageRecord> {
         let (db, pid) = self.db_and_pid()?;
