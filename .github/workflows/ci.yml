@@ -100,6 +100,25 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Extract changelog section for this tag
+        id: changelog
+        shell: bash
+        run: |
+          # Pull the "## <tag>" section out of CHANGELOG.md; fall back to the
+          # compare link if the tag has no entry yet (KB bug #23: release body
+          # was hardcoded to v3.1.0 text forever).
+          TAG="${GITHUB_REF_NAME}"
+          awk -v tag="$TAG" '
+            $0 ~ "^## "tag { grab=1; next }
+            grab && /^## / { exit }
+            grab { print }
+          ' CHANGELOG.md > section.txt
+          if [ -s section.txt ]; then
+            { echo "section<<EOF_SECTION"; cat section.txt; echo "EOF_SECTION"; } >> "$GITHUB_OUTPUT"
+          else
+            echo "section=See the [full changes](https://github.com/${GITHUB_REPOSITORY}/compare/main...${TAG}) and commit log for this release." >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build Tauri App
         id: tauri
         uses: tauri-apps/tauri-action@v0.6.2
@@ -111,12 +130,8 @@ jobs:
           releaseBody: |
             **Manual culling, keyboard-fast. Zero AI.**
 
-            ### v3.1.0 — Changes
-            - **JPG performance**: Fast-path dimension check skips full decode for small images
-            - **Cross-platform**: Proper Cmd/Ctrl key handling on macOS, trash fallback, CI builds for all platforms
-            - **RAW handling**: Optimized preview extraction for non-RAW files
-            - **Info panel**: EXIF data, filename, dimensions
-            - **UI**: Better HUD, settings persistence, toast positions
+            ### Changes
+            ${{ steps.changelog.outputs.section }}
 
             ### Downloads
             | Platform | Asset |
