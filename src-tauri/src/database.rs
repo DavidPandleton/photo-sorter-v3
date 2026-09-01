@@ -170,6 +170,7 @@ pub struct HudItemRecord {
 
 pub struct PhotoDatabase {
     conn: Mutex<Connection>,
+    path: PathBuf,
 }
 
 impl PhotoDatabase {
@@ -177,19 +178,29 @@ impl PhotoDatabase {
         let parent = db_path.as_ref().parent().unwrap();
         std::fs::create_dir_all(parent).unwrap_or(());
         
-        let conn = Connection::open(db_path)?;
+        let db_path = db_path.as_ref().to_path_buf();
+        let conn = Connection::open(&db_path)?;
         
-        // WAL mode for parallel speed
+        // WAL mode for parallel speed; busy_timeout so a second connection
+        // (e.g. the thumbnail batch writer, KB bug #6) waits out the rare
+        // writer-writer conflict inside SQLite instead of failing busy.
         conn.execute_batch("
             PRAGMA journal_mode=WAL;
             PRAGMA foreign_keys=ON;
+            PRAGMA busy_timeout=5000;
         ")?;
         
         let db = PhotoDatabase {
             conn: Mutex::new(conn),
+            path: db_path,
         };
         db.init_db()?;
         Ok(db)
+    }
+
+    /// File this database is backed by (for opening a second connection).
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     fn init_db(&self) -> Result<()> {
@@ -757,6 +768,25 @@ mod tests {
     fn seed_image(db: &PhotoDatabase, pid: i64, path: &str) -> ImageRecord {
         db.sync_images(pid, &[path.to_string()]).unwrap();
         db.get_image_by_path(pid, path).unwrap().unwrap()
+    }
+
+    #[test]
+    fn second_connection_sees_first_writers() {
+        // KB bug #6: the thumbnail batch runs on its own PhotoDatabase
+        // handle. Two handles to the same WAL file must share data.
+        let (db, db_path) = setup_db();
+        let pid = db.get_or_create_project("/test/dual").unwrap();
+        db.sync_images(pid, &["/test/dual/a.jpg".to_string()]).unwrap();
+
+        let db2 = PhotoDatabase::new(&db_path).unwrap();
+        let imgs = db2.get_images(pid).unwrap();
+        assert_eq!(imgs.len(), 1);
+
+        // write through handle 2, read back through handle 1
+        db2.set_rating(imgs[0].id, Some("keeper")).unwrap();
+        let rec = db.get_image_by_path(pid, "/test/dual/a.jpg").unwrap().unwrap();
+        assert_eq!(rec.rating.as_deref(), Some("keeper"));
+        let _ = std::fs::remove_file(&db_path);
     }
 
     #[test]
