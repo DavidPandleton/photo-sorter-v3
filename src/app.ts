@@ -6,10 +6,11 @@ import { PhotoViewer } from './viewer';
 import { ImageCacheManager } from './cache';
 import { FilmstripBuilder } from './filmstrip';
 import { GamepadHandler } from './gamepad';
+import { BrowserPanel } from './browser';
 import { SettingsModal } from './settings';
 import { COLOR_UNRATE_FLASH } from './constants';
 import type {
-  CategoryRecord, DateRecord, HudItemRecord, ImageRecord,
+  CategoryRecord, HudItemRecord, ImageRecord,
   KeybindingRecord, Project, ProjectStats,
 } from './types';
 import {
@@ -30,7 +31,6 @@ class PhotoSorterApp {
   private rootFolder: string = '';
   private isProcessingRating: boolean = false;
   private isNavigating: boolean = false;
-  private isSidePanelRight: boolean = false;
   private isCompareMode: boolean = false;
   private ratedPaths: Set<string> = new Set();
   private filterMode: string = 'all';
@@ -40,6 +40,7 @@ class PhotoSorterApp {
   private keybindings: Map<string, string> = new Map();
   private hudItems: HudItemRecord[] = [];
   private settings: SettingsModal;
+  private browser: BrowserPanel;
 
   constructor() {
     this.viewer = new PhotoViewer('photo-canvas');
@@ -61,6 +62,10 @@ class PhotoSorterApp {
         this.updateHUDControls();
       },
       refreshHUD: () => this.updateHUDControls(),
+    });
+    this.browser = new BrowserPanel({
+      onFilter: (t, f, d, m) => this.updateFilters(t, f, d, m),
+      onResize: () => this.viewer.resizeCanvas(),
     });
     this.gamepad = new GamepadHandler({
       rateGood: () => {
@@ -104,8 +109,8 @@ class PhotoSorterApp {
     document.getElementById('btn-restore-checkpoint')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-exit-app')?.addEventListener('click', () => this.exitApp());
     document.getElementById('btn-back')?.addEventListener('click', () => this.confirmReturnToMenu());
-    document.getElementById('btn-toggle-browser')?.addEventListener('click', () => this.toggleBrowser());
-    document.getElementById('btn-toggle-side')?.addEventListener('click', () => this.togglePanelSide());
+    document.getElementById('btn-toggle-browser')?.addEventListener('click', () => this.browser.toggleBrowser());
+    document.getElementById('btn-toggle-side')?.addEventListener('click', () => this.browser.togglePanelSide());
     document.getElementById('btn-top-restore')?.addEventListener('click', () => this.restoreCheckpoint());
     document.getElementById('btn-finish-export')?.addEventListener('click', () => this.finishSorting());
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
@@ -192,8 +197,8 @@ class PhotoSorterApp {
       document.getElementById('menu-screen')?.classList.remove('active');
       document.getElementById('workspace-screen')?.classList.add('active');
       this.viewer.resizeCanvas();
-      this.buildFolderTree(folderPath);
-      this.loadDateHierarchy();
+      this.browser.buildFolderTree(folderPath, this.imagePaths);
+      this.browser.loadDateHierarchy();
       await this.navigateImage(0);
       this.filmstrip.rebuild(this.imagePaths, (i) => this.navigateImage(i));
       showToast(`Loaded ${count} images successfully!`, 'GOOD');
@@ -453,133 +458,6 @@ class PhotoSorterApp {
 
   private exitApp() {
     getCurrentWindow().close().catch(() => window.close());
-  }
-
-  private toggleBrowser() {
-    const panel = document.getElementById('side-panel');
-    const btn = document.getElementById('btn-toggle-browser');
-    if (panel && btn) {
-      const isVisible = panel.style.display !== 'none';
-      panel.style.display = isVisible ? 'none' : 'flex';
-      btn.classList.toggle('active');
-      this.viewer.resizeCanvas();
-    }
-  }
-
-  private togglePanelSide() {
-    const panel = document.getElementById('side-panel');
-    const btn = document.getElementById('btn-toggle-side');
-    if (panel && btn) {
-      this.isSidePanelRight = !this.isSidePanelRight;
-      if (this.isSidePanelRight) { panel.className = 'side-panel-right'; btn.textContent = '◀'; }
-      else { panel.className = 'side-panel-left'; btn.textContent = '▶'; }
-      this.viewer.resizeCanvas();
-    }
-  }
-
-  private buildFolderTree(rootPath: string) {
-    const container = document.getElementById('folder-tree');
-    if (!container) return;
-    container.innerHTML = '';
-    const rootName = rootPath.split(/[/\\]/).pop() || rootPath;
-    const rootNode = this.createTreeNode(rootName, rootPath, true);
-    container.appendChild(rootNode);
-
-    const directories = new Set<string>();
-    for (const p of this.imagePaths) {
-      const relative = p.substring(rootPath.length + 1);
-      const parts = relative.split(/[/\\]/); parts.pop();
-      let accum = rootPath;
-      for (const part of parts) { accum = accum + '/' + part; directories.add(accum); }
-    }
-
-    const sortedDirs = Array.from(directories).sort();
-    const treeMap: Record<string, HTMLElement> = { [rootPath]: rootNode.querySelector('.tree-children') as HTMLElement };
-    for (const dir of sortedDirs) {
-      const parentDir = dir.substring(0, dir.lastIndexOf('/'));
-      const dirName = dir.substring(dir.lastIndexOf('/') + 1);
-      const node = this.createTreeNode(dirName, dir, false);
-      const parentChildren = treeMap[parentDir] || treeMap[rootPath];
-      if (parentChildren) { parentChildren.appendChild(node); treeMap[dir] = node.querySelector('.tree-children') as HTMLElement; }
-    }
-  }
-
-  private createTreeNode(name: string, path: string, isRoot: boolean): HTMLElement {
-    const item = document.createElement('div');
-    item.className = 'tree-item';
-    item.setAttribute('data-node-path', path);
-    const row = document.createElement('div');
-    row.className = 'tree-row';
-    if (isRoot) row.classList.add('selected');
-    const arrow = document.createElement('span');
-    arrow.className = 'tree-arrow expanded';
-    arrow.textContent = '▶';
-    const icon = document.createElement('span');
-    icon.className = 'tree-icon';
-    icon.textContent = isRoot ? '💻' : '📁';
-    const text = document.createElement('span');
-    text.textContent = name;
-    row.appendChild(arrow); row.appendChild(icon); row.appendChild(text);
-    item.appendChild(row);
-    const children = document.createElement('div');
-    children.className = 'tree-children expanded';
-    item.appendChild(children);
-    arrow.addEventListener('click', (e) => { e.stopPropagation(); children.classList.toggle('expanded'); arrow.classList.toggle('expanded'); });
-    row.addEventListener('click', () => {
-      document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('selected'));
-      row.classList.add('selected');
-      this.updateFilters('', path, '', '');
-    });
-    return item;
-  }
-
-  private async loadDateHierarchy() {
-    const container = document.getElementById('date-tree');
-    const dateWidget = document.getElementById('date-widget');
-    if (!container || !dateWidget) return;
-    try {
-      const dates = await invoke<DateRecord[]>('get_date_hierarchy');
-      if (dates.length === 0) { dateWidget.style.display = 'none'; return; }
-      dateWidget.style.display = 'flex';
-      container.innerHTML = '';
-      const yearsMap: Record<string, HTMLElement> = {};
-      const monthsMap: Record<string, HTMLElement> = {};
-      for (const d of dates) {
-        const yKey = d.year; const mKey = `${d.year}-${d.month}`;
-        if (!yearsMap[yKey]) { const yNode = this.createDateNode(d.year, d.year, '📅'); container.appendChild(yNode); yearsMap[yKey] = yNode.querySelector('.tree-children') as HTMLElement; }
-        if (!monthsMap[mKey]) { const mNode = this.createDateNode(d.month, `${d.year}-${d.month}`, '🌙'); yearsMap[yKey].appendChild(mNode); monthsMap[mKey] = mNode.querySelector('.tree-children') as HTMLElement; }
-        const dayText = `${d.year}-${d.month}-${d.day}`;
-        const dayNode = this.createDateNode(d.day, dayText, '☀️');
-        monthsMap[mKey].appendChild(dayNode);
-      }
-    } catch (err) { console.error(err); }
-  }
-
-  private createDateNode(name: string, filterValue: string, iconChar: string): HTMLElement {
-    const item = document.createElement('div');
-    item.className = 'tree-item';
-    const row = document.createElement('div');
-    row.className = 'tree-row';
-    const arrow = document.createElement('span');
-    arrow.className = 'tree-arrow expanded';
-    arrow.textContent = '▶';
-    const icon = document.createElement('span');
-    icon.className = 'tree-icon';
-    icon.textContent = iconChar;
-    const text = document.createElement('span');
-    text.textContent = name;
-    row.appendChild(arrow); row.appendChild(icon); row.appendChild(text);
-    item.appendChild(row);
-    const children = document.createElement('div');
-    children.className = 'tree-children expanded';
-    item.appendChild(children);
-    arrow.addEventListener('click', (e) => { e.stopPropagation(); children.classList.toggle('expanded'); arrow.classList.toggle('expanded'); });
-    row.addEventListener('click', () => {
-      document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('selected'));
-      row.classList.add('selected');
-      this.updateFilters('', '', filterValue, '');
-    });
-    return item;
   }
 
   private initKeyboardBinds() {
