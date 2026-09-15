@@ -230,3 +230,54 @@ pub fn generate_thumbnail<P: AsRef<Path>>(file_path: P, target_height: u32) -> O
     
     Some((jpeg_bytes, blur_score))
 }
+
+/// Wire format for `get_thumbnail_data` raw IPC responses:
+/// [8 bytes LE f64 blur_score][JPEG bytes...]
+/// Keeps the payload a single binary buffer instead of JSON number arrays.
+pub fn encode_thumb_response(jpeg: Vec<u8>, blur_score: f64) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(8 + jpeg.len());
+    buf.extend_from_slice(&blur_score.to_le_bytes());
+    buf.extend_from_slice(&jpeg);
+    buf
+}
+
+/// Inverse of [`encode_thumb_response`]. Exposed for tests and any future
+/// consumer that reads the raw IPC payload.
+pub fn decode_thumb_response(buf: &[u8]) -> Option<(f64, &[u8])> {
+    if buf.len() < 8 {
+        return None;
+    }
+    let mut score_bytes = [0u8; 8];
+    score_bytes.copy_from_slice(&buf[..8]);
+    Some((f64::from_le_bytes(score_bytes), &buf[8..]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn thumb_response_roundtrip() {
+        let jpeg = vec![0xFF, 0xD8, 0x00, 0x42, 0xFF, 0xD9];
+        let encoded = encode_thumb_response(jpeg.clone(), 123.456);
+        assert_eq!(encoded.len(), 8 + jpeg.len());
+        let (score, bytes) = decode_thumb_response(&encoded).unwrap();
+        assert!((score - 123.456).abs() < f64::EPSILON);
+        assert_eq!(bytes, &jpeg[..]);
+    }
+
+    #[test]
+    fn thumb_response_rejects_truncated() {
+        assert!(decode_thumb_response(&[0u8; 7]).is_none());
+    }
+
+    #[test]
+    fn thumb_response_handles_negative_zero_and_nan_scores() {
+        // blur scores are variances (>= 0) but the codec must not panic on odd values
+        for score in [0.0, -0.0, f64::MAX] {
+            let encoded = encode_thumb_response(vec![1, 2, 3], score);
+            let (decoded, _) = decode_thumb_response(&encoded).unwrap();
+            assert_eq!(decoded.to_bits(), score.to_bits());
+        }
+    }
+}

@@ -1,21 +1,23 @@
 {
   "name": "photo-sorter-v3-frontend",
   "private": true,
-  "version": "3.1.0",
+  "version": "3.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run",
     "preview": "vite preview",
     "tauri": "node_modules/.bin/tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0-rc.0",
-    "@tauri-apps/plugin-dialog": "^2.0.0-rc.0"
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0-rc.0",
+    "@tauri-apps/cli": "^2.11.2",
     "typescript": "^5.0.2",
-    "vite": "^4.4.5"
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
   }
 }

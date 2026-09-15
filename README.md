@@ -124,14 +124,13 @@ For developers who want to compile or contribute:
 ```bash
 git clone https://github.com/DavidPandleton/photo-sorter-v3.git
 cd photo-sorter-v3
-bun install
-bun run tauri build
+npm install
+npm run tauri build
 ```
 
 Binary output: `src-tauri/target/release/photo-sorter-v3` (or `.exe` on Windows).
 
-Gamepad support is built-in via the Web Gamepad API — no special flags needed.
-Enable the Rust `gilrs` backend for rumble support: `bun run tauri build -- --features gamepad`
+Gamepad support is built-in via the Web Gamepad API. No special flags or optional features needed.
 
 ---
 

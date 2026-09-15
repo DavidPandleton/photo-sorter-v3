@@ -3,6 +3,24 @@
    Rich, dark, glassmorphic developer-focused visual identity.
    ========================================================================== */
 
+/* --- Self-hosted variable fonts (latin subset, offline-safe) --- */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/inter-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/outfit-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* --- Design System Variables --- */
 :root {
   --font-display: 'Outfit', 'Inter', -apple-system, sans-serif;
@@ -665,7 +683,9 @@ input, button {
   align-items: center;
 }
 
-/* Thumbnail Item Card */
+/* Thumbnail Item Card
+   width + container gap (12px) = THUMB_ITEM_WIDTH in src/constants.ts.
+   Change both together or virtual scroll drifts (bug #16). */
 .thumbnail-item {
   width: 150px;
   height: 100%;
@@ -829,6 +849,22 @@ input, button {
   font-size: 14px;
   line-height: 1.6;
   margin-bottom: 24px;
+}
+
+.dialog-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--text-primary, #e5e7eb);
+  font-size: 14px;
+  outline: none;
+}
+.dialog-input:focus {
+  border-color: var(--accent-teal, #2dd4bf);
 }
 
 .dialog-actions {
