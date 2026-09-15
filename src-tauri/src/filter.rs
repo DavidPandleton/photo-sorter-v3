@@ -41,14 +41,14 @@ impl AppState {
 
 #[cfg(test)]
 mod tests {
-    use crate::state::test_util::{cleanup, project_with_files};
+    use crate::state::test_util::{cleanup, norm_path, project_with_files};
 
     #[test]
     fn unrated_mode_excludes_db_ratings_across_sessions() {
         // KB bug #5 regression: 'unrated' used to consult an in-memory map
         // that was empty in a fresh session, showing rated images again.
         let (state, root) = project_with_files(&[("a.jpg", b"A"), ("b.jpg", b"B")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
         state.rate_image(&a, Some("good")).unwrap();
         let (ta, fa, da, _) = state.filter_values();
         state.set_filter_values(&ta, &fa, &da, "unrated");
@@ -93,7 +93,7 @@ mod tests {
         let (state, root) = project_with_files(&[("a.jpg", b"A"), ("b.jpg", b"B"), ("c.jpg", b"C")]);
         state.apply_filters(); // populate image_paths from the DB
         state.set_current_index(2).unwrap(); // last image
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
         state.rate_image(&a, Some("good")).unwrap();
         state.set_filter_values("", "", "", "unrated");
         state.apply_filters();

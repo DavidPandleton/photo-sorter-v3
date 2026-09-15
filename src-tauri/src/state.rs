@@ -571,8 +571,12 @@ pub(crate) mod test_util {
     /// load_images so no background thumbnail thread races the assertions.
     pub fn project_with_files(files: &[(&str, &[u8])]) -> (AppState, PathBuf) {
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let root = std::env::temp_dir().join(format!("psort_test_{}_{}", std::process::id(), n));
+        let mut root = std::env::temp_dir().join(format!("psort_test_{}_{}", std::process::id(), n));
         fs::create_dir_all(&root).unwrap();
+        // Mirror production normalization: load_images canonicalizes the root
+        // and stores forward-slash paths. Raw temp_dir() strings on Windows
+        // can carry 8.3 short names (RUNNER~1) that never exact-match.
+        root = root.canonicalize().unwrap();
         let mut paths = Vec::new();
         for (name, content) in files {
             let p = root.join(name);
@@ -580,7 +584,7 @@ pub(crate) mod test_util {
                 fs::create_dir_all(parent).unwrap();
             }
             fs::write(&p, content).unwrap();
-            paths.push(p.to_string_lossy().into_owned());
+            paths.push(p.to_string_lossy().replace('\\', "/"));
         }
         let db = PhotoDatabase::new(root.join(".test.db")).unwrap();
         let pid = db.get_or_create_project(&root.to_string_lossy()).unwrap();
@@ -593,17 +597,24 @@ pub(crate) mod test_util {
     pub fn cleanup(root: &Path) {
         let _ = fs::remove_dir_all(root);
     }
+
+    /// Normalize a test-built path to the form the app stores and compares
+    /// (forward slashes; see load_images). Exact-match lookups such as
+    /// rate_image compare raw strings, so tests must pass the same form.
+    pub fn norm_path(p: &std::path::Path) -> String {
+        p.to_string_lossy().replace('\\', "/")
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::test_util::{cleanup, project_with_files};
+    use super::test_util::{cleanup, norm_path, project_with_files};
     use super::*;
 
     #[test]
     fn rate_then_undo_restores_previous_rating() {
         let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
 
         // ratings store the raw category key_name; only export maps it to
         // the uppercase folder name.
@@ -629,7 +640,7 @@ mod tests {
     #[test]
     fn rating_is_persisted_to_db() {
         let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
         state.rate_image(&a, Some("ok")).unwrap();
         let (db, pid) = state.db_and_pid().unwrap();
         let rec = db.get_image_by_path(pid, &a).unwrap().unwrap();
@@ -640,7 +651,7 @@ mod tests {
     #[test]
     fn rotation_wraps_mod_360_both_directions() {
         let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
         assert_eq!(state.set_rotation(&a, 1).unwrap(), 90); // cw
         assert_eq!(state.set_rotation(&a, 1).unwrap(), 180);
         assert_eq!(state.set_rotation(&a, 1).unwrap(), 270);
@@ -653,7 +664,7 @@ mod tests {
     #[test]
     fn star_rating_toggles_off_when_same_value() {
         let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
         assert_eq!(state.set_star_rating(&a, 3).unwrap(), 3);
         assert_eq!(state.set_star_rating(&a, 3).unwrap(), 0); // same -> clear
         cleanup(&root);
@@ -674,6 +685,11 @@ mod tests {
         fs::write(root.join("vacation/notes.txt"), b"3").unwrap(); // filtered out
         fs::write(root.join("GOOD/already.jpg"), b"4").unwrap(); // category dir skipped
 
+        // load_images canonicalizes the root and stores forward-slash paths;
+        // mirror that here (Windows temp dirs can use 8.3 short names, e.g.
+        // RUNNER~1, which would not exact-match the raw temp_dir() form).
+        let root = root.canonicalize().unwrap();
+
         let state = AppState::new();
         let count = state
             .load_images(root.join(".db").clone(), &root.to_string_lossy())
@@ -687,7 +703,7 @@ mod tests {
         }
 
         // rate, then reload: the DB is the source of truth, ratings come back
-        let one = root.join("vacation/one.jpg").to_string_lossy().into_owned();
+        let one = norm_path(&root.join("vacation/one.jpg"));
         state.rate_image(&one, Some("good")).unwrap();
         assert_eq!(
             state
@@ -704,7 +720,7 @@ mod tests {
         // KB bug #4 regression: writing a rating for a path that is not in
         // the project must fail WITHOUT pushing an undo entry.
         let (state, root) = project_with_files(&[("a.jpg", b"AAA")]);
-        let ghost = root.join("nope.jpg").to_string_lossy().into_owned();
+        let ghost = norm_path(&root.join("nope.jpg"));
         assert!(state.rate_image(&ghost, Some("good")).is_err());
         assert_eq!(state.undo_last_rating().unwrap(), None);
         cleanup(&root);
