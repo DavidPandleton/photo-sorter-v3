@@ -336,12 +336,15 @@ impl AppState {
     pub fn load_images(&self, db_path: PathBuf, root: &str) -> AppResult<usize> {
         self.reset();
         let path = PathBuf::from(root);
-        let root_abs = path
-            .canonicalize()
-            ?
-            .to_string_lossy()
-            .into_owned()
-            .replace('\\', "/");
+        let mut root_abs = path.canonicalize()?.to_string_lossy().into_owned();
+        // Windows canonicalize returns a verbatim path ("\\?\C:\..."). The
+        // NT verbatim namespace splits only on backslash, so verbatim paths
+        // with forward slashes fail every fs call (export would silently
+        // skip files). Strip the prefix so stored paths are normal strings.
+        if let Some(stripped) = root_abs.strip_prefix(r"\\?\") {
+            root_abs = stripped.to_string();
+        }
+        root_abs = root_abs.replace('\\', "/");
 
         let mut paths = Vec::new();
         let exts = constants::SUPPORTED_EXTENSIONS;
@@ -573,10 +576,12 @@ pub(crate) mod test_util {
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
         let mut root = std::env::temp_dir().join(format!("psort_test_{}_{}", std::process::id(), n));
         fs::create_dir_all(&root).unwrap();
-        // Mirror production normalization: load_images canonicalizes the root
-        // and stores forward-slash paths. Raw temp_dir() strings on Windows
-        // can carry 8.3 short names (RUNNER~1) that never exact-match.
+        // Mirror production normalization: load_images canonicalizes the root,
+        // strips the Windows verbatim prefix, and stores forward-slash paths.
+        // Raw temp_dir() strings on Windows can carry 8.3 short names
+        // (RUNNER~1) that never exact-match.
         root = root.canonicalize().unwrap();
+        root = PathBuf::from(root.to_string_lossy().trim_start_matches(r"\\?\"));
         let mut paths = Vec::new();
         for (name, content) in files {
             let p = root.join(name);
@@ -599,10 +604,13 @@ pub(crate) mod test_util {
     }
 
     /// Normalize a test-built path to the form the app stores and compares
-    /// (forward slashes; see load_images). Exact-match lookups such as
-    /// rate_image compare raw strings, so tests must pass the same form.
+    /// (no verbatim prefix, forward slashes; see load_images). Exact-match
+    /// lookups such as rate_image compare raw strings, so tests must pass
+    /// the same form.
     pub fn norm_path(p: &std::path::Path) -> String {
-        p.to_string_lossy().replace('\\', "/")
+        p.to_string_lossy()
+            .trim_start_matches(r"\\?\")
+            .replace('\\', "/")
     }
 }
 
@@ -685,11 +693,12 @@ mod tests {
         fs::write(root.join("vacation/notes.txt"), b"3").unwrap(); // filtered out
         fs::write(root.join("GOOD/already.jpg"), b"4").unwrap(); // category dir skipped
 
-        // load_images canonicalizes the root and stores forward-slash paths;
-        // mirror that here (Windows temp dirs can use 8.3 short names, e.g.
-        // RUNNER~1, which would not exact-match the raw temp_dir() form).
+        // load_images canonicalizes the root, strips the Windows verbatim
+        // prefix, and stores forward-slash paths; mirror that here (raw
+        // temp_dir() strings can use 8.3 short names, e.g. RUNNER~1, which
+        // would not exact-match the stored form).
         let root = root.canonicalize().unwrap();
-
+        let root = PathBuf::from(root.to_string_lossy().trim_start_matches(r"\\?\"));
         let state = AppState::new();
         let count = state
             .load_images(root.join(".db").clone(), &root.to_string_lossy())

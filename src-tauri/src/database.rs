@@ -314,7 +314,13 @@ impl PhotoDatabase {
     pub fn get_or_create_project(&self, root_path: &str) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let path_norm = PathBuf::from(root_path).canonicalize().unwrap_or_else(|_| PathBuf::from(root_path));
-        let root_str = path_norm.to_string_lossy().into_owned();
+        let mut root_str = path_norm.to_string_lossy().into_owned();
+        // Windows canonicalize returns a verbatim path ("\\?\C:\..."); strip
+        // the prefix so project rows share the same plain form as the image
+        // paths stored by load_images.
+        if let Some(stripped) = root_str.strip_prefix(r"\\?\") {
+            root_str = stripped.to_string();
+        }
         
         let project_id: Option<i64> = conn
             .query_row(
