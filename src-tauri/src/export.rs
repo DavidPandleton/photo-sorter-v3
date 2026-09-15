@@ -208,7 +208,7 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::test_util::{cleanup, project_with_files};
+    use crate::state::test_util::{cleanup, norm_path, project_with_files};
 
     fn read(p: &Path) -> Vec<u8> {
         fs::read(p).unwrap()
@@ -217,8 +217,8 @@ mod tests {
     #[test]
     fn finish_sorting_moves_rated_into_category_folders() {
         let (state, root) = project_with_files(&[("a.jpg", b"AAA"), ("b.jpg", b"BBB")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
-        let b = root.join("b.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
+        let b = norm_path(&root.join("b.jpg"));
         state.rate_image(&a, Some("good")).unwrap();
         state.rate_image(&b, Some("bad")).unwrap();
 
@@ -239,7 +239,7 @@ mod tests {
         let (state, root) = project_with_files(&[("a.jpg", b"NEW")]);
         fs::create_dir_all(root.join("GOOD")).unwrap();
         fs::write(root.join("GOOD/a.jpg"), b"OLD").unwrap();
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
         state.rate_image(&a, Some("good")).unwrap();
 
         let (moved, _) = state.finish_sorting().unwrap();
@@ -259,8 +259,8 @@ mod tests {
     #[test]
     fn restore_reverses_a_full_export() {
         let (state, root) = project_with_files(&[("a.jpg", b"AAA"), ("sub/b.jpg", b"BBB")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
-        let b = root.join("sub/b.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
+        let b = norm_path(&root.join("sub/b.jpg"));
         state.rate_image(&a, Some("good")).unwrap();
         state.rate_image(&b, Some("ok")).unwrap();
         state.finish_sorting().unwrap();
@@ -280,7 +280,7 @@ mod tests {
         // After export, the user drops a fresh file where the old one lived.
         // Restore must skip that op rather than silently overwrite it.
         let (state, root) = project_with_files(&[("a.jpg", b"ORIGINAL")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
         state.rate_image(&a, Some("good")).unwrap();
         state.finish_sorting().unwrap();
         fs::write(root.join("a.jpg"), b"USER_NEW").unwrap();
@@ -299,8 +299,8 @@ mod tests {
         // finish_sorting, restore must leave it alone instead of putting a
         // corrupted file back at the original path.
         let (state, root) = project_with_files(&[("a.jpg", b"AAA"), ("b.jpg", b"BBB")]);
-        let a = root.join("a.jpg").to_string_lossy().into_owned();
-        let b = root.join("b.jpg").to_string_lossy().into_owned();
+        let a = norm_path(&root.join("a.jpg"));
+        let b = norm_path(&root.join("b.jpg"));
         state.rate_image(&a, Some("good")).unwrap();
         state.rate_image(&b, Some("good")).unwrap();
         state.finish_sorting().unwrap();
