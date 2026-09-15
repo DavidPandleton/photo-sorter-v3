@@ -77,7 +77,10 @@ describe('color helpers', () => {
 
 describe('fmtShortcut', () => {
   it('expands modifier abbreviations', () => {
-    expect(fmtShortcut('Ctrl+Z')).toContain('Ctrl');
+    // ui.ts maps Ctrl+ to Cmd+ when navigator.platform is macOS; assert the
+    // platform-appropriate form so this suite stays green on every runner.
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    expect(fmtShortcut('Ctrl+Z')).toBe(isMac ? 'Cmd+Z' : 'Ctrl+Z');
     expect(fmtShortcut('None')).toBe('None');
   });
 });
